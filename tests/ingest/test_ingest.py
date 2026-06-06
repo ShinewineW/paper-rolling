@@ -3,7 +3,51 @@ import json
 import pytest
 from conftest import write_mineru_output
 from scripts.ingest.contract import sha256_bytes
-from scripts.ingest.ingest import IngestFailed, ingest, quarantine
+from scripts.ingest.ingest import IngestFailed, _paper_id, ingest, quarantine
+
+
+def test_paper_id_doi_only_candidate_is_not_none(tmp_path):
+    """Codex R21: a non-arXiv (DOI-only) candidate must NOT build a `None_...`
+    corpus id — it gets a stable doi-hash identity."""
+    doi_only = {"arxiv_id": None, "doi": "10.1109/CVPR.2022.01164", "title": "Venue Paper"}
+    pid = _paper_id(doi_only)
+    assert not pid.startswith("None")
+    assert pid.startswith("doi-")
+    assert pid.endswith("_VenuePaper")
+    # arXiv candidates keep the version-aware id.
+    arxiv = {"arxiv_id": "2403.12345", "arxiv_version": "v2", "doi": None, "title": "ArxivPaper"}
+    assert _paper_id(arxiv) == "2403.12345v2_ArxivPaper"
+
+
+def test_ingest_derives_arxiv_pdf_url_when_oa_pdf_url_missing(
+    tmp_path, fake_http, fake_cli, candidate
+):
+    """Codex R21: an HF-discovered arXiv candidate may carry oa_pdf_url=None; when
+    Tier-1 is unavailable, Tier-2 must DERIVE the arXiv PDF URL rather than fail."""
+    aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
+    candidate = {**candidate, "oa_pdf_url": None}  # HF-style: no OA pdf url
+    derived = f"https://arxiv.org/pdf/{aid}{ver}"
+    fake_http.add(f"https://arxiv.org/html/{aid}{ver}", 404, b"")  # Tier-1 unavailable
+    fake_http.add(derived, 200, b"%PDF body")  # derived arXiv PDF URL
+
+    def mineru(argv, cwd):
+        from pathlib import Path
+
+        out = argv[argv.index("-o") + 1]
+        write_mineru_output(
+            Path(cwd, out),
+            md="# T\n$$a$$\n",
+            images=["x.png"],
+            content_list='[{"type":"equation"}]',
+        )
+
+    fake_cli.program(returncode=0, side_effect=mineru)
+
+    res = ingest(candidate, tmp_path, http=fake_http, run_cli=fake_cli, now=_now)
+
+    assert res.tier == 2
+    assert derived in fake_http.requested  # the derived arXiv PDF URL was fetched
+
 
 FIXED_NOW = "2026-06-05T12:00:00+00:00"
 

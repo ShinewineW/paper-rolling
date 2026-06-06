@@ -65,8 +65,13 @@ def dedup_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Collapse duplicate candidates across sources into one record each.
 
     Two passes: (1) exact-key folding on DOI then arxiv_id@version; (2) a
-    title-similarity sweep over the survivors for records that carry neither
-    a DOI nor an arxiv id.
+    title-similarity consolidation over ALL survivors + keyless records that
+    merges same-paper records exact-key folding missed — notably a DOI-only
+    record (OpenAlex) and an arXiv-only record (arXiv/HF) of the same paper,
+    which carry DIFFERENT key types and so never collide in pass 1 (Codex R21).
+    Two survivors are merged only when their titles match AND they share no
+    CONFLICTING hard identifier (same-typed but different DOI / arxiv id ⇒ kept
+    apart, since those are genuinely different papers or versions).
     """
     by_key: dict[str, dict[str, Any]] = {}
     no_key: list[dict[str, Any]] = []
@@ -80,23 +85,36 @@ def dedup_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             by_key[key] = dict(cand)
 
-    survivors = list(by_key.values())
-
-    # Title-similarity sweep for keyless records (and fold them into a keyed
-    # survivor when titles match, else into each other).
-    for cand in no_key:
+    # Title-similarity consolidation over the keyed survivors + keyless records.
+    consolidated: list[dict[str, Any]] = []
+    for cand in list(by_key.values()) + no_key:
         match = None
-        for existing in survivors:
-            if _titles_match(cand, existing):
+        for existing in consolidated:
+            if _keys_compatible(cand, existing) and _titles_match(cand, existing):
                 match = existing
                 break
         if match is not None:
-            merged = merge_pair(match, cand)
-            survivors[survivors.index(match)] = merged
+            consolidated[consolidated.index(match)] = merge_pair(match, cand)
         else:
-            survivors.append(dict(cand))
+            consolidated.append(dict(cand))
 
-    return survivors
+    return consolidated
+
+
+def _keys_compatible(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    """True unless a and b carry a CONFLICTING hard identifier of the same type.
+
+    A DOI-only record and an arXiv-only record can be the same paper (compatible);
+    two different DOIs — or two different arxiv ids INCLUDING version — cannot, so
+    they are never title-merged. Comparing the versioned arxiv id preserves the
+    v1≠v2 distinctness the dedup key relies on (a revision must stay separate).
+    """
+    ad, bd = (a.get("doi") or "").lower(), (b.get("doi") or "").lower()
+    if ad and bd and ad != bd:
+        return False
+    aa = (a.get("arxiv_id") or "") + (a.get("arxiv_version") or "")
+    ba = (b.get("arxiv_id") or "") + (b.get("arxiv_version") or "")
+    return not (aa and ba and aa != ba)
 
 
 def _titles_match(a: dict[str, Any], b: dict[str, Any]) -> bool:

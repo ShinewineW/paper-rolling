@@ -178,11 +178,12 @@ ruff" is the validation gate.
    PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.run_campaign
    ```
 
-4. **`/paper-landscape-invalidate` — force-reprocess CLI** (`scripts/ledger/store.py`).
-   Soft-deletes ledger rows so a paper is reprocessed next tick:
+4. **`/paper-landscape-invalidate` — force-reprocess CLI** (`scripts/invalidate.py`,
+   wrapping `scripts.ledger.store.main`). Soft-deletes ledger rows so a paper is
+   reprocessed next tick:
 
    ```bash
-   PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.ledger.store \
+   PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.invalidate \
        <key>... --topic-dir .
    ```
 

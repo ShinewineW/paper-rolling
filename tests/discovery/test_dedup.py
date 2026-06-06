@@ -29,6 +29,52 @@ def _c(**kw):
     return base
 
 
+def test_dedup_merges_doi_only_and_arxiv_only_same_paper():
+    # Codex R21: the same paper seen as a DOI-only OpenAlex record and an
+    # arXiv-only arXiv/HF record carries DIFFERENT key types, so exact-key folding
+    # misses it; the title-similarity consolidation merges them (unioning signals).
+    openalex = _c(
+        doi="10.1/x",
+        arxiv_id=None,
+        title="Attention Is All You Need",
+        year=2017,
+        cited_by_count=134000,
+        discovery_sources=["openalex"],
+    )
+    arxiv = _c(
+        doi=None,
+        arxiv_id="1706.03762",
+        arxiv_version="v5",
+        title="Attention Is All You Need",
+        year=2017,
+        oa_pdf_url="https://arxiv.org/pdf/1706.03762v5",
+        discovery_sources=["arxiv"],
+    )
+    out = dedup_candidates([openalex, arxiv])
+    assert len(out) == 1
+    merged = out[0]
+    assert merged["doi"] == "10.1/x"
+    assert merged["arxiv_id"] == "1706.03762"
+    assert set(merged["discovery_sources"]) == {"openalex", "arxiv"}
+    assert merged["cited_by_count"] == 134000
+
+
+def test_dedup_keeps_distinct_arxiv_versions_apart():
+    # v1 and v2 of the same paper must stay distinct (revision -> reprocess); the
+    # title-merge must NOT collapse them (conflicting versioned arxiv id).
+    v1 = _c(arxiv_id="1706.03762", arxiv_version="v1", title="Same Title", year=2017)
+    v2 = _c(arxiv_id="1706.03762", arxiv_version="v2", title="Same Title", year=2017)
+    assert len(dedup_candidates([v1, v2])) == 2
+
+
+def test_dedup_does_not_merge_distinct_dois_with_similar_titles():
+    # Two different DOIs (genuinely different papers) with similar titles must NOT
+    # merge — _keys_compatible blocks the title-merge on the DOI conflict.
+    a = _c(doi="10.1/a", title="A Study of Transformers", year=2020)
+    b = _c(doi="10.1/b", title="A Study of Transformers", year=2020)
+    assert len(dedup_candidates([a, b])) == 2
+
+
 def test_doi_dedup_merges_two_sources():
     a = _c(
         doi="10.1/x",
