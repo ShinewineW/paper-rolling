@@ -116,6 +116,39 @@ def test_produce_reverts_promotion_when_cancelled_mid_move(
     assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
 
 
+def test_produce_reverts_promotion_when_cancelled_after_code_ref(
+    tmp_path, candidate, ledger, md_path, analyzer
+):
+    """Codex R19: a cancel landing during record_code_ref (AFTER the move-check)
+    must still revert the promoted vault — the post-record re-check catches it."""
+    from scripts.output.produce import SpokeCancelled
+
+    class _FlipCancel:
+        def __init__(self):
+            self.calls = 0
+
+        def is_set(self):
+            self.calls += 1
+            return self.calls >= 3  # pre-check + move-check: not set; post-record check: set
+
+    cancel = _FlipCancel()
+    with pytest.raises(SpokeCancelled):
+        produce_outputs(
+            md_path,
+            candidate,
+            ledger,
+            root=tmp_path,
+            resolve_analysis=analyzer,
+            cancel=cancel,
+        )
+    assert cancel.calls >= 3  # the post-record-code-ref window was checked...
+    # ...and the vault was reverted.
+    assert not (tmp_path / "person_vault").exists() or not any(
+        (tmp_path / "person_vault").iterdir()
+    )
+    assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
+
+
 def test_produce_uses_passed_resolve_analysis_not_a_global(
     tmp_path, candidate, ledger, md_path, analysis
 ):

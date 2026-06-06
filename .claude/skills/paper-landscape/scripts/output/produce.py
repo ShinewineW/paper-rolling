@@ -166,22 +166,32 @@ def produce_outputs(
         shutil.move(str(stage_person), str(person_dest))
         shutil.move(str(staging / "ai"), str(ai_dest))
 
-        # B2 / Codex R18: re-check AFTER the moves and REVERT if the guard fired
-        # during them. The pre-check alone left a check-to-promotion race — a
-        # cancel set mid-`shutil.move` would still complete the promotion. Undoing
-        # both dirs here closes the window Codex reproduced (cancel set during the
-        # move). RESIDUAL (documented, not reproducible via an injected delay): a
-        # cancel landing in the few instructions between this check and the
-        # worker's return leaves a promoted vault for an abandoned spoke — a
-        # non-killable thread cannot be cancelled with literally zero residual.
-        # Fully closing it would require moving promotion out of the spoke thread
-        # into the single-writer hub (a larger change; see docs/adr if pursued).
+        # B2 / Codex R18+R19: REVERT the promotion if the guard fired during any
+        # durable step. There is one cancel re-check after EACH such step (the
+        # moves, then the code-ref ledger note), so a cancel landing in either
+        # window undoes both vault dirs. This closes both reproduced races
+        # (slow shutil.move, slow record_code_ref). On revert the (idempotent)
+        # code-ref note may already be appended — harmless: landscapes scan vault
+        # dirs, not code-ref notes, and the next-tick reconciliation (see
+        # store.consistency_check) prunes any vault dir not backed by a `done`
+        # row regardless.
+        #
+        # RESIDUAL: a cancel landing in the CPU-instruction gap between the final
+        # check and the worker's return — a thread-scheduling microgap with no
+        # injectable app-code, so not reproducible by delay injection. The
+        # reconciliation backstop makes even that self-heal within one tick. The
+        # only way to a literal zero-residual is moving promotion out of the spoke
+        # thread into the single-writer hub (a larger change; ADR if pursued).
         if cancel is not None and cancel.is_set():
             shutil.rmtree(person_dest, ignore_errors=True)
             shutil.rmtree(ai_dest, ignore_errors=True)
             raise SpokeCancelled("spoke cancelled during vault promotion (stall budget exceeded)")
 
         ledger.record_code_ref(key, str(ai_dest / "ara" / "src/code_ref.md"))
+        if cancel is not None and cancel.is_set():
+            shutil.rmtree(person_dest, ignore_errors=True)
+            shutil.rmtree(ai_dest, ignore_errors=True)
+            raise SpokeCancelled("spoke cancelled after vault promotion (stall budget exceeded)")
         return ProduceResult(key=key, person_path=person_dest, ai_path=ai_dest)
     finally:
         shutil.rmtree(staging, ignore_errors=True)

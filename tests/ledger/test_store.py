@@ -271,6 +271,36 @@ def test_consistency_check_iterates_the_branch_field_set(tmp_path, monkeypatch):
     assert "5555.6666v1" in led.consistency_check()
 
 
+def test_consistency_check_prunes_orphan_vault_dirs(tmp_path):
+    """Codex R19 / B2 residual self-heal: a vault dir NOT backed by a complete
+    `done` row (an orphan from a crash or a stalled-then-resumed spoke that
+    promoted late) is pruned at tick start, so it never persists in the library."""
+    led = Ledger(tmp_path)
+    # A legit done paper: both halves on disk + a done row claiming them.
+    pv = tmp_path / "person_vault" / "2026-06-05_Good_1.1"
+    ai = tmp_path / "ai_package" / "2026-06-05_Good_1.1"
+    pv.mkdir(parents=True)
+    ai.mkdir(parents=True)
+    led.record_status(
+        "1.1v1",
+        status="done",
+        md_sha256="h",
+        person_vault_path=str(pv),
+        ai_package_path=str(ai),
+    )
+    # An ORPHAN: vault dirs on disk with NO done row pointing at them.
+    orphan_pv = tmp_path / "person_vault" / "2026-06-05_Orphan_9.9"
+    orphan_ai = tmp_path / "ai_package" / "2026-06-05_Orphan_9.9"
+    orphan_pv.mkdir(parents=True)
+    orphan_ai.mkdir(parents=True)
+
+    led.consistency_check()
+
+    assert pv.exists() and ai.exists()  # the legit done paper is kept
+    assert not orphan_pv.exists()  # the orphan is pruned...
+    assert not orphan_ai.exists()
+
+
 def test_consistency_check_keeps_complete_done(tmp_path):
     led = Ledger(tmp_path)
     pv = tmp_path / "person_vault" / "2026-06-05_Q_3333.4444"

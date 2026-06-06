@@ -260,26 +260,44 @@ class Ledger:
     # -- LS-4 startup consistency self-heal ---------------------------------
 
     def consistency_check(self) -> list[str]:
-        """LS-4: demote any `done` row missing a vault half; return demoted keys.
+        """LS-4 ledger↔FS reconciliation (run at tick start); return demoted keys.
 
-        A `done` row MUST have EVERY output branch (paths.VAULT_BRANCH_PATH_FIELDS)
-        recorded AND present on disk. If any is absent (ledger↔FS drift), append a
-        `failed` row so the key leaves the skip-set and is reprocessed next run.
-        Iterating the centralized branch set (ADR-0002) means adding a branch
-        extends the self-heal automatically — no edit here.
+        Two directions, both iterating the centralized branch set (ADR-0002), so
+        adding an output branch extends both automatically:
+
+        (a) DEMOTE — a `done` row missing any vault half on disk is downgraded to
+            `failed` so the key leaves the skip-set and is reprocessed next run.
+        (b) PRUNE ORPHANS — any vault entry dir NOT backed by a live, complete
+            `done` row is removed. This self-heals the B2 stall residual (a
+            stalled-then-resumed spoke that promoted late, after the hub recorded
+            it failed) and any crash-orphan: such products never persist in the
+            library/landscape beyond the tick that discovers them.
         """
+        latest = self._latest_by_key()
         demoted: list[str] = []
-        for key, row in self._latest_by_key().items():
+        claimed: set[Path] = set()
+        for key, row in latest.items():
             if row["status"] != _DONE or row.get("rescinded_at"):
                 continue
-            ok = all(
-                bool(row.get(field)) and Path(row[field]).exists()
+            present = [
+                Path(row[field]).resolve()
                 for field in paths.VAULT_BRANCH_PATH_FIELDS
-            )
-            if not ok:
-                demoted.append(key)
+                if bool(row.get(field)) and Path(row[field]).exists()
+            ]
+            if len(present) == len(paths.VAULT_BRANCH_PATH_FIELDS):
+                claimed.update(present)  # a complete done paper claims its dirs
+            else:
+                demoted.append(key)  # (a) incomplete → demote (its dirs become orphans)
         for key in demoted:
             self.record_status(key, status="failed", failure_class="convert_error")
+        # (b) prune any vault entry dir not claimed by a complete `done` row.
+        for dirname, _field in paths.VAULT_BRANCHES:
+            branch_dir = self.topic_dir / dirname
+            if not branch_dir.exists():
+                continue
+            for entry in branch_dir.iterdir():
+                if entry.is_dir() and entry.resolve() not in claimed:
+                    shutil.rmtree(entry, ignore_errors=True)
         return demoted
 
 
