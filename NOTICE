@@ -1,0 +1,23 @@
+paper-rolling
+=============
+This research-only workspace is licensed CC-BY-NC 4.0 (see LICENSE).
+
+It VENDORS exactly TWO modules VERBATIM (+ a small public-alias trailer, no
+logic change) from academic-research-skills by Cheng-I Wu
+(https://github.com/Imbad0202/academic-research-skills),
+Copyright (c) 2026 Cheng-I Wu, licensed CC-BY-NC 4.0 (Attribution-NonCommercial).
+Per its terms — attribution, license link, and indication of changes:
+
+  scripts/_text_similarity.py  -> discovery/_text.py   (CHANGE: appended a 3-line
+                                  public-alias trailer: similarity/normalize_title/THRESHOLD)
+  scripts/verification_cache.py -> discovery/cache.py   (CHANGE: appended a 2-line
+                                  public-alias trailer: CitationCache/TTL_DAYS)
+
+  License: https://creativecommons.org/licenses/by-nc/4.0/
+
+All other modules in this repo are original paper-rolling code (not vendored
+from ARS); they are covered by this repo's own CC-BY-NC 4.0 license, not by ARS's.
+Permissively-licensed material is cherry-picked with per-file attribution:
+MIT (AI-Research-SKILLs ARA schema/rigor-reviewer; scientific-agent-skills
+OpenAlex/Unpaywall recipes); Apache-2.0 (the scientific-agent-skills
+markdown-mermaid `classDef` palette embedded in branch1_report.py).

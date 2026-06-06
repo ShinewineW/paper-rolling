@@ -1,0 +1,29 @@
+# .gitignore — track PRODUCTS (derived knowledge), ignore INPUTS (regenerable).
+# Policy source: 基调-D2 (only track products; inputs stay local).
+
+# --- inputs / intermediates (regenerable, local-only) ---
+# Original source PDFs (frozen input after MD conversion; MD-only contract).
+corpus/**/*.pdf
+# Full MinerU image dumps (the curated subset is copied into vault figures/).
+corpus/**/images/
+# MinerU structured intermediate.
+corpus/**/content_list.json
+
+# Citation-lookup cache + secrets.
+.cache/
+.env
+
+# --- python / tooling ---
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# Transient clone area (analysis-D2: clone-then-delete; pointers kept in ai_package).
+/tmp/paper-repos/
+
+# NOTE: everything else is tracked on purpose — *.md knowledge products,
+# person_vault/, ai_package/, _ledger/, landscapes/, config/, .md_contract.json,
+# and curated branch1 figures. Do NOT add blanket ignores for those.

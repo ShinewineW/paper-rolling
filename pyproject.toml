@@ -1,0 +1,32 @@
+# pyproject.toml
+[project]
+name = "paper-rolling"
+version = "0.1.0"
+description = "Autonomous AI paper-knowledge-processing engine (paper-landscape v2)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "CC-BY-NC-4.0" }
+authors = [{ name = "ShinewineW" }]
+dependencies = [
+    "requests>=2.32",
+    "pyyaml>=6.0",
+    "rapidfuzz>=3.9",
+    "lxml>=5.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".claude/skills/paper-landscape"]

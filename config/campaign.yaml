@@ -1,0 +1,93 @@
+# config/campaign.yaml — locked campaign parameters (吸收-D4).
+#
+# Confirmed ONCE at the campaign Hard Gate (中枢-D1: explicit topic + count,
+# no ambiguity). Daily /loop ticks read this file and run autonomously WITHOUT
+# re-gating. Re-run the Hard Gate only to change topic or per_round_count.
+
+# --- Hard-Gate-confirmed (人在场显式钉死) ---
+# Precise, non-ambiguous research topic. The Hard Gate refuses vague topics
+# (e.g. bare "autonomous driving") and forces a narrowed scope here.
+topic: "PLACEHOLDER — set a precise topic at the campaign Hard Gate"
+
+# Per-round target = number of SUCCESSFULLY processed papers each /loop tick
+# (中枢-D2: failures are skipped and back-filled from the candidate pool).
+# Also the cost / disk ceiling per round (中枢-D1 side effect).
+per_round_count: 5
+
+# --- discovery policy ---
+# 中枢-D5a / 吸收-D6: strict = preprints excluded from the authoritative set,
+# logged status:deferred, auto-retried after the OpenAlex indexing lag (~21d).
+preprint_policy: strict
+
+# arXiv categories the discovery layer is restricted to (D-发现-3).
+arxiv_categories:
+  - cs.CV
+  - cs.RO
+  - cs.LG
+  - cs.AI
+  - eess.IV
+
+# D-发现-2: OpenAlex polite-pool email -> ~10 req/s. Not a secret.
+openalex_mailto: "ahhssxlcwjz@163.com"
+
+# Top-tier venue allowlist — Tier-B authority signal S2 (D-发现-3/D-发现-5).
+venue_allowlist:
+  - NeurIPS
+  - ICML
+  - ICLR
+  - CVPR
+  - ICCV
+  - ECCV
+  - AAAI
+  - ICRA
+  - IROS
+  - CoRL
+  - RSS
+  - TPAMI
+  - IJCV
+  - RA-L
+  - T-RO
+
+# Institution whitelist — authority signal S3 (D-发现-5). Matched against
+# OpenAlex/S2 authorships[].institutions[].display_name (substring match).
+institution_whitelist:
+  - "Google"
+  - "DeepMind"
+  - "Meta"
+  - "FAIR"
+  - "NVIDIA"
+  - "Microsoft Research"
+  - "OpenAI"
+  - "Apple"
+  - "Amazon"
+  - "Waymo"
+  - "Tesla"
+  - "Wayve"
+  - "Cruise"
+  - "Nuro"
+  - "Toyota Research"
+  - "Boston Dynamics"
+  - "Allen Institute for AI"
+  - "SenseTime"
+  - "Megvii"
+  - "Baidu"
+  - "Huawei Noah"
+  - "Horizon Robotics"
+  - "Alibaba DAMO"
+  - "Tencent AI Lab"
+  - "ByteDance"
+  - "Momenta"
+  - "Pony.ai"
+  - "Unitree"
+
+# Authority multi-signal tuning (ADR-0001: no hard citation gate; OR model).
+authority:
+  # Discovery over-pulls 2-3x per_round_count so failed papers have back-fill
+  # candidates (中枢-D2).
+  candidate_multiplier: 3
+  # Tier-B S2 influence threshold (recency-aware bar, ADR-0001 S1 helper).
+  tierB_influence_threshold: 5
+  # Recency weight applied in the composite top_k ranking (ADR-0001 S4).
+  recency_weight: 0.3
+  # Reserved quota for brand-new papers so classics don't crowd them out.
+  new_paper_quota: 1
