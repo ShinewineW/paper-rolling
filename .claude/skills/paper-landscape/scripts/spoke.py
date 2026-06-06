@@ -84,6 +84,7 @@ def make_spoke(
     max_gate_rounds: int = 2,
     cross_model_votes: SkepticVoteFn | None = None,
     cross_model_sample: float = 0.0,
+    empirical_classifier: Callable | None = None,
 ) -> SpokeFn:
     """Build the production SpokeFn that runs the full gated pipeline per paper.
 
@@ -205,6 +206,7 @@ def make_spoke(
                 content_list_path,
                 rigor_scores=rigor_scores,
                 entailment_judge=entailment_judge,
+                empirical_classifier=empirical_classifier,
             )
 
         outcome = run_with_budget(

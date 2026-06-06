@@ -66,6 +66,7 @@ def run_campaign(
     run_cli: Callable,
     cross_model_votes: SkepticVoteFn | None = None,
     cross_model_sample: float = 0.0,
+    empirical_classifier: Callable | None = None,
     requested_topic: str | None = None,
     requested_n: int | None = None,
 ) -> TickResult:
@@ -132,6 +133,7 @@ def run_campaign(
         ledger=ledger,
         cross_model_votes=cross_model_votes,
         cross_model_sample=cross_model_sample,
+        empirical_classifier=empirical_classifier,
     )
     # LS-1 single-writer lock: hold _ledger/.lock for the whole tick so a second
     # concurrent instance fails fast (LedgerLockError) instead of racing the

@@ -25,6 +25,7 @@ Marker shape and quote-word conventions follow
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote
@@ -110,8 +111,20 @@ def resolves_in_md(kind: str, value: str, md_text: str) -> bool:
     return needle.lower() in _normalize(md_text).lower()
 
 
-def check_branch1_md_anchors(report_path: Path, md_path: Path) -> GateVerdict:
-    """Hard-block unresolvable anchors and anchorless empirical sentences."""
+def check_branch1_md_anchors(
+    report_path: Path,
+    md_path: Path,
+    *,
+    is_empirical: Callable[[str], bool] | None = None,
+) -> GateVerdict:
+    """Hard-block unresolvable anchors and anchorless empirical sentences.
+
+    `is_empirical` (ROADMAP C4 / deferred B9): an OPTIONAL injected classifier
+    `(sentence) -> bool` deciding which sentences are empirical-performance claims
+    that MUST anchor. Defaults to the metric-cue heuristic; production may plug a
+    trained NLI / factual-consistency model that generalizes beyond keyword cues.
+    """
+    classify = is_empirical or _is_empirical_performance
     report = report_path.read_text(encoding="utf-8")
     md_text = md_path.read_text(encoding="utf-8")
     findings: list[Finding] = []
@@ -147,7 +160,7 @@ def check_branch1_md_anchors(report_path: Path, md_path: Path) -> GateVerdict:
     fault = 0
     for sentence in _SENTENCE_SPLIT.split(scan):
         s = sentence.strip()
-        if not s or not _is_empirical_performance(s):
+        if not s or not classify(s):
             continue
         if not _ANY_ANCHOR.search(s):
             fault += 1

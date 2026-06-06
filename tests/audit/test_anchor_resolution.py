@@ -81,3 +81,28 @@ def test_check_ignores_non_empirical_prose(tmp_path: Path) -> None:
     report.write_text("本文提出了一种全新的注意力机制，思路非常优雅。\n", encoding="utf-8")
     verdict = check_branch1_md_anchors(report, md)
     assert verdict.blocked is False
+
+
+def test_anchor_check_accepts_injected_empirical_classifier(tmp_path):
+    """ROADMAP C4: the empirical-sentence detector is injectable — a custom
+    classifier (stand-in for an NLI / factual-consistency model) overrides the
+    metric-cue heuristic for deciding which sentences must anchor."""
+    from scripts.audit.anchor_resolution import check_branch1_md_anchors
+
+    report = tmp_path / "report.md"
+    # A number-bearing sentence with NO metric cue: the heuristic does not flag it.
+    report.write_text("The system processed 42 documents overnight.\n", encoding="utf-8")
+    md = tmp_path / "src.md"
+    md.write_text("Unrelated source text.\n", encoding="utf-8")
+
+    # Default heuristic -> not empirical -> not gated.
+    assert check_branch1_md_anchors(report, md).blocked is False
+
+    # Injected classifier treats any number-bearing sentence as empirical -> the
+    # unanchored sentence is now hard-blocked.
+    def nli_stub(sentence: str) -> bool:
+        return any(c.isdigit() for c in sentence)
+
+    verdict = check_branch1_md_anchors(report, md, is_empirical=nli_stub)
+    assert verdict.blocked is True
+    assert any("no anchor" in f.observation for f in verdict.hard_findings)
