@@ -82,6 +82,40 @@ def test_produce_aborts_before_promotion_when_cancelled(
     assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
 
 
+def test_produce_reverts_promotion_when_cancelled_mid_move(
+    tmp_path, candidate, ledger, md_path, analyzer
+):
+    """Codex R18: the post-promotion re-check must REVERT a promotion when the
+    guard fires DURING the move (the single pre-check left a check-to-promotion
+    race). A cancel that flips True only after the pre-check leaves NO vault dirs."""
+    from scripts.output.produce import SpokeCancelled
+
+    class _FlipCancel:
+        def __init__(self):
+            self.calls = 0
+
+        def is_set(self):
+            self.calls += 1
+            return self.calls >= 2  # pre-check: not set; post-move check: set
+
+    cancel = _FlipCancel()
+    with pytest.raises(SpokeCancelled):
+        produce_outputs(
+            md_path,
+            candidate,
+            ledger,
+            root=tmp_path,
+            resolve_analysis=analyzer,
+            cancel=cancel,
+        )
+    assert cancel.calls >= 2  # promotion happened between the two checks...
+    # ...and was reverted: neither vault retains the promoted entry.
+    assert not (tmp_path / "person_vault").exists() or not any(
+        (tmp_path / "person_vault").iterdir()
+    )
+    assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
+
+
 def test_produce_uses_passed_resolve_analysis_not_a_global(
     tmp_path, candidate, ledger, md_path, analysis
 ):

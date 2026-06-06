@@ -166,6 +166,21 @@ def produce_outputs(
         shutil.move(str(stage_person), str(person_dest))
         shutil.move(str(staging / "ai"), str(ai_dest))
 
+        # B2 / Codex R18: re-check AFTER the moves and REVERT if the guard fired
+        # during them. The pre-check alone left a check-to-promotion race — a
+        # cancel set mid-`shutil.move` would still complete the promotion. Undoing
+        # both dirs here closes the window Codex reproduced (cancel set during the
+        # move). RESIDUAL (documented, not reproducible via an injected delay): a
+        # cancel landing in the few instructions between this check and the
+        # worker's return leaves a promoted vault for an abandoned spoke — a
+        # non-killable thread cannot be cancelled with literally zero residual.
+        # Fully closing it would require moving promotion out of the spoke thread
+        # into the single-writer hub (a larger change; see docs/adr if pursued).
+        if cancel is not None and cancel.is_set():
+            shutil.rmtree(person_dest, ignore_errors=True)
+            shutil.rmtree(ai_dest, ignore_errors=True)
+            raise SpokeCancelled("spoke cancelled during vault promotion (stall budget exceeded)")
+
         ledger.record_code_ref(key, str(ai_dest / "ara" / "src/code_ref.md"))
         return ProduceResult(key=key, person_path=person_dest, ai_path=ai_dest)
     finally:
