@@ -101,6 +101,65 @@ The spoke **never** writes the ledger (single-writer invariant): the hub records
 the EXACT `person_vault_path` / `ai_package_path` that `produce_outputs` returns,
 never a re-derived key.
 
+## Wiring the model seams [MUST]
+
+`make_spoke(...)` (and the `run_campaign(...)` driver that composes it) take four
+**injected model seams**. The composition is CODE — the only thing left to the
+runtime is constructing these four callables. Each seam **MUST** be backed by an
+**independent Agent-tool invocation** (a fresh sub-agent per call) so the audit
+votes are uncorrelated with the generator that produced the numbers. The entry
+point the `/loop` tick drives, once the four seams are constructed, is
+**`scripts/run_campaign.py`** → `run_campaign(workspace, discover,
+resolve_analysis, skeptic_votes, rigor_scores, entailment_judge, http, run_cli,
+...)`; it builds the ledger, wires the seams into `make_spoke`, and calls
+`run_campaign_tick` (which raises `GateRequired` if the campaign Hard Gate is not
+satisfied). Do **not** hard-code an LLM call — the seams are provider-agnostic.
+
+1. **`resolve_analysis(md_path, candidate) -> dict`** — the analyzer sub-agent.
+   - **Input**: the frozen `corpus/{ID}/{ID}.md` path + the discovery `candidate`
+     dict (identity + metadata).
+   - **Output**: the ARA analysis bundle that `branch2_ara` / `branch1` and the
+     `landscapes` comparator consume (`overview`, `problem`, `claims`, `concepts`,
+     `experiments`, `related_work`, `architecture`, `algorithm`, `heuristics`,
+     `configs_training`, `configs_model`, `environment`, `execution_stub`,
+     `innovations`, `exploration_tree`, `evidence_tables`, `highlights`, …). It
+     **MUST** include the headline-metric keys the landscape table needs:
+     `headline_metric` (str, e.g. `"NDS"`), `headline_value` (float), and
+     `params_million` (float) — without them branch2's `PAPER.md` frontmatter is
+     dropped from the cross-paper table.
+   - **MUST**: an independent Agent-tool invocation.
+
+2. **`skeptic_votes(numbers, source_md, claim_context) -> tuple[SkepticVote, ...]`**
+   — the G2 ground-truth-isolated skeptic (`SkepticVoteFn` in
+   `scripts/audit/types.py`).
+   - **Input**: the candidate `numbers` (tuple of stringified values), the raw
+     `source_md` text, and a short `claim_context` string. **Ground-truth
+     isolation [MUST]**: the seam **NEVER** receives the evidence file / answer
+     key / any rubric — only the candidate numbers + the source MD.
+   - **Output**: exactly one `SkepticVote(number, found_in_source, note="")` per
+     input number. One **independent** vote per number; G2 runs `n_skeptics`
+     independent passes and the **multi-vote majority** is what hard-blocks a
+     fabricated number. Correlation with the generator would defeat the block,
+     hence the isolation MUST.
+   - **MUST**: an independent Agent-tool invocation per call.
+
+3. **`rigor_scores(ara_bundle) -> dict`** — the G3 6-dim rigor reviewer
+   (`RigorScoreFn` in `scripts/audit/types.py`).
+   - **Input**: the ARA text bundle (`dict[str, str]`).
+   - **Output**: `{"dimensions": {dimension_key: {"score": int (1–5),
+     "strengths": [...], "weaknesses": [...], "suggestions": [...]}}, "findings":
+     [...]}` covering all six `DIMENSION_KEYS`
+     (D1_evidence_relevance … D6_methodological_rigor).
+   - **Private-rubric [MUST]**: the scoring rubric is held **privately** by the
+     seam implementation and **never** appears in any generator prompt
+     (ground-truth isolation). An independent Agent-tool invocation.
+
+4. **`entailment_judge(claim, experiment_text) -> tuple[bool, str]`** — the G3
+   type-aware entailment check (`EntailmentJudgeFn` in `scripts/audit/types.py`).
+   - **Input**: a `ClaimRecord` + the linked experiment text.
+   - **Output**: `(entailed: bool, reason: str)`.
+   - **MUST**: an independent Agent-tool invocation.
+
 ## Failure handling (中枢-D2)
 
 - **Whole-paper unprocessable** (download all-fail / both ingest tiers fail /
