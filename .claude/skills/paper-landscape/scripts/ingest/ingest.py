@@ -44,6 +44,9 @@ class IngestResult:
     contract: MdContract
     tier: int
     images_dir: Path
+    # Tier-2 (MinerU) emits content_list.json (typed formula blocks for the G3
+    # equation gate); tier-1 (pandoc) emits none, so the spoke synthesizes one.
+    content_list_path: Path | None = None
 
     # dict-style access for callers that prefer it (analysis/audit slices).
     def __getitem__(self, key: str):
@@ -80,6 +83,7 @@ def _finalize(
     converter: str,
     converter_version: str,
     source_pdf_sha256: str | None,
+    content_list_path: Path | None = None,
 ) -> IngestResult:
     """Write {ID}.md + .md_contract.json and return the result."""
     md_path = paper_dir / f"{paper_id}.md"
@@ -96,7 +100,13 @@ def _finalize(
         equation_block_count=count_equation_blocks(md_text),
     )
     write_contract(contract, paper_dir / ".md_contract.json")
-    return IngestResult(md_path=md_path, contract=contract, tier=tier, images_dir=images_dir)
+    return IngestResult(
+        md_path=md_path,
+        contract=contract,
+        tier=tier,
+        images_dir=images_dir,
+        content_list_path=content_list_path,
+    )
 
 
 def ingest(
@@ -166,6 +176,7 @@ def ingest(
         converter="mineru",
         converter_version=MINERU_VERSION,
         source_pdf_sha256=t2.source_pdf_sha256,
+        content_list_path=t2.content_list_path,
     )
 
 

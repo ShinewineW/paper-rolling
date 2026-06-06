@@ -66,13 +66,29 @@ def load_paper_summary(workspace: Path, entry_name: str) -> PaperSummary:
     )
 
 
+_HEADLINE_KEYS = ("key", "headline_metric", "headline_value", "params_million")
+
+
+def _has_headline_frontmatter(paper_md: Path) -> bool:
+    """True iff PAPER.md carries the headline-metric keys the comparator needs.
+
+    A branch2 PAPER.md without headline metrics (no leaderboard number to
+    aggregate) is skipped from the cross-paper table rather than crashing the
+    read-side aggregator (the entry still lives in the vault; it just has no
+    metric row in the landscape).
+    """
+    fm = _read_frontmatter(paper_md)
+    return all(k in fm for k in _HEADLINE_KEYS)
+
+
 def _collect(workspace: Path) -> list[PaperSummary]:
     ai_root = Path(workspace) / "ai_package"
     if not ai_root.exists():
         return []
     summaries: list[PaperSummary] = []
     for entry in sorted(ai_root.iterdir()):
-        if not (entry / "ara" / "PAPER.md").exists():
+        paper_md = entry / "ara" / "PAPER.md"
+        if not paper_md.exists() or not _has_headline_frontmatter(paper_md):
             continue
         summaries.append(load_paper_summary(workspace, entry.name))
     return summaries

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,18 @@ class ProduceResult:
     ai_path: Path
 
 
+class ProduceGateBlocked(Exception):
+    """G2 hard-blocked the staged branch2 BEFORE branch1/promotion (OT-5 holds).
+
+    Carries the blocking verdict so the spoke can record the reason; nothing has
+    reached either real vault when this is raised.
+    """
+
+    def __init__(self, verdict: Any) -> None:
+        self.verdict = verdict
+        super().__init__("branch2 hard-blocked by the G2 data-fidelity gate")
+
+
 def resolve_analysis(md_path: Path, candidate: Any) -> dict:  # pragma: no cover
     """Return the analyzer-spoke bundle for this paper.
 
@@ -52,6 +65,8 @@ def produce_outputs(
     candidate: Any,
     ledger: Any,
     root: Path | None = None,
+    *,
+    g2_gate: Callable[[Path], Any] | None = None,
 ) -> ProduceResult:
     """Produce branch2 + branch1 atomically into the two top-level vaults.
 
@@ -61,12 +76,19 @@ def produce_outputs(
         ledger: Ledger; provides `intake_date()` and `record_code_ref(key, path)`.
         root: Workspace root containing `person_vault/` and `ai_package/`.
               Defaults to the current working directory.
+        g2_gate: Optional G2 data-fidelity gate, called with the staged ai ENTRY
+              dir (parent of `ara/`) AFTER branch2 + Seal-1 and BEFORE branch1.
+              A blocked verdict raises ProduceGateBlocked, aborting before any
+              promotion (OT-5). The return is typed `Any` so output never hard-
+              imports audit (avoids a cross-chunk import cycle). Default None
+              keeps the gate out of the path entirely (backward-compatible).
 
     Returns:
         ProduceResult with the shared vault key and both final paths.
 
     Raises:
-        Exception: Any failure aborts BEFORE either vault is touched (OT-5).
+        ProduceGateBlocked: G2 hard-blocked the staged branch2 (nothing promoted).
+        Exception: Any other failure aborts BEFORE either vault is touched (OT-5).
     """
     root = (root or Path.cwd()).resolve()
     person_vault = root / "person_vault"
@@ -90,6 +112,14 @@ def produce_outputs(
         ara_errors = validate_ara_tree(stage_ai)
         if ara_errors:
             raise ValueError(f"branch2 failed Seal-1: {'; '.join(ara_errors[:5])}")
+
+        # G2 (after branch2, before branch1): adversarial data-fidelity gate on
+        # the staged ARA evidence. A hard block aborts BEFORE branch1 and any
+        # promotion, so OT-5 holds (nothing reaches the real vault).
+        if g2_gate is not None:
+            verdict = g2_gate(staging / "ai")  # staged ai ENTRY dir (parent of ara/)
+            if verdict.blocked:
+                raise ProduceGateBlocked(verdict)
 
         # branch1 derives from branch2 and self-gates on the anchor lint;
         # any unanchored empirical claim raises AnchorGateError here.

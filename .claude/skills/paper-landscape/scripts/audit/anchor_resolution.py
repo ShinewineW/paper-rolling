@@ -45,6 +45,32 @@ _ANY_ANCHOR = re.compile(r"<!--anchor:[a-z]+:[^>]*?-->")
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 # Sentence splitter that respects CJK and Latin terminators.
 _SENTENCE_SPLIT = re.compile(r"[。！？\n]|(?<=[.!?])\s+")
+# Fenced code blocks (mermaid diagrams, code stubs) — blanked before the
+# anchorless-number scan so diagram/code digits never count as empirical
+# assertions (mirrors branch1's own authoring gate, anchor_lint._strip_code_fences).
+_FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
+# Empirical PERFORMANCE cue (吸收-D1 contract, mirrored from anchor_lint): a
+# number alone (file paths, math exponents, the literal "branch2") is
+# illustrative and does NOT require an anchor; only a number co-occurring with a
+# metric/comparison cue (or a percent) is an empirical claim that MUST anchor.
+_PERCENT = re.compile(r"\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*个百分点")
+_METRIC_CUE = re.compile(
+    r"\b(NDS|mAP|AP|IoU|mIoU|BLEU|F1|AUC|ROUGE|PSNR|SSIM|FID|accuracy|acc|recall|"
+    r"precision|score|top-?\d|准确率|精度|召回|提升|超过|高于|达到|outperform\w*|"
+    r"improv\w*|reduc\w*|gain|百分点)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_empirical_performance(sentence: str) -> bool:
+    """True iff `sentence` asserts an empirical performance number (must anchor).
+
+    Mirrors anchor_lint's authoring-side contract so the G3 auditor and the
+    branch1 author agree on which sentences require a three-layer anchor.
+    """
+    if _PERCENT.search(sentence):
+        return True
+    return bool(_NUMBER.search(sentence) and _METRIC_CUE.search(sentence))
 
 
 @dataclass(frozen=True)
@@ -112,11 +138,16 @@ def check_branch1_md_anchors(report_path: Path, md_path: Path) -> GateVerdict:
                 )
             )
 
-    # 2. Every empirical sentence (carries a number) must carry an anchor.
+    # 2. Every empirical PERFORMANCE sentence must carry an anchor. Code fences
+    #    (mermaid diagrams) are blanked first, and bare numbers without a
+    #    metric/comparison cue (math exponents, file paths, the literal
+    #    "branch2") are illustrative — only performance assertions must anchor,
+    #    matching branch1's own authoring gate (吸收-D1).
+    scan = _FENCE.sub(lambda m: "\n" * m.group(0).count("\n"), report)
     fault = 0
-    for sentence in _SENTENCE_SPLIT.split(report):
+    for sentence in _SENTENCE_SPLIT.split(scan):
         s = sentence.strip()
-        if not s or not _NUMBER.search(s):
+        if not s or not _is_empirical_performance(s):
             continue
         if not _ANY_ANCHOR.search(s):
             fault += 1
