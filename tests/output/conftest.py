@@ -332,3 +332,18 @@ def analysis() -> dict:
         ],
         "highlights": {"model_structure": True, "math": True, "loss": True},
     }
+
+
+@pytest.fixture(autouse=True)
+def _patch_analyzer(monkeypatch, analysis):
+    """Inject the analyzer-spoke bundle so produce_outputs is hermetic.
+
+    In production, Chunk 3's hub passes the real analysis bundle; in tests we
+    patch the resolver the orchestrator calls. Autouse + guarded import so it
+    is a no-op for the earlier tasks whose module does not yet exist.
+    """
+    try:
+        import scripts.output.produce as prod
+    except ModuleNotFoundError:
+        return
+    monkeypatch.setattr(prod, "resolve_analysis", lambda md_path, candidate: analysis)
