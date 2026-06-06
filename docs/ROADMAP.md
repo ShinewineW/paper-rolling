@@ -10,15 +10,20 @@
 
 Status keys: `planned` · `in-progress` · `done`.
 
+> **Status (2026-06-07): the capability rail is COMPLETE.** A1, A2, B1, B2, C1,
+> C2, C3, C4 are all `done` and committed, each with regression tests. The only
+> remaining item is **W1 (production wiring)**, which is an owner decision carried
+> over from the oh-my-codex audit (R21), not a capability gap.
+
 ## Phase A — ingest-layer fidelity (self-contained, low-risk)
 
-- **A1. Equation-ratio gate** — `planned`. Today the equation gate only fires on
+- **A1. Equation-ratio gate** — `done`. Today the equation gate only fires on
   the all-or-nothing case (HTML had math but pandoc emitted **0** `$$`). PARTIAL
   loss (50 source equations, 5 survive) passes undetected. Add a ratio/threshold
   of emitted `$$` vs the source MathML count. *Source:* LaTeXML/pandoc
   practitioner consensus (pandoc handles vanilla LaTeX/MathML but drops complex
   cases).
-- **A2. Table-fidelity gate** — `planned`. pandoc HTML→GFM table conversion is
+- **A2. Table-fidelity gate** — `done`. pandoc HTML→GFM table conversion is
   weak and there is **no** gate analogous to the equation gate; a garbled/dropped
   table passes silently. Tables are the landscape's core product, so this is the
   biggest silent ingest-failure risk. Add a table-presence/shape check (source
@@ -28,33 +33,33 @@ Status keys: `planned` · `in-progress` · `done`.
 
 ## Phase B — discovery / output enrichment
 
-- **B1. Retraction / withdrawal detection** — `planned`. discovery has
+- **B1. Retraction / withdrawal detection** — `done`. discovery has
   preprint_flag + DOI cross-check but no retraction gate. Add an OpenAlex /
   Crossref `is_retracted` check in discovery so retracted papers are excluded (or
   flagged). *Source:* paper-qa retraction checks; ARS contamination triangulation.
-- **B2. Bibliographic export** — `planned`. Outputs are MD vaults + ARA JSON with
+- **B2. Bibliographic export** — `done`. Outputs are MD vaults + ARA JSON with
   no reference-manager-interoperable export. Emit CSL-JSON / BibTeX for the
   discovered corpus so it is reusable. *Source:* ARS CSL-JSON `literature_corpus`;
   scientific-agent-skills pyzotero integration.
 
 ## Phase C — verification depth (the headline anti-hallucination gaps)
 
-- **C1. Eval harness** — `planned`, **do before C2**. A fixture set of
+- **C1. Eval harness** — `done` (done before C2, as planned). A fixture set of
   known-fabricated and known-clean papers to MEASURE G2/G3 precision/recall, so
   "we have gates" becomes "the gates catch fabrication at rate X". *Source:*
   paper-qa (0% hallucinated citations), STORM (FreshWiki), AI-Scientist
   (near-human reviewer correlation).
-- **C2. Cross-model verification (the deferred B10)** — `planned`. The single
+- **C2. Cross-model verification (the deferred B10)** — `done`. The single
   biggest benchmark gap: G2/G3 verification is same-family multi-vote, which the
   literature warns suffers conformity / premature convergence. Route the skeptic /
   rigor / entailment seams (a sample or all) through a **heterogeneous** model
   family (the already-wired Codex). *Source:* prover-skeptic + adversarial-debate
   literature; ARS / AI-Research-SKILLs reviewer-diversity. Prove it with C1.
-- **C3. Claim-audit defect taxonomy (the deferred B8)** — `planned`. G2 is binary
+- **C3. Claim-audit defect taxonomy (the deferred B8)** — `done`. G2 is binary
   block/pass; classify WHAT failed (transcription typo vs fabrication vs
   unverifiable) so findings are actionable. *Source:* ARS claim_audit defect-stage
   taxonomy; AI-Scientist multi-dimension rubric.
-- **C4. NLI / guarded entailment (the deferred B9)** — `planned`. anchor /
+- **C4. NLI / guarded entailment (the deferred B9)** — `done`. anchor /
   entailment use metric-cue heuristics; route claim↔evidence entailment through a
   trained NLI / factual-consistency check that generalizes beyond keyword cues.
   *Source:* ARS uncited-assertion guarded detector; factual-consistency models.
