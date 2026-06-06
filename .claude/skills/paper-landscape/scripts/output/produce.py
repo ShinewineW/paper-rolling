@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +50,18 @@ class ProduceGateBlocked(Exception):
         super().__init__("branch2 hard-blocked by the G2 data-fidelity gate")
 
 
+class SpokeCancelled(Exception):
+    """The per-paper guard abandoned this spoke (stall budget exceeded) BEFORE
+    promotion, so produce_outputs aborted without touching either real vault.
+
+    A daemon spoke that overran its wall-clock budget keeps running (Python can't
+    kill threads); this lets it bail out at the last safe point — right before the
+    atomic vault promotion — so a late finisher never writes products the hub has
+    already recorded as failed (Codex R17 stall-isolation gap). Staging is cleaned
+    up in produce_outputs' `finally`.
+    """
+
+
 def produce_outputs(
     md_path: Path,
     candidate: Any,
@@ -57,6 +70,7 @@ def produce_outputs(
     *,
     resolve_analysis: Callable[[Path, Any], dict],
     g2_gate: Callable[[Path], Any] | None = None,
+    cancel: threading.Event | None = None,
 ) -> ProduceResult:
     """Produce branch2 + branch1 atomically into the two top-level vaults.
 
@@ -75,6 +89,10 @@ def produce_outputs(
               promotion (OT-5). The return is typed `Any` so output never hard-
               imports audit (avoids a cross-chunk import cycle). Default None
               keeps the gate out of the path entirely (backward-compatible).
+        cancel: Optional stall-abort signal from the hub's per-paper guard. If it
+              is set by the time both gates pass, promotion is skipped (raises
+              SpokeCancelled) so a daemon spoke abandoned for overrunning its
+              wall-clock budget never writes to the real vault (Codex R17).
 
     Returns:
         ProduceResult with the shared vault key and both final paths.
@@ -118,6 +136,13 @@ def produce_outputs(
         # any unanchored empirical claim raises AnchorGateError here. `key` is
         # the shared vault key so branch1 links to the paired ai_package.
         write_branch1(stage_person, candidate, stage_ai, md_path, analysis, key=key)
+
+        # B2 / Codex R17: last safe point before any real-vault write. If the
+        # per-paper guard already abandoned this spoke (stall budget exceeded), a
+        # late-finishing daemon thread must NOT promote products the hub has
+        # recorded as failed — bail out; the `finally` cleans staging.
+        if cancel is not None and cancel.is_set():
+            raise SpokeCancelled("spoke cancelled before vault promotion (stall budget exceeded)")
 
         # Both gates passed → promote atomically. Remove prior same-identity
         # entries first (OT-2), then move staging into place.

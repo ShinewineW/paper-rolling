@@ -16,6 +16,7 @@ set.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from typing import Any
 
@@ -24,14 +25,22 @@ from typing import Any
 # User granted an explicit exemption to security.md secrets MUST after being
 # warned twice that git sync pushes this into GitHub history. The token is a
 # fine-grained READ-ONLY credential; leak blast radius = public-metadata read.
-# Single source of truth; never logged, never duplicated. Replace at deploy.
+# Single source of truth; never logged, never duplicated. Replace at deploy, OR
+# set HF_TOKEN in the environment (read FIRST — see .env.example).
 # ===========================================================================
-HF_READONLY_TOKEN = "hf_REPLACE_WITH_READONLY_TOKEN"  # user-forced, read-only scope
+HF_READONLY_TOKEN = "hf_REPLACE_WITH_READONLY_TOKEN"  # user-forced fallback, read-only scope
 
 # OpenAlex polite-pool email (non-secret, D-发现-2).
 OPENALEX_POLITE_EMAIL = "ahhssxlcwjz@163.com"
 
 _BASE = "https://huggingface.co/api/papers/search"
+
+
+def _hf_token() -> str:
+    """Resolve the HF token: the HF_TOKEN env var first (honoring .env.example),
+    the hardcoded read-only constant as the self-contained fallback. Codex R17:
+    the code now actually reads the env override the docs promised."""
+    return os.environ.get("HF_TOKEN") or HF_READONLY_TOKEN
 
 
 class HFPapersSource:
@@ -42,7 +51,7 @@ class HFPapersSource:
 
     def search(self, topic: str, max_results: int = 50) -> Iterator[dict[str, Any]]:
         """Yield candidates for *topic* with code + heat enrichment."""
-        headers = {"Authorization": f"Bearer {HF_READONLY_TOKEN}"}
+        headers = {"Authorization": f"Bearer {_hf_token()}"}
         results = self._client.get_json(_BASE, {"q": topic}, headers=headers)
         emitted = 0
         for item in results or []:

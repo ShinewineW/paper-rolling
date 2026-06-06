@@ -109,6 +109,38 @@ def test_run_g2_uses_majority_vote_not_single_skeptic(tmp_path: Path) -> None:
     assert verdict.blocked is False
 
 
+def test_run_g2_fails_closed_when_skeptic_returns_no_votes(tmp_path: Path) -> None:
+    """Codex R17 (Final): G2 must FAIL CLOSED. A malformed skeptic seam that
+    returns no votes for a candidate number must NOT let it pass — an
+    unconfirmed (possibly fabricated) number is hard-blocked, not silently
+    accepted on zero coverage."""
+    ara = _make_ai_package(tmp_path)
+    md = tmp_path / "src.md"
+    md.write_text("The model achieves a BLEU of 28.4 versus 24.6.\n", encoding="utf-8")
+
+    def malformed_skeptic(numbers, source_md, claim_context):
+        return ()  # returns NOTHING — no confirmation for any number
+
+    verdict = run_g2(ara.parent, md, skeptic_votes=malformed_skeptic, n_skeptics=3)
+    assert verdict.blocked is True  # zero coverage → not confirmed → blocked
+
+
+def test_run_g2_fails_closed_on_partial_skeptic_coverage(tmp_path: Path) -> None:
+    """A skeptic that confirms only SOME candidate numbers must not let the
+    unconfirmed ones through (fail closed on partial coverage)."""
+    ara = _make_ai_package(tmp_path)
+    md = tmp_path / "src.md"
+    md.write_text("The model achieves a BLEU of 28.4 versus 24.6.\n", encoding="utf-8")
+
+    def partial_skeptic(numbers, source_md, claim_context):
+        # Only ever confirms 24.6; never votes on 28.4 → 28.4 is unconfirmed.
+        return tuple(SkepticVote(number=n, found_in_source=True) for n in numbers if n == "24.6")
+
+    verdict = run_g2(ara.parent, md, skeptic_votes=partial_skeptic, n_skeptics=3)
+    assert verdict.blocked is True
+    assert any("28.4" in f.observation for f in verdict.hard_findings)
+
+
 def test_run_g2_skeptic_seam_never_receives_evidence_path(tmp_path: Path) -> None:
     """Ground-truth isolation: the skeptic seam gets candidate numbers + source
     text only, never a handle to the evidence file (the 'answer')."""

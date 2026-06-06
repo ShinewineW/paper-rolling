@@ -54,6 +54,34 @@ def test_produce_records_code_ref_in_ledger(tmp_path, candidate, ledger, md_path
     assert result.key in ledger.code_refs
 
 
+def test_produce_aborts_before_promotion_when_cancelled(
+    tmp_path, candidate, ledger, md_path, analyzer
+):
+    """Codex R17 stall-isolation: if the per-paper guard's cancel is already set
+    by the time both gates pass, produce_outputs must NOT promote to the vault —
+    a stalled-then-resumed daemon spoke leaves no products behind (OT-5 holds)."""
+    import threading
+
+    from scripts.output.produce import SpokeCancelled
+
+    cancel = threading.Event()
+    cancel.set()
+    with pytest.raises(SpokeCancelled):
+        produce_outputs(
+            md_path,
+            candidate,
+            ledger,
+            root=tmp_path,
+            resolve_analysis=analyzer,
+            cancel=cancel,
+        )
+    # Neither vault holds a partial entry.
+    assert not (tmp_path / "person_vault").exists() or not any(
+        (tmp_path / "person_vault").iterdir()
+    )
+    assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
+
+
 def test_produce_uses_passed_resolve_analysis_not_a_global(
     tmp_path, candidate, ledger, md_path, analysis
 ):

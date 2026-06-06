@@ -64,6 +64,19 @@ def test_generate_landscapes_writes_index_and_report(tmp_path: Path):
     assert out.paper_count == 2
 
 
+def test_generate_landscapes_stamps_injected_date_not_hardcoded(tmp_path: Path):
+    # Codex R17: the report date must be injectable, not a fixed 2026-06-05 that
+    # every daily-regenerated report would carry.
+    _write_paper(
+        tmp_path, "p0", title="MethodA", year=2025, metric="mAP", value=48.0, params_m=90.0
+    )
+    generate_landscapes(tmp_path, topic="3d detection", generated_on="2099-12-31")
+    index = (tmp_path / "landscapes" / "3d-detection" / "INDEX.md").read_text(encoding="utf-8")
+    report = (tmp_path / "landscapes" / "3d-detection" / "report.md").read_text(encoding="utf-8")
+    assert "2099-12-31" in index and "2099-12-31" in report
+    assert "2026-06-05" not in index and "2026-06-05" not in report
+
+
 def test_generate_landscapes_empty_corpus_is_safe(tmp_path: Path):
     out = generate_landscapes(tmp_path, topic="empty topic")
     assert out.paper_count == 0

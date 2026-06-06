@@ -438,6 +438,36 @@ def test_run_tick_isolates_a_stalled_spoke(tmp_path: Path):
     assert res.failed_count == 1
 
 
+def test_guarded_spoke_is_signalled_to_cancel_on_stall(tmp_path: Path):
+    # Codex R17: a non-killable daemon spoke can't be force-stopped, but when the
+    # guard abandons it on stall it SETS the spoke's cancel signal — so the late
+    # finisher aborts before promoting to the vault (verified at the produce layer
+    # in tests/output/test_produce.py). Here we pin the wiring: cancel reaches the
+    # spoke and is set on timeout.
+    import threading
+    import time as _time
+
+    from scripts.hub import _run_spoke_guarded
+    from scripts.paths import FAILURE_STALLED
+
+    saw: dict = {}
+    finished = threading.Event()
+
+    def slow_spoke(cand: dict, *, cancel=None) -> SpokeResult:
+        saw["cancel_obj"] = cancel
+        _time.sleep(0.5)  # overrun the 0.15s budget so the guard abandons us
+        saw["set_after_timeout"] = cancel.is_set()
+        finished.set()
+        return _ok(cand)
+
+    res = _run_spoke_guarded(slow_spoke, _candidate("p0"), stall_seconds=0.15)
+    assert res.status == "failed"
+    assert res.failure_class == FAILURE_STALLED
+    assert finished.wait(3.0)  # let the abandoned daemon run to completion
+    assert saw["cancel_obj"] is not None  # the spoke received a cancel signal...
+    assert saw["set_after_timeout"] is True  # ...and the guard set it on timeout
+
+
 def test_watchdog_recover_isolates_a_crashing_refire(tmp_path: Path):
     # Codex Round-15: the watchdog RE-FIRE path must use the same per-paper
     # isolation as the main dispatch — a crashing re-fire spoke must NOT abort

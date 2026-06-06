@@ -11,6 +11,7 @@ This is a pure read-side aggregator: it never writes the ledger or vaults.
 
 from __future__ import annotations
 
+import datetime
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -100,11 +101,11 @@ def _efficiency(s: PaperSummary) -> float:
     return round(s.headline_value / s.params_million, 4)
 
 
-def _render_index(topic: str, papers: list[PaperSummary]) -> str:
+def _render_index(topic: str, papers: list[PaperSummary], generated_on: str) -> str:
     lines = [
         f"# {topic} — 论文索引",
         "",
-        f"> 生成日期: 2026-06-05 | 共 {len(papers)} 篇论文",
+        f"> 生成日期: {generated_on} | 共 {len(papers)} 篇论文",
         ">",
         "> [完整全景报告](report.md)",
         "",
@@ -121,12 +122,12 @@ def _render_index(topic: str, papers: list[PaperSummary]) -> str:
     return "\n".join(lines)
 
 
-def _render_report(topic: str, papers: list[PaperSummary]) -> str:
+def _render_report(topic: str, papers: list[PaperSummary], generated_on: str) -> str:
     ordered = sorted(papers, key=lambda p: (-p.year, p.title))
     lines = [
         f"# {topic} — 全景对比报告",
         "",
-        f"> 共 {len(papers)} 篇论文 | 生成日期 2026-06-05",
+        f"> 共 {len(papers)} 篇论文 | 生成日期 {generated_on}",
         "",
         "## 一、统一指标对比表",
         "",
@@ -161,14 +162,22 @@ def _render_report(topic: str, papers: list[PaperSummary]) -> str:
     return "\n".join(lines)
 
 
-def generate_landscapes(workspace: Path, *, topic: str) -> LandscapeResult:
-    """Generate landscapes/{slug}/INDEX.md + report.md for the corpus."""
+def generate_landscapes(
+    workspace: Path, *, topic: str, generated_on: str | None = None
+) -> LandscapeResult:
+    """Generate landscapes/{slug}/INDEX.md + report.md for the corpus.
+
+    `generated_on` stamps the report (ISO date); it defaults to today's date so a
+    daily /loop tick writes the current date instead of a fixed one (Codex R17).
+    Callers may inject a fixed value for deterministic output.
+    """
+    generated_on = generated_on or datetime.date.today().isoformat()
     papers = _collect(workspace)
     slug = slugify(topic)
     out_dir = Path(workspace) / "landscapes" / slug
     out_dir.mkdir(parents=True, exist_ok=True)
     index_path = out_dir / "INDEX.md"
     report_path = out_dir / "report.md"
-    index_path.write_text(_render_index(topic, papers), encoding="utf-8")
-    report_path.write_text(_render_report(topic, papers), encoding="utf-8")
+    index_path.write_text(_render_index(topic, papers, generated_on), encoding="utf-8")
+    report_path.write_text(_render_report(topic, papers, generated_on), encoding="utf-8")
     return LandscapeResult(paper_count=len(papers), index_path=index_path, report_path=report_path)

@@ -79,7 +79,10 @@ def make_spoke(
     workspace = Path(workspace)
     failed_dir = workspace / "_failed"
 
-    def spoke(candidate: dict) -> SpokeResult:
+    def spoke(candidate: dict, *, cancel=None) -> SpokeResult:
+        # `cancel` is the hub guard's stall-abort signal (threading.Event | None);
+        # threaded into produce_outputs so a spoke abandoned for overrunning its
+        # wall-clock budget aborts before promoting to the vault (Codex R17).
         source_url = candidate.get("oa_pdf_url")
 
         # 1. Ingest (tier-1 -> tier-2). On total failure: quarantine + report.
@@ -119,6 +122,7 @@ def make_spoke(
                 root=workspace,
                 resolve_analysis=resolve_analysis,
                 g2_gate=_g2,
+                cancel=cancel,
             )
 
         # 5. branch2 -> G2 -> branch1. A G2 hard block aborts before promotion.

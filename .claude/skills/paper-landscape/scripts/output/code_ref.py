@@ -45,11 +45,23 @@ def _locate(repo_dir: Path, needle: str) -> str | None:
 
 
 def _render(
-    github_repo: str | None, sha: str | None, located: list[tuple[Innovation, str | None]]
+    github_repo: str | None,
+    sha: str | None,
+    located: list[tuple[Innovation, str | None]],
+    *,
+    clone_error: str | None = None,
 ) -> str:
     lines = ["# Code Reference", ""]
     if github_repo is None:
         lines += ["**No public repository** — closed-source paper; code locations unavailable.", ""]
+    elif clone_error is not None:
+        lines += [
+            f"- **Repository (declared)**: {github_repo}",
+            f"- **Status**: unavailable — clone failed (`{clone_error}`); "
+            "code locations could not be resolved.",
+            "- **Note**: the link is recorded for provenance; re-resolve when reachable.",
+            "",
+        ]
     else:
         lines += [
             f"- **Repository**: {github_repo}",
@@ -94,6 +106,7 @@ def build_code_ref(
     repo_dir.parent.mkdir(parents=True, exist_ok=True)
     sha: str | None = None
     located: list[tuple[Innovation, str | None]] = []
+    clone_error: str | None = None
     try:
         subprocess.run(
             ["git", "clone", "--depth", "1", github_repo, str(repo_dir)],
@@ -112,7 +125,16 @@ def build_code_ref(
         )
         sha = rev.stdout.strip()
         located = [(innov, _locate(repo_dir, innov.grep)) for innov in innovations]
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
+        # A DECLARED repo that is unreachable / private / deleted is PARTIAL
+        # degradation, not an unprocessable paper (中枢-D2 / SKILL "no OSS code →
+        # don't skip"): record the pointer with an "unavailable" note and let
+        # branch2 continue, instead of letting the clone error crash the paper
+        # (Codex R17). The shared crash-isolation would otherwise quarantine it.
+        clone_error = type(exc).__name__
     finally:
         shutil.rmtree(repo_dir, ignore_errors=True)
 
-    out_path.write_text(_render(github_repo, sha, located), encoding="utf-8")
+    out_path.write_text(
+        _render(github_repo, sha, located, clone_error=clone_error), encoding="utf-8"
+    )

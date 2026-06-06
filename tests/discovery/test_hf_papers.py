@@ -39,7 +39,8 @@ def test_token_constant_is_readonly_labeled():
     assert HF_READONLY_TOKEN  # non-empty
 
 
-def test_search_uses_q_param_and_auth_header():
+def test_search_uses_q_param_and_auth_header(monkeypatch):
+    monkeypatch.delenv("HF_TOKEN", raising=False)  # pin the hardcoded fallback path
     client = StubClient([HF_RESULTS])
     src = HFPapersSource(client)
     list(src.search("end-to-end driving", max_results=10))
@@ -47,6 +48,17 @@ def test_search_uses_q_param_and_auth_header():
     assert url.endswith("/api/papers/search")
     assert q["q"] == "end-to-end driving"
     assert headers.get("Authorization") == f"Bearer {HF_READONLY_TOKEN}"
+
+
+def test_search_prefers_env_token_over_hardcoded(monkeypatch):
+    # Codex R17: .env.example promises an HF_TOKEN override — the code must
+    # actually read it (env first, hardcoded constant as fallback).
+    monkeypatch.setenv("HF_TOKEN", "hf_env_override_xyz")
+    client = StubClient([HF_RESULTS])
+    src = HFPapersSource(client)
+    list(src.search("q", max_results=10))
+    _url, _q, headers = client.calls[0]
+    assert headers.get("Authorization") == "Bearer hf_env_override_xyz"
 
 
 def test_candidate_extracts_github_keywords_upvotes():

@@ -17,6 +17,7 @@ ledger (single-writer, avoids YAML corruption — logging.md).
 
 from __future__ import annotations
 
+import inspect
 import re
 import threading
 import time
@@ -69,7 +70,10 @@ class Ledger(Protocol):  # structural — the real corpus-ledger satisfies this
 
 
 DiscoverFn = Callable[[str, int], list[dict]]
-SpokeFn = Callable[[dict], SpokeResult]
+# A spoke takes a candidate and optionally a `cancel` threading.Event (the
+# production spoke accepts it; ad-hoc test spokes may omit it — see
+# _run_spoke_guarded, which passes it only when the signature accepts it).
+SpokeFn = Callable[..., SpokeResult]
 
 
 def _safe_key(raw: str) -> str:
@@ -212,10 +216,15 @@ def _run_spoke_guarded(
     with the same per-paper budget (Codex Round-14).
     """
     box: dict[str, object] = {}
+    # Stall-abort signal: SET on timeout so a late-finishing daemon spoke aborts
+    # before promoting to the vault (Codex R17). Passed only to spokes that accept
+    # it, so ad-hoc test spokes `def spoke(cand)` keep working.
+    cancel = threading.Event()
+    accepts_cancel = "cancel" in inspect.signature(spoke).parameters
 
     def _worker() -> None:
         try:
-            box["result"] = spoke(candidate)
+            box["result"] = spoke(candidate, cancel=cancel) if accepts_cancel else spoke(candidate)
         except Exception as exc:  # noqa: BLE001 — per-paper isolation; never abort the tick
             box["error"] = exc
 
@@ -226,7 +235,9 @@ def _run_spoke_guarded(
     src = candidate.get("oa_pdf_url") or candidate.get("source_url")
     if worker.is_alive():
         # Still running past the budget — abandon it (the daemon dies at process
-        # exit) and move on so the tick keeps making progress.
+        # exit) and move on so the tick keeps making progress. Signal cancel so a
+        # late finisher does NOT promote products after we record this paper failed.
+        cancel.set()
         return SpokeResult(
             status="failed",
             person_vault_path=None,

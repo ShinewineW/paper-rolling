@@ -24,8 +24,13 @@ If you are taking this over with no prior context:
   `.claude/skills/paper-landscape/scripts/`. There is **no `__main__`** that runs a
   campaign — the runtime (a Claude Code agent) composes the pipeline by calling
   `run_campaign(...)` and supplying the seams (see **Entry points** below).
-- The four **model seams** (LLM-backed callables) are the only thing not in code;
-  their exact contract is in `SKILL.md` → "Wiring the model seams".
+- The runtime injects the **seams** — everything LLM-backed or I/O-backed lives
+  outside the pure core. These are: three **infrastructure adapters** the driver
+  supplies (`discover`, `http`, `run_cli`), and the **LLM-backed seams** — the
+  four analysis/audit callables (`resolve_analysis`, `skeptic_votes`,
+  `rigor_scores`, `entailment_judge`) **plus** the query-expansion `llm` used
+  inside the `discover` callable. Their exact contracts are in `SKILL.md` →
+  "Wiring the model seams".
 - Tests are the executable spec. Start at `tests/test_spoke.py` (full per-paper
   pipeline with fake seams) and `tests/test_run_campaign.py` (the driver).
 - To **extend** the engine (new source / tier / gate / branch / cross-paper step),
@@ -188,13 +193,17 @@ ruff" is the validation gate.
    PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.output.anchor_lint <file>...
    ```
 
-## The four injected model seams
+## The injected seams
 
-The composition is CODE; the only thing the runtime constructs is four
-provider-agnostic LLM-backed callables. Each **MUST** be an **independent Agent-tool
-invocation** (a fresh sub-agent per call) so audit votes stay uncorrelated with the
-generator. `SKILL.md` → "Wiring the model seams" documents the exact input/output
-shape of each:
+The composition is CODE; the runtime injects the seams. Two infrastructure
+adapters + a network client are supplied to `run_campaign(...)` — **`discover`**
+(the discovery callable, built over the query-expansion `llm` + the source
+clients), **`http`**, and **`run_cli`** — and the LLM-backed analysis/audit
+callables below. Note there are **five** LLM-backed seams in total: the
+query-expansion `llm` (inside `discover`) plus the four here. Each of the four
+**MUST** be an **independent Agent-tool invocation** (a fresh sub-agent per call)
+so audit votes stay uncorrelated with the generator. `SKILL.md` → "Wiring the
+model seams" documents the exact input/output shape of each:
 
 - **`resolve_analysis(md_path, candidate) -> dict`** — the analyzer sub-agent that
   reads the frozen `{ID}.md` and returns the ARA bundle (incl. `headline_metric` /

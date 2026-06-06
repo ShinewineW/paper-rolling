@@ -82,17 +82,25 @@ def _collect_evidence_numbers(ara_dir: Path) -> tuple[str, ...]:
     return tuple(seen)
 
 
-def _majority_says_missing(votes_per_round: list[tuple[SkepticVote, ...]], number: str) -> bool:
-    """True iff a strict majority of skeptic rounds reported `number` NOT found."""
-    missing = 0
-    total = 0
+def _insufficiently_confirmed(
+    votes_per_round: list[tuple[SkepticVote, ...]], number: str, n_skeptics: int
+) -> bool:
+    """True iff `number` is NOT affirmatively confirmed present by a strict
+    majority of the n_skeptics rounds — i.e. the gate must hard-block it.
+
+    Fails CLOSED: missing votes, absent votes, and a malformed skeptic seam that
+    returns no/partial votes ALL count as "not confirmed", so a misbehaving
+    verifier can never silently pass an unverified (possibly fabricated) number.
+    A number passes only when a strict majority of the EXPECTED rounds each
+    affirmatively report it found in the source MD.
+    """
+    found = 0
     for round_votes in votes_per_round:
         for v in round_votes:
-            if v.number == number:
-                total += 1
-                if not v.found_in_source:
-                    missing += 1
-    return total > 0 and missing * 2 > total
+            if v.number == number and v.found_in_source:
+                found += 1
+                break  # at most one affirmative confirmation per round
+    return found * 2 <= n_skeptics
 
 
 def run_g2(
@@ -106,7 +114,8 @@ def run_g2(
 
     `ai_package_dir` is the per-paper vault entry directory (containing `ara/`).
     `md_path` is the source MD (ground truth). Hard-blocks any evidence number
-    that the majority of skeptics cannot locate in the source.
+    NOT affirmatively confirmed present by a strict majority of skeptics — so the
+    gate fails CLOSED if the skeptic seam misbehaves (returns no/partial votes).
     """
     ara_dir = find_ara_dir(ai_package_dir)
     source_md = md_path.read_text(encoding="utf-8")
@@ -123,16 +132,16 @@ def run_g2(
 
     findings: list[Finding] = []
     for idx, number in enumerate(candidate_numbers, start=1):
-        if _majority_says_missing(votes_per_round, number):
+        if _insufficiently_confirmed(votes_per_round, number, n_skeptics):
             findings.append(
                 Finding(
                     finding_id=f"G2F{idx:02d}",
                     severity=Severity.CRITICAL,
                     target=str(ara_dir.relative_to(ai_package_dir.parent)),
                     observation=(
-                        f"evidence number {number!r} not found in source MD by "
-                        f"majority skeptic vote — likely fabricated or "
-                        f"mis-transcribed"
+                        f"evidence number {number!r} not confirmed present in the "
+                        f"source MD by a majority of skeptics — likely fabricated, "
+                        f"mis-transcribed, or unverifiable"
                     ),
                     is_hard_block=True,
                     reasoning=(

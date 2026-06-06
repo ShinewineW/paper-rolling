@@ -110,15 +110,19 @@ never a re-derived key.
 ## Wiring the model seams [MUST]
 
 `make_spoke(...)` (and the `run_campaign(...)` driver that composes it) take four
-**injected model seams**. The composition is CODE — the only thing left to the
-runtime is constructing these four callables. Each seam **MUST** be backed by an
-**independent Agent-tool invocation** (a fresh sub-agent per call) so the audit
-votes are uncorrelated with the generator that produced the numbers. The entry
-point the `/loop` tick drives, once the four seams are constructed, is
-**`scripts/run_campaign.py`** → `run_campaign(workspace, discover,
-resolve_analysis, skeptic_votes, rigor_scores, entailment_judge, http, run_cli,
-...)`; it builds the ledger, wires the seams into `make_spoke`, and calls
-`run_campaign_tick` (which raises `GateRequired` if the campaign Hard Gate is not
+**injected analysis/audit model seams**. The composition is CODE; the runtime
+injects everything LLM-backed or I/O-backed. Besides these four, the runtime also
+supplies the infrastructure adapters `discover` / `http` / `run_cli`, and the
+`discover` callable is itself built over a **fifth** LLM-backed seam — the
+query-expansion `llm` (`discovery.query_expand.expand_queries(topic, llm=...)`).
+Each of the four below **MUST** be backed by an **independent Agent-tool
+invocation** (a fresh sub-agent per call) so the audit votes are uncorrelated with
+the generator that produced the numbers. The entry point the `/loop` tick drives,
+once the seams are constructed, is **`scripts/run_campaign.py`** →
+`run_campaign(workspace, discover, resolve_analysis, skeptic_votes, rigor_scores,
+entailment_judge, http, run_cli, ...)`; it builds the ledger, wires the seams into
+`make_spoke`, and calls `run_campaign_tick` (which raises `GateRequired` if the
+campaign Hard Gate is not
 satisfied). Do **not** hard-code an LLM call — the seams are provider-agnostic.
 
 1. **`resolve_analysis(md_path, candidate) -> dict`** — the analyzer sub-agent.

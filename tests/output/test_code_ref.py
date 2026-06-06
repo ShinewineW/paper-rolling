@@ -48,6 +48,36 @@ def test_clone_is_deleted_pointer_survives(tmp_path, monkeypatch):
     assert not (clone_root / "2411.15139").exists()
 
 
+def test_clone_failure_degrades_to_stub_not_crash(tmp_path, monkeypatch):
+    """Codex R17 (Final): a DECLARED repo that fails to clone (private / deleted /
+    unreachable) must degrade to an 'unavailable' pointer and let branch2
+    continue — NOT raise and quarantine the whole paper."""
+    real_run = subprocess.run
+
+    def failing_clone(cmd, *args, **kwargs):
+        if cmd[:2] == ["git", "clone"]:
+            raise subprocess.CalledProcessError(128, cmd, stderr="repository not found")
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", failing_clone)
+    clone_root = tmp_path / "repos"
+    out = tmp_path / "code_ref.md"
+    # Must not raise.
+    build_code_ref(
+        github_repo="https://github.com/x/deleted-or-private",
+        innovations=[Innovation(name="X", grep="X")],
+        out_path=out,
+        clone_root=clone_root,
+        idbase="2411.15139",
+    )
+    body = out.read_text(encoding="utf-8")
+    assert "unavailable" in body.lower()
+    assert "https://github.com/x/deleted-or-private" in body  # link kept for provenance
+    assert "CalledProcessError" in body
+    # Clone dir cleaned up.
+    assert not (clone_root / "2411.15139").exists()
+
+
 def test_closed_source_writes_stub(tmp_path):
     out = tmp_path / "code_ref.md"
     build_code_ref(
