@@ -64,15 +64,21 @@ Status keys: `planned` · `in-progress` · `done`.
   trained NLI / factual-consistency check that generalizes beyond keyword cues.
   *Source:* ARS uncited-assertion guarded detector; factual-consistency models.
 
-## Carried from the oh-my-codex audit (R21, open)
+## Carried from the oh-my-codex audit (R21) — RESOLVED (owner overrule, evidence-based)
 
-- **W1. Ship production wiring factories** — `planned` (owner decision pending).
-  `run_campaign` requires `discover` / `http` / `run_cli` injected; the
-  "only LLM is not in code" claim is not true as delivered. Ship `scripts/wiring.py`
-  (`build_http` urllib / `build_run_cli` subprocess / `build_discover` source
-  assembly) so only the LLM seams are external — OR formally adopt the
-  agent-composes-infra skill model and correct the docs. See the review log
-  (`attn_sink/oh-my-codex-review-log.md`, Round 21).
+- **W1. Production wiring** — `optional` (BLOCKING severity OVERRULED by the owner,
+  2026-06-07, grounded in open-source evidence). Codex's R21 BLOCKING ("not runnable
+  without writing adapter code") misjudges the SKILL operating model: `anthropics/skills`
+  ship no standalone runner and rely on the host agent harness to orchestrate, so the
+  absence of a standalone autonomous `main()` is by design, not a defect — and the
+  LLM seams must be the agent (correctly already injected). The remaining ~40 lines of
+  deterministic glue (`build_http`/`build_run_cli`/`build_discover`) are an OPTIONAL,
+  norm-aligned convenience: every comparable project (gpt-researcher, paper-qa, STORM,
+  smolagents) AND Anthropic's own skills (docx/pdf) ship deterministic helper scripts,
+  and `ingest(http=…, run_cli=…)` needs Python callables the agent's WebFetch/Bash tools
+  cannot directly be — so shipping the factories is the norm, but it is low-priority
+  polish, NOT a gate. See `attn_sink/oh-my-codex-review-log.md` (R21) + the 2026-06-07
+  evidence pass.
 
 ## Recommended execution order
 
