@@ -43,6 +43,16 @@ _CLAIM_HEADER = re.compile(r"^##\s+(C\d{2,}):\s*(.+?)\s*$", re.MULTILINE)
 _PROOF_LINE = re.compile(r"\*\*Proof\*\*:\s*(.+)$", re.MULTILINE)
 _EXP_ID = re.compile(r"E\d{2,}")
 
+# A markdown table separator row (| --- | --- |) — carries no data.
+_TABLE_SEP = re.compile(r"^\|[\s:|-]+\|$")
+# Provenance LOCATORS (Table 1 / §4 / Section 9 / Figure 2 / Eq 3 / Appendix A1).
+# These are references, NOT evidence/metric values — strip them before counting
+# so an honest skeptic does not hard-block a clean paper on a locator digit that
+# happens to be absent from the source MD (Codex Round-10/11).
+_LOCATOR = re.compile(
+    r"(?i)(?:\b(?:tables?|tab|sections?|sec|figures?|fig|equations?|eq|appendix|app)\.?\s*|§\s*)\d+"
+)
+
 _CAUSAL = ("causes", "leads to", "enables", "because", "drives")
 _GENERALIZATION = ("generalizes", "robust", "across", "transfers")
 _IMPROVEMENT = ("outperform", "better", "improves", "beats", "exceeds", "surpass")
@@ -107,23 +117,36 @@ def extract_claim_registry(ara_dir: Path) -> tuple[ClaimRecord, ...]:
 
 
 def _collect_evidence_numbers(ara_dir: Path) -> tuple[str, ...]:
-    """Every number that appears in evidence/ tables + the claim statements.
-    These are the candidates that MUST ground in the source MD."""
+    """Metric numbers in evidence-table DATA CELLS + claim statements — the
+    candidates that MUST ground in the source MD.
+
+    Deliberately scopes to the actual evidence VALUES and excludes provenance
+    METADATA (Codex Round-10/11): only the markdown table DATA rows under
+    evidence/tables/ are read (the per-table `# title` / `- **Source**` locator /
+    `- **Caption**` lines and the evidence/README.md index are skipped), and
+    locator references (Table 1 / §4 / Section 9 …) are stripped — so a locator
+    digit absent from the source MD never false-blocks a clean paper, while a
+    fabricated METRIC value in a data cell is still caught."""
     seen: list[str] = []
 
     def _add(text: str) -> None:
-        for n in extract_numbers(text):
+        for n in extract_numbers(_LOCATOR.sub(" ", text)):
             if n not in seen:
                 seen.append(n)
 
-    evidence = ara_dir / "evidence"
-    if evidence.exists():
-        for md_file in sorted(evidence.rglob("*.md")):
-            _add(md_file.read_text(encoding="utf-8"))
+    tables_dir = ara_dir / "evidence" / "tables"
+    if tables_dir.exists():
+        for md_file in sorted(tables_dir.glob("*.md")):
+            for line in md_file.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                # Only real markdown table rows (data + header); skip the
+                # `# title` / `- **Source**` / `- **Caption**` metadata lines and
+                # the `| --- |` separator. Header cells are column names, not
+                # numbers, so including them is harmless.
+                if stripped.startswith("|") and not _TABLE_SEP.match(stripped):
+                    _add(stripped)
     for rec in extract_claim_registry(ara_dir):
-        for n in rec.numbers:
-            if n not in seen:
-                seen.append(n)
+        _add(rec.statement)
     return tuple(seen)
 
 

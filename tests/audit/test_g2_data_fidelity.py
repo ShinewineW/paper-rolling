@@ -131,3 +131,30 @@ def test_run_g2_skeptic_seam_never_receives_evidence_path(tmp_path: Path) -> Non
         # source_md is the MD ground truth, not the evidence table content.
         assert "| Ours |" not in source_md
         assert str(ara) not in claim_context
+
+
+def test_run_g2_ignores_evidence_metadata_locators(tmp_path: Path) -> None:
+    # Codex Round-11: the evidence-table Source/Caption metadata carries locator
+    # digits (Section 9 / Table 1 / §4) that are NOT metric values. They must be
+    # excluded so an honest skeptic does not hard-block a clean paper on a locator
+    # digit absent from the source MD — while the real metric (28.4) is verified.
+    ara = tmp_path / "ai_package" / "2026-06-05_X_1" / "ara"
+    (ara / "logic").mkdir(parents=True)
+    (ara / "evidence" / "tables").mkdir(parents=True)
+    (ara / "logic" / "claims.md").write_text("# Claims\n", encoding="utf-8")
+    (ara / "evidence" / "tables" / "main.md").write_text(
+        "# main\n"
+        "- **Source**: Section 9, Table 1, §4\n"
+        '- **Caption**: "results"\n\n'
+        "| Model | BLEU |\n|---|---|\n| Ours | 28.4 |\n",
+        encoding="utf-8",
+    )
+    md = tmp_path / "src.md"
+    # Source MD contains the metric 28.4 but NOT the locator digits 9/1/4.
+    md.write_text("Our model reaches a BLEU of 28.4.\n", encoding="utf-8")
+
+    def honest(numbers, source_md, claim_context):
+        return tuple(SkepticVote(number=n, found_in_source=(n in source_md)) for n in numbers)
+
+    verdict = run_g2(ara.parent, md, skeptic_votes=honest, n_skeptics=3)
+    assert not verdict.blocked  # locators excluded; only the metric 28.4 (present) verified
