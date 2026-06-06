@@ -112,3 +112,19 @@ def write_mineru_output(out_dir: Path, *, md: str, images: list[str], content_li
     for name in images:
         (img_dir / name).write_bytes(b"\x89PNG\r\n")
     (out_dir / "content_list.json").write_text(content_list)
+
+
+# --- Chunk 3 (ledger): make frozen dataclasses resolve under file-path imports ---
+# The ledger tests load their engine modules via
+# importlib.util.spec_from_file_location(...) + exec_module(...) WITHOUT
+# registering the result in sys.modules. On Python 3.13, dataclasses'
+# annotation resolver (_is_type) does sys.modules.get(cls.__module__).__dict__,
+# which raises AttributeError: 'NoneType' has no '__dict__' for a frozen
+# dataclass defined in an unregistered module (e.g. CorpusRecord in "corpus").
+# Pre-register placeholder modules under the names those tests use so the
+# resolver finds a real (empty) namespace. Conftest is imported before the test
+# modules, so these placeholders are in place by exec_module time.
+import types as _types  # noqa: E402
+
+for _engine_mod_name in ("naming", "corpus", "store"):
+    sys.modules.setdefault(_engine_mod_name, _types.ModuleType(_engine_mod_name))
