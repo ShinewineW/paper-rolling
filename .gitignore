@@ -21,6 +21,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# CodeGraph index (per-machine, regenerable tooling state)
+.codegraph/
+
 # Transient clone area (analysis-D2: clone-then-delete; pointers kept in ai_package).
 /tmp/paper-repos/
 
