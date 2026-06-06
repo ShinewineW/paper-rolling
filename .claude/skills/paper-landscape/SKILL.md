@@ -63,28 +63,43 @@ gate (no candidate-list approval) — the entry gate is the only HITL point.
 ## Full pipeline order (per tick)
 
 The hub (single ledger writer) drives this order; spokes run max-N papers in
-parallel, but **serial within one paper** (branch2 emits before branch1):
+parallel, but **serial within one paper** (branch2 emits before branch1). The
+ordinal sequence is discover → ingest → ledger → branch2 → **G2** → branch1 →
+**G3** → landscapes (G2 sits between the branches; G3 after both):
 
-1. **discover** — `scripts/discover.py`: multi-signal OR ranking (ADR-0001),
-   over-pull 2–3×N candidate pool.
-2. **ingest** — `scripts/convert_pdf.py`: arXiv-HTML (Tier 1) → MinerU (Tier 2);
-   both fail → quarantine to `_failed/` (吸收-D6). Produces `corpus/{ID}/{ID}.md`
-   + `.md_contract.json`.
-3. **ledger** — `scripts/ledger.py`: version-aware skip + hash-on-fetch; the hub
-   is the **only** writer (`processed_ledger.yaml`, atomic append).
-4. **branch2** — ARA compiler: `ai_package/{date}_{Name}/ara/` (AI knowledge
-   pack; exact numbers only under `evidence/`).
-5. **branch1** — illustration author: `person_vault/{date}_{Name}/` (Chinese
-   report; Mermaid redraw + derivation + loss explainer; every empirical claim
-   anchored to the MD via `<!--ref-->` markers, 吸收-D1).
-6. **G2 / G3** — audit gates: G2 (number/claim fidelity, adversarial multi-vote,
-   hard-block on fabrication) runs **after branch2, before branch1** (on branch2's staged ARA evidence); G3
-   (branch1↔MD consistency + equation fidelity + 6-dim rigor seal) runs **after
-   branches**. Hard failures block + re-emit (max N rounds → escalate / flag for
-   human).
-7. **landscapes** — `scripts/landscapes.py` (corpus-batch-comparator): after the
+1. **discover** — `scripts/discovery/discover.py`: multi-signal OR ranking
+   (ADR-0001), over-pull 2–3×N candidate pool.
+2. **ingest** — `scripts/ingest/ingest.py`: arXiv-HTML (Tier 1) → MinerU
+   (Tier 2); both fail → quarantine to `_failed/` (吸收-D6). Produces
+   `corpus/{ID}/{ID}.md` + `.md_contract.json`.
+3. **ledger** — `scripts/ledger/store.py`: version-aware skip + hash-on-fetch;
+   the hub is the **only** writer (`processed_ledger.yaml`, atomic append).
+4. **branch2** — ARA compiler: `ai_package/{date}_{Name}_{idbase}/ara/` (AI
+   knowledge pack; exact numbers only under `evidence/`).
+5. **G2** — data-fidelity gate (number/claim fidelity, adversarial multi-vote,
+   hard-block on fabrication): runs **after branch2, before branch1**, on
+   branch2's staged ARA evidence. A hard block aborts before branch1 and any
+   promotion (OT-5: nothing reaches the real vault).
+6. **branch1** — illustration author: `person_vault/{date}_{Name}_{idbase}/`
+   (Chinese report; Mermaid redraw + derivation + loss explainer; every
+   empirical claim anchored to the MD via `<!--ref-->` markers, 吸收-D1).
+7. **G3** — seal gate (branch1↔MD consistency + equation fidelity + 6-dim rigor
+   seal): runs **after both branches**. Hard failures block + re-emit (max N
+   rounds → escalate / flag for human).
+8. **landscapes** — `scripts/landscapes.py` (corpus-batch-comparator): after the
    batch, regenerate `landscapes/{topic}/INDEX.md` + `report.md` (unified metric
    tables, efficiency, trends).
+
+### Per-paper spoke
+
+The per-paper pipeline (steps 2–7) is realized by `scripts/spoke.py`
+`make_spoke(...)`, which composes ingest → branch2 → G2 → branch1 → G3 in order
+via the bounded `gate_runner`. G2/branch1 are wired **through** `produce_outputs`
+(the only place that holds the staged branch2 before branch1), so a G2 hard
+block aborts before promotion; G3 runs after promotion under the bounded runner.
+The spoke **never** writes the ledger (single-writer invariant): the hub records
+the EXACT `person_vault_path` / `ai_package_path` that `produce_outputs` returns,
+never a re-derived key.
 
 ## Failure handling (中枢-D2)
 

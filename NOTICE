@@ -2,16 +2,23 @@ paper-rolling
 =============
 This research-only workspace is licensed CC-BY-NC 4.0 (see LICENSE).
 
-It VENDORS exactly TWO modules VERBATIM (+ a small public-alias trailer, no
-logic change) from academic-research-skills by Cheng-I Wu
+It VENDORS exactly TWO modules from academic-research-skills by Cheng-I Wu
 (https://github.com/Imbad0202/academic-research-skills),
 Copyright (c) 2026 Cheng-I Wu, licensed CC-BY-NC 4.0 (Attribution-NonCommercial).
-Per its terms — attribution, license link, and indication of changes:
+The logic is unchanged; each file carries a small public-alias trailer plus
+behavior-preserving ruff autofixes. Per its terms — attribution, license link,
+and indication of changes:
 
-  scripts/_text_similarity.py  -> discovery/_text.py   (CHANGE: appended a 3-line
-                                  public-alias trailer: similarity/normalize_title/THRESHOLD)
-  scripts/verification_cache.py -> discovery/cache.py   (CHANGE: appended a 2-line
-                                  public-alias trailer: CitationCache/TTL_DAYS)
+  scripts/_text_similarity.py  -> discovery/_text.py   (CHANGES, behavior-
+                                  preserving: appended a 3-line public-alias
+                                  trailer — similarity/normalize_title/THRESHOLD;
+                                  ruff I001 — removed one blank line in the
+                                  import block. No logic change.)
+  scripts/verification_cache.py -> discovery/cache.py   (CHANGES, behavior-
+                                  preserving: appended a 2-line public-alias
+                                  trailer — CitationCache/TTL_DAYS; ruff UP017 —
+                                  rewrote `timezone.utc` as `datetime.UTC`
+                                  (identical value). No logic change.)
 
   License: https://creativecommons.org/licenses/by-nc/4.0/
 

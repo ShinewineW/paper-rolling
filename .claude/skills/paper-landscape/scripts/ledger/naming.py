@@ -26,6 +26,13 @@ def derive_name(title: str) -> str:
     non-alphanumeric char, split on whitespace, capitalize each token's first
     letter, concatenate, truncate to 40 chars. Empty result → "Untitled".
 
+    NOTE — NOT the live vault-key authority. The live pipeline (produce_outputs
+    → spoke → ledger.record) names entries via `scripts.output.naming.vault_key`
+    / `derive_name`, which SPLIT the title on the first ':' (this one does NOT),
+    yielding a DIFFERENT name for colon-titled papers. Pinned by its own test;
+    use `scripts.output.naming` for any new caller. (`identity_key` /
+    `version_key` below ARE the live idempotency keys — no such caveat.)
+
     Args:
         title: Raw paper title (typically the arXiv title).
 
@@ -83,5 +90,12 @@ def vault_entry_name(ingest_date: str, title: str, arxiv_id: str | None, doi: st
 
     `ingest_date` is the INGEST day (YYYY-MM-DD), never the publication date
     (双输出-D5). The identity suffix uniquifies same-day same-name papers.
+
+    NOTE — NOT the live vault-key authority. The live pipeline (produce_outputs
+    → spoke → ledger.record) builds the vault entry name with
+    `scripts.output.naming.vault_key` (which splits the title on ':') and the
+    ledger records the path produce_outputs returns verbatim — never this
+    function. Pinned by its own test; use `scripts.output.naming.vault_key` for
+    any new caller.
     """
     return f"{ingest_date}_{derive_name(title)}_{identity_key(arxiv_id, doi)}"

@@ -48,10 +48,7 @@ def test_short_name_is_deterministic_and_sanitized():
     # CamelCase the significant words, truncate.
     assert paths.short_name("Attention Is All You Need") == "AttentionIsAllYouNeed"
     # Punctuation / colons / hyphens stripped, not turned into word breaks oddly.
-    assert (
-        paths.short_name("DiffusionDrive: End-to-End Driving")
-        == "DiffusionDriveEndToEndDriving"
-    )
+    assert paths.short_name("DiffusionDrive: End-to-End Driving") == "DiffusionDriveEndToEndDriving"
     # Empty / junk title falls back to a stable token, never empty.
     assert paths.short_name("   ???   ") == "Untitled"
     # Same input always yields the same output (idempotent).

@@ -174,6 +174,15 @@ def vault_key(
         2026-06-05_DiffusionDriveEndToEndDriving_2411.15139
 
     intake_date is the ingest day (not the publication date) per 双输出-D5.
+
+    NOTE — NOT the live vault-key authority. The live pipeline
+    (produce_outputs → spoke → ledger.record) builds keys with
+    `scripts.output.naming.vault_key`, which SPLITS the title on the first ':'
+    (yielding the conventional paper short-name) and records the path
+    produce_outputs returns verbatim. This `short_name` does NOT split on ':',
+    so it yields a DIFFERENT name for colon-titled papers. Pinned by its own
+    tests; kept only for those. Use `scripts.output.naming.vault_key` for any
+    new caller.
     """
     suffix = _identity_suffix(arxiv_base, doi)
     return f"{intake_date}_{short_name(title)}_{suffix}"
@@ -181,7 +190,12 @@ def vault_key(
 
 def vault_entry_glob(arxiv_base: str | None = None, doi: str | None = None) -> str:
     """Glob that matches an existing vault entry by identity, ignoring the date
-    prefix and short name (OT-2 reprocessing: delete-old + write-new)."""
+    prefix and short name (OT-2 reprocessing: delete-old + write-new).
+
+    NOTE — NOT the live vault-key authority. The live OT-2 reprocessing path uses
+    `scripts.output.naming.find_existing_entries`; this glob is pinned only by
+    its own test. Use `scripts.output.naming` for any new caller.
+    """
     suffix = _identity_suffix(arxiv_base, doi)
     return f"*_{suffix}"
 
