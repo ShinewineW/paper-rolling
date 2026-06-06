@@ -99,3 +99,17 @@ def test_run_g3_blocks_on_entailment_failure(tmp_path: Path) -> None:
     verdict = run_g3(person, ai, md, cl, rigor_scores=_good_rigor, entailment_judge=not_entailed)
     assert verdict.blocked is True
     assert any("baseline" in f.observation for f in verdict.hard_findings)
+
+
+def test_run_g3_hard_blocks_when_branch1_report_missing(tmp_path: Path) -> None:
+    # A person_vault entry with NO report.md must HARD-block (cannot seal an empty
+    # human branch); previously the anchor check was skipped silently and passed.
+    md, cl, person, ai = _build_paper(tmp_path, good=True)
+    (person / "report.md").unlink()  # remove branch1 report
+
+    verdict = run_g3(person, ai, md, cl, rigor_scores=_good_rigor, entailment_judge=_entailed)
+    assert verdict.blocked is True
+    assert any(
+        f.finding_id == "G3R0" and "missing branch1 report.md" in f.observation
+        for f in verdict.hard_findings
+    )

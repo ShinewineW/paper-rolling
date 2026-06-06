@@ -92,10 +92,25 @@ def run_g3(
     # Hard-blocks a count mismatch (garbled-equation ingest).
     findings.extend(check_equation_fidelity(md_path, content_list_path).findings)
 
-    # (a) branch1 <-> MD anchor resolution.
+    # (a) branch1 <-> MD anchor resolution. A MISSING branch1 report.md is a HARD
+    # block: with no report there is nothing to seal, so passing it would let the
+    # paper seal on an empty human branch (the audit found this silent pass).
     report_md = person_vault_entry / "report.md"
     if report_md.exists():
         findings.extend(check_branch1_md_anchors(report_md, md_path).findings)
+    else:
+        findings.append(
+            Finding(
+                finding_id="G3R0",
+                severity=Severity.CRITICAL,
+                target=str(report_md),
+                observation="missing branch1 report.md — cannot seal",
+                is_hard_block=True,
+                reasoning="G3 seals the branch1 human report against the MD; with no "
+                "report.md there is no branch1 to anchor-check, so the paper must NOT seal.",
+                suggestion="Re-emit branch1 so person_vault/{key}/report.md exists, then re-run.",
+            )
+        )
 
     # (b) type-aware entailment.
     claims = extract_claim_registry(ara_dir)
