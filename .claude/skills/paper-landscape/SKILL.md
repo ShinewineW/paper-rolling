@@ -1,85 +1,104 @@
 ---
 name: paper-landscape
-description: >-
-  Autonomous paper-knowledge engine for the paper-rolling workspace. Use when
-  surveying SOTA, building a research knowledge base, or running a long-lived
-  daily paper campaign. Triggers on "paper survey", "SOTA landscape", "调研论文",
-  "paper-landscape". Project-specific — runs only inside ~/Coding/paper-rolling/.
-allowed-tools: Bash Read Write Edit Glob Grep AskUserQuestion
+description: Autonomous paper-knowledge engine for the paper-rolling workspace. Discovers authoritative + latest papers (multi-signal OR ranking), ingests via arXiv-HTML→MinerU, and emits a human report (person_vault/) plus an AI knowledge pack (ai_package/) per paper, gated by adversarial audits. Use inside ~/Coding/paper-rolling/ to survey a field, build a SOTA landscape, or run a daily /loop research campaign.
+license: CC-BY-NC-4.0
 ---
 
-# paper-landscape (v2) — autonomous paper-knowledge engine
+# paper-landscape (v2 — paper-rolling engine)
 
-This skill is the engine for the `paper-rolling` workspace. It discovers,
-ingests, analyzes, and dual-publishes papers as accumulated knowledge products.
-It is **project-specific** (基调-D3): it hard-assumes the workspace layout
-(`corpus/` `_ledger/` `person_vault/` `ai_package/` `landscapes/` `_failed/`
-`config/`) and is **not** a globally installable skill.
+Project-specific engine for the `~/Coding/paper-rolling/` workspace. It turns a
+confirmed research topic into a growing knowledge base: per-paper human reports
+(`person_vault/`) + AI knowledge packs (`ai_package/`), plus cross-paper
+landscapes. It is **not** a general installable skill — it hard-assumes the
+paper-rolling workspace layout (`corpus/`, `_ledger/`, `person_vault/`,
+`ai_package/`, `landscapes/`, `config/`).
 
-> Run only from the workspace root: `cd ~/Coding/paper-rolling` first.
-> All on-disk layout is defined in `scripts/paths.py` — never hardcode paths.
+## Entry: the campaign Hard Gate (HITL, once per campaign) — MUST
 
-## Entry: the campaign Hard Gate [MUST]
+The **first action** on a new campaign is a blocking **Hard Gate** (中枢-D1).
+You MUST get explicit human confirmation of **two** things, then lock them into
+`config/campaign.yaml`:
 
-**[MUST] On a NEW or CHANGED campaign, the FIRST step is a blocking Hard Gate.**
-You may not enter discovery / download / processing until the user has
-**explicitly confirmed two things** (中枢-D1):
+1. **Topic** — precise, not vague. If the user says something broad ("自动驾驶"),
+   propose a narrowed scope and get confirmation. A vague single-term topic is
+   rejected (`GateError`).
+2. **N per tick** — the explicit number of papers to *successfully* process per
+   `/loop` tick (the cost/disk ceiling). No number → no go.
 
-1. **Topic — precise, non-ambiguous.** If the user gives a vague topic
-   (e.g. "autonomous driving"), you MUST propose a narrowed scope and get
-   confirmation. Never start on a vague topic.
-2. **Count — an explicit per-round paper number (`per_round_count`).** This is
-   the success target AND the cost/disk ceiling for each round. No number → no go.
-
-Both confirmations are written into `config/campaign.yaml` (吸收-D4). This Hard
-Gate runs **once at campaign establishment** (a human is present), not on every
-round. Use `AskUserQuestion` here, and ONLY here.
-
-## Daily autonomous cadence: `/loop`
-
-After the campaign is locked, schedule daily incremental runs:
-
-```
-/loop 1d /paper-landscape
+```bash
+# Establish the campaign (run once, human present):
+PYTHONPATH=.claude/skills/paper-landscape uv run python -c "from scripts.campaign import CampaignConfig, write_campaign; \
+import pathlib; write_campaign(pathlib.Path('.'), \
+CampaignConfig(topic='end-to-end AD trajectory prediction', n_per_tick=5, is_ad_domain=True))"
 ```
 
-Each `/loop` tick (吸收-D3 / 吸收-D4):
-- Reads the locked `config/campaign.yaml` — **does NOT re-gate**.
-- Incrementally processes `per_round_count` NEW papers (ledger-done papers are
-  skipped; discovery over-pulls `candidate_multiplier × N` for back-fill).
-- Runs **fully autonomously**: **[MUST] no mid-pipeline `AskUserQuestion`** after
-  the gate (中枢-D2). Any problem is self-resolved; failures are skipped, recorded
-  in `_failed/`, and back-filled from the candidate pool until N succeed or the
-  pool is exhausted.
-- A bounded round watchdog re-fires the hub if it stalls or the ledger has
-  non-`done` papers the hub claims are complete; it stops when N are done or the
-  pool empties (吸收-D3 — bounded, not a daemon).
+Until `config/campaign.yaml` exists, `run_campaign_tick` raises `GateRequired`
+and processing is blocked. Changing the topic or N re-fires the gate; a plain
+`/loop` tick on an unchanged campaign **reads the config and re-gates not at all
+— no re-gate** (吸收-D4). It runs autonomously.
 
-Re-run the Hard Gate (re-invoke and confirm) ONLY to change the topic or count.
+## Daily usage: /loop (the long-running cadence)
 
-## Pipeline (high level)
+This engine is long-running. The recommended cadence is **daily** (once per day):
 
-`Step 0` ledger load + version-aware skip + crash-residue cleanup (LS-3) →
-`Step 1` campaign params → `Step 2` discovery hub (multi-signal authority,
-ADR-0001) → `Step 2.5` ingest (arXiv-HTML → MinerU, 摄取-D1; two-tier, failures
-isolated to `_failed/`) → `Step 3` per-paper hub-spoke fan-out → `Step 4`
-cross-paper synthesis → `Step 5` landscape report in `landscapes/`.
+```
+/loop 1d Continue the paper-rolling campaign. Read config/campaign.yaml and the
+ledger. Run one tick: discover N new papers, process them through the pipeline,
+update person_vault/ + ai_package/, regenerate landscapes/. Skip ledger-done
+papers; backfill failures from the candidate pool. Never idle, never ask the user.
+```
 
-Per paper, the spoke is **strictly sequential** (§5.2 MUST): `ai_package` (ARA)
-is produced first, then `person_vault` is derived from it; the two vaults are
-written **atomically — same success or same failure** (OT-5). Cross-paper
-parallelism (disjoint `{ID}` trees) is the only concurrency; the hub is the
-single ledger writer (LS-1 `.lock`).
+Each tick **incrementally** processes N *new* papers (ledger-`done` papers are
+skipped; discovery over-pulls 2–3×N candidates so failures can be backfilled).
+A per-tick **watchdog** (bounded, not a daemon) re-fires stalled or
+falsely-claimed-done papers up to a re-fire budget, then stops.
 
-## Outputs
+## Zero mid-pipeline questions — MUST
 
-- `corpus/{ID}/{ID}.md` — converted full-text knowledge (tracked); pdf/images
-  local-only (基调-D2).
-- `ai_package/{date}_{Name}_{id}/ara/` — AI-facing ARA knowledge pack.
-- `person_vault/{date}_{Name}_{id}/` — human-facing illustrated Chinese report.
-- `_failed/` — per-paper failure records for manual follow-up.
-- `landscapes/` — cross-paper synthesis reports.
+After the entry gate, the **中段 (mid-pipeline) is fully autonomous** (中枢-D2):
+the engine **MUST NOT** call `AskUserQuestion` or otherwise interrupt the user
+mid-pipeline. Any ambiguity is self-resolved. There is no second confirmation
+gate (no candidate-list approval) — the entry gate is the only HITL point.
 
-Vault entries pair 1:1 across `person_vault/` and `ai_package/` by the same key
-(双输出-D5); keys are deterministic (OT-3, never LLM-named) and collision-proof
-(OT-1: `{intake_date}_{Name}_{arxiv_base_or_doi_hash}`).
+## Full pipeline order (per tick)
+
+The hub (single ledger writer) drives this order; spokes run max-N papers in
+parallel, but **serial within one paper** (branch2 emits before branch1):
+
+1. **discover** — `scripts/discover.py`: multi-signal OR ranking (ADR-0001),
+   over-pull 2–3×N candidate pool.
+2. **ingest** — `scripts/convert_pdf.py`: arXiv-HTML (Tier 1) → MinerU (Tier 2);
+   both fail → quarantine to `_failed/` (吸收-D6). Produces `corpus/{ID}/{ID}.md`
+   + `.md_contract.json`.
+3. **ledger** — `scripts/ledger.py`: version-aware skip + hash-on-fetch; the hub
+   is the **only** writer (`processed_ledger.yaml`, atomic append).
+4. **branch2** — ARA compiler: `ai_package/{date}_{Name}/ara/` (AI knowledge
+   pack; exact numbers only under `evidence/`).
+5. **branch1** — illustration author: `person_vault/{date}_{Name}/` (Chinese
+   report; Mermaid redraw + derivation + loss explainer; every empirical claim
+   anchored to the MD via `<!--ref-->` markers, 吸收-D1).
+6. **G2 / G3** — audit gates: G2 (number/claim fidelity, adversarial multi-vote,
+   hard-block on fabrication) runs **after branch2, before branch1** (on branch2's staged ARA evidence); G3
+   (branch1↔MD consistency + equation fidelity + 6-dim rigor seal) runs **after
+   branches**. Hard failures block + re-emit (max N rounds → escalate / flag for
+   human).
+7. **landscapes** — `scripts/landscapes.py` (corpus-batch-comparator): after the
+   batch, regenerate `landscapes/{topic}/INDEX.md` + `report.md` (unified metric
+   tables, efficiency, trends).
+
+## Failure handling (中枢-D2)
+
+- **Whole-paper unprocessable** (download all-fail / both ingest tiers fail /
+  audit hard-block unresolved after N rounds) → skip, write a small tracked
+  record to `_failed/{key}.md`, mark `status: failed` in the ledger, and
+  **backfill** the next pool candidate until N done or the pool is exhausted.
+- **Local degradation** (garbled equations, no OSS code) → do **not** skip; tag
+  + downgrade (suppress unreliable derivation, flag) and keep the paper.
+
+## Stability invariants (long-program hardening)
+
+- Single ledger writer (hub only); `_ledger/.lock` rejects a second instance.
+- Startup consistency check: every `done` paper must have both a `person_vault/`
+  and an `ai_package/` entry; missing → downgrade to re-process (drift self-heal).
+- Vault entry key = `{入库日期}_{Name}_{arxivid_base}` (deterministic `Name`,
+  no LLM ad-hoc naming) → 1:1 person↔ai pairing, stable across runs.
