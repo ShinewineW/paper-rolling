@@ -228,3 +228,21 @@ def test_consistency_check_keeps_complete_done(tmp_path):
     demoted = led.consistency_check()
     assert demoted == []
     assert "3333.4444v1" in led.load_skip_set()
+
+
+# ---- /paper-landscape-invalidate CLI ---------------------------------------
+
+
+def test_cli_invalidate_rescinds_key(tmp_path, capsys):
+    led = Ledger(tmp_path)
+    led.record_status("k1", status="done", md_sha256="abc")
+    rc = store.main(["k1", "--topic-dir", str(tmp_path)])
+    assert rc == 0
+    assert "k1" not in Ledger(tmp_path).load_skip_set()
+
+
+def test_cli_invalidate_unknown_key_errors(tmp_path):
+    led = Ledger(tmp_path)
+    led.record_status("k1", status="done", md_sha256="abc")
+    rc = store.main(["does-not-exist", "--topic-dir", str(tmp_path)])
+    assert rc == 2

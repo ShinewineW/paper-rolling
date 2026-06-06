@@ -8,9 +8,11 @@ record_status.
 
 from __future__ import annotations
 
+import argparse
 import fcntl
 import os
 import shutil
+import sys
 import tempfile
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
@@ -298,3 +300,33 @@ def overwrite_vault_entry(vault_dir: Path, identity: str, new_entry_name: str) -
     target = vault_dir / new_entry_name
     target.mkdir(parents=True)
     return target
+
+
+def main(argv: list[str] | None = None) -> int:
+    """`/paper-landscape-invalidate <key>...` — soft-delete for force-reprocess.
+
+    Writes rescinded_at onto the latest unrescinded row for each key so it
+    drops out of the skip-set and is reprocessed next run (§3.2).
+    """
+    parser = argparse.ArgumentParser(
+        prog="paper-landscape-invalidate",
+        description="Force-reprocess one or more ledger keys (soft-delete).",
+    )
+    parser.add_argument("keys", nargs="+", help="version keys to rescind")
+    parser.add_argument("--topic-dir", type=Path, required=True, help="topic directory root")
+    args = parser.parse_args(argv)
+
+    ledger = Ledger(args.topic_dir)
+    missing = [k for k in args.keys if not ledger.invalidate(k)]
+    if missing:
+        for k in missing:
+            print(
+                f"[INVALIDATE ERROR: no active ledger entry for '{k}']",
+                file=sys.stderr,
+            )
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
