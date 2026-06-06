@@ -50,7 +50,9 @@ def identity_base(arxiv_id: str | None, doi: str | None) -> str:
     The arXiv id is taken WITHOUT version suffix (identity, not idempotency).
     """
     if arxiv_id:
-        return arxiv_id.split("v", 1)[0] if re.search(r"v\d+$", arxiv_id) else arxiv_id
+        # Strip ONLY a trailing version (v\d+$). A naive split("v") would also cut
+        # old-style IDs like "solv-int/9901001v1" at the first 'v' → "sol" (Codex R16).
+        return re.sub(r"v\d+$", "", arxiv_id)
     if doi:
         digest = hashlib.sha256(doi.strip().lower().encode("utf-8")).hexdigest()[:8]
         return f"doi-{digest}"

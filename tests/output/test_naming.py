@@ -50,6 +50,15 @@ def test_identity_base_prefers_arxiv_then_doi() -> None:
     assert identity_base(arxiv_id=None, doi="10.1145/3592979.3593412") == h
 
 
+def test_identity_base_strips_only_trailing_version() -> None:
+    # Modern IDs: a trailing vN is stripped.
+    assert identity_base(arxiv_id="2403.12345v2", doi=None) == "2403.12345"
+    # Old-style IDs with a 'v' INSIDE the category must NOT be split at the first
+    # 'v' (Codex R16 — a naive split("v") gave "sol"); strip only the trailing vN.
+    assert identity_base(arxiv_id="solv-int/9901001v1", doi=None) == "solv-int/9901001"
+    assert identity_base(arxiv_id="solv-int/9901001", doi=None) == "solv-int/9901001"
+
+
 def test_vault_key_is_date_name_idbase() -> None:
     key = vault_key(
         intake=datetime.date(2026, 6, 5),
