@@ -10,9 +10,11 @@ ONLY thing left to the runtime agent is constructing the four LLM-backed seams.
 
 The `/loop` tick drives `run_campaign(...)`:
 
-    Ledger(workspace)                          # single-writer processed-state
-      -> make_spoke(seams + http/run_cli)      # per-paper gated pipeline
-        -> run_campaign_tick(discover, spoke)  # gate-check -> batch -> landscape
+    Ledger(workspace)                            # single-writer processed-state
+      -> make_spoke(seams + http/run_cli)        # per-paper gated pipeline
+        -> with ledger.acquire():                # LS-1 single-writer lock (fail fast)
+             run_campaign_tick(discover, spoke)  # gate-check -> LS-4 self-heal
+                                                 #   -> batch -> landscape
 
 The four model seams are provider-agnostic injected callables (NO LLM call is
 hard-coded here). In production EACH seam MUST be backed by an INDEPENDENT
@@ -127,11 +129,55 @@ def run_campaign(
         entailment_judge=entailment_judge,
         ledger=ledger,
     )
-    return run_campaign_tick(
-        workspace=workspace,
-        ledger=ledger,
-        discover=discover,
-        spoke=spoke,
-        requested_topic=requested_topic,
-        requested_n=requested_n,
-    )
+    # LS-1 single-writer lock: hold _ledger/.lock for the whole tick so a second
+    # concurrent instance fails fast (LedgerLockError) instead of racing the
+    # single-writer ledger. The lock belongs at the production driver entry — NOT
+    # inside run_campaign_tick, which the hub tests call directly with their own
+    # ledger.
+    with ledger.acquire():
+        return run_campaign_tick(
+            workspace=workspace,
+            ledger=ledger,
+            discover=discover,
+            spoke=spoke,
+            requested_topic=requested_topic,
+            requested_n=requested_n,
+        )
+
+
+_USAGE = """\
+run_campaign — the paper-landscape v2 production campaign DRIVER (composition).
+
+This module is NOT runnable on its own: `run_campaign(...)` is a composition
+entry point, not a CLI. It deterministically wires
+    Ledger -> make_spoke(seams) -> (LS-1 lock) run_campaign_tick
+and runs one /loop tick of the campaign (discover -> ingest -> branch2 -> G2 ->
+branch1 -> G3 -> landscapes), with the adversarial guarantees (G2 number-
+fabrication hard-block + G3 6-dim seal) baked into code.
+
+The runtime agent (the /paper-landscape skill or the daily /loop tick) MUST call
+run_campaign(...) and supply EIGHT injected callables — it cannot be invoked
+blindly from the shell:
+
+  discover           — the discovery layer (topic, n) -> ranked candidate pool
+  resolve_analysis   — model seam #1: the analyzer sub-agent (ARA bundle)
+  skeptic_votes      — model seam #2: the G2 ground-truth-isolated skeptic
+  rigor_scores       — model seam #3: the G3 6-dim rigor reviewer
+  entailment_judge   — model seam #4: the G3 type-aware entailment judge
+  http               — HTTP fetch seam used by ingest (Tier-1 arXiv-HTML)
+  run_cli            — CLI runner seam used by ingest (Tier-2 MinerU / pandoc)
+
+The FOUR model seams MUST each be backed by an INDEPENDENT Agent-tool invocation
+(a fresh sub-agent per call) so the audit votes are uncorrelated with the
+generator. See SKILL.md "Wiring the model seams" for the exact contract of each.
+
+Running this file directly does nothing but print this message — that is by
+design (a direct invocation is not a silent no-op).\
+"""
+
+
+if __name__ == "__main__":
+    import sys
+
+    print(_USAGE)
+    sys.exit(0)

@@ -37,6 +37,41 @@ class FakeLedger:
         done = {r["key"] for r in self.records if r["status"] == "done"}
         return [k for k in (r["key"] for r in self.records) if k not in done]
 
+    def _latest_by_key(self) -> dict[str, dict]:
+        latest: dict[str, dict] = {}
+        for r in self.records:
+            latest[r["key"]] = r
+        return latest
+
+    def consistency_check(self) -> list[str]:
+        """LS-4: demote any `done` row whose vault halves are missing on disk.
+
+        Mirrors the real Ledger.consistency_check: a `done` row must have both a
+        person_vault and ai_package dir present; if either is missing, append a
+        `failed` row so the key leaves the skip-set and is reprocessed.
+        """
+        demoted: list[str] = []
+        for key, row in self._latest_by_key().items():
+            if row["status"] != "done":
+                continue
+            pv = row.get("person_vault_path")
+            ai = row.get("ai_package_path")
+            ok = bool(pv) and Path(pv).exists() and bool(ai) and Path(ai).exists()
+            if not ok:
+                demoted.append(key)
+        for key in demoted:
+            self.records.append(
+                {
+                    "key": key,
+                    "status": "failed",
+                    "failure_class": "convert_error",
+                    "person_vault_path": None,
+                    "ai_package_path": None,
+                }
+            )
+            self._skip.discard(key)
+        return demoted
+
 
 def _candidate(key: str) -> dict:
     return {"key": key, "arxiv_id": key, "title": f"Paper {key}", "source_url": f"http://x/{key}"}
@@ -274,3 +309,58 @@ def test_run_campaign_tick_runs_and_builds_landscape(tmp_path: Path):
     assert res.hub.done_count == 2
     # Landscape regenerated for the campaign topic slug.
     assert (tmp_path / "landscapes" / "multi-object-tracking" / "report.md").exists()
+
+
+def test_run_campaign_tick_self_heals_stale_done_row(tmp_path: Path):
+    # LS-4: a 'done' ledger row whose vault paths don't exist on disk is stale
+    # (ledger↔FS drift). run_campaign_tick MUST run consistency_check before the
+    # batch so the key is demoted, leaves the skip-set, and is reprocessed —
+    # NOT silently skipped.
+    write_campaign(
+        tmp_path, CampaignConfig(topic="multi object tracking", n_per_tick=1, is_ad_domain=False)
+    )
+    ledger = FakeLedger()
+    # Pre-seed a 'done' row pointing at vault dirs that were never created.
+    ledger.record(
+        "p0",
+        status="done",
+        person_vault_path=str(tmp_path / "person_vault" / "gone_p0"),
+        ai_package_path=str(tmp_path / "ai_package" / "gone_p0"),
+    )
+    assert "p0" in ledger.skip_set()  # stale row currently suppresses p0
+
+    dispatched: list[str] = []
+
+    def spoke(cand: dict) -> SpokeResult:
+        k = cand["key"]
+        dispatched.append(k)
+        ara = tmp_path / "ai_package" / f"2026-06-05_{k}" / "ara"
+        ara.mkdir(parents=True, exist_ok=True)
+        (ara / "PAPER.md").write_text(
+            "---\n"
+            f"title: T{k}\nyear: 2025\nkey: {k}\nschema_version: 1\n"
+            "headline_metric: mota\nheadline_value: 70.0\nparams_million: 50.0\n---\n",
+            encoding="utf-8",
+        )
+        return SpokeResult(
+            status="done",
+            person_vault_path=f"person_vault/2026-06-05_{k}",
+            ai_package_path=f"ai_package/2026-06-05_{k}",
+            failure_class=None,
+            failure_reason=None,
+            source_url=cand["source_url"],
+            attempted_tier="tier1",
+        )
+
+    res = run_campaign_tick(
+        workspace=tmp_path,
+        ledger=ledger,
+        discover=lambda topic, n: [_candidate("p0")],
+        spoke=spoke,
+    )
+    # The stale key was demoted (a 'failed' row appended) and reprocessed.
+    assert "p0" in dispatched
+    assert any(
+        r["key"] == "p0" and r["status"] == "failed" for r in ledger.entries()
+    )  # demoted by consistency_check
+    assert res.hub.done_count == 1

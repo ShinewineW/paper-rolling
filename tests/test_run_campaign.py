@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 from scripts.campaign import CampaignConfig, write_campaign
 from scripts.hub import GateRequired
+from scripts.ledger.store import Ledger, LedgerLockError
 from scripts.run_campaign import run_campaign
 from test_spoke import (
     _CANDIDATE,
@@ -83,3 +84,31 @@ def test_run_campaign_propagates_gate_required_without_campaign(tmp_path, fake_h
             http=fake_http,
             run_cli=fake_cli,
         )
+
+
+def test_run_campaign_fails_fast_when_ledger_locked(tmp_path, fake_http, fake_cli):
+    # LS-1 single-writer: a second concurrent instance must fail fast. While an
+    # outer holder owns _ledger/.lock, the driver's run_campaign(...) raises
+    # LedgerLockError instead of racing the single-writer ledger.
+    write_campaign(
+        tmp_path,
+        CampaignConfig(
+            topic="real-time diffusion planning",
+            n_per_tick=1,
+            is_ad_domain=True,
+        ),
+    )
+    fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
+
+    with Ledger(tmp_path).acquire():  # outer instance holds the lock
+        with pytest.raises(LedgerLockError):
+            run_campaign(
+                workspace=tmp_path,
+                discover=_discover,
+                resolve_analysis=_resolve_analysis,
+                skeptic_votes=_all_found_skeptic,
+                rigor_scores=_good_rigor,
+                entailment_judge=_entailed,
+                http=fake_http,
+                run_cli=fake_cli,
+            )

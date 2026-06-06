@@ -62,6 +62,7 @@ class Ledger(Protocol):  # structural — the real corpus-ledger satisfies this
     ) -> None: ...
     def entries(self) -> list[dict]: ...
     def non_done_keys(self) -> list[str]: ...
+    def consistency_check(self) -> list[str]: ...
 
 
 DiscoverFn = Callable[[str, int], list[dict]]
@@ -285,6 +286,11 @@ def run_campaign_tick(
         )
     cfg = load_campaign(workspace)
     assert cfg is not None  # gate_needed False guarantees a locked config
+    # LS-4 startup consistency self-heal: demote any `done` ledger row whose
+    # person_vault or ai_package half is missing on disk, so the key leaves the
+    # skip-set and is reprocessed this tick (ledger↔FS drift self-heal). Runs
+    # AFTER the gate passes and BEFORE the batch dispatch.
+    ledger.consistency_check()
     if watchdog is None:
         watchdog = Watchdog()
     hub = run_tick(
