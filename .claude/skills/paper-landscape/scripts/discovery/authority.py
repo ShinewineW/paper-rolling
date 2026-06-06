@@ -9,15 +9,19 @@ signals; a composite, recency-weighted score then orders the survivors:
   S3 institution: an authorship institution matches the org whitelist
   S4 heat      : GitHub stars + HF upvotes + recency (the search-index proxy)
 
-Whitelists default to the D-发现-5 initial lists; campaign config can override.
+Whitelists are split into a GENERAL set (always applied) and an AD/robotics
+EXTRA set; the campaign's `is_ad_domain` flag selects whether the AD extra is
+added (D-发现-5). `is_ad_domain` flows from the campaign (`CampaignConfig`) into
+the discovery `config` dict (production wiring); a campaign config can still
+override `venue_allowlist` / `institution_whitelist` outright.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-# D-发现-5 initial top-venue allowlist (matched case-insensitively as substrings).
-DEFAULT_VENUE_ALLOWLIST = (
+# D-发现-5 GENERAL top venues (ML / CV / AI) — applied for every campaign.
+GENERAL_VENUE_ALLOWLIST = (
     "NeurIPS",
     "ICML",
     "ICLR",
@@ -25,18 +29,26 @@ DEFAULT_VENUE_ALLOWLIST = (
     "ICCV",
     "ECCV",
     "AAAI",
+    "TPAMI",
+    "IJCV",
+)
+
+# Autonomous-driving / robotics venues — added only when is_ad_domain.
+AD_VENUE_ALLOWLIST = (
     "ICRA",
     "IROS",
     "CoRL",
     "RSS",
-    "TPAMI",
-    "IJCV",
     "RA-L",
     "T-RO",
 )
 
-# D-发现-5 initial institution whitelist (matched case-insensitively as substrings).
-DEFAULT_INSTITUTION_WHITELIST = (
+# Full default = general + AD (the historical list; used when is_ad_domain).
+DEFAULT_VENUE_ALLOWLIST = GENERAL_VENUE_ALLOWLIST + AD_VENUE_ALLOWLIST
+
+# D-发现-5 GENERAL institution whitelist (big AI/ML labs) — applied for every
+# campaign (matched case-insensitively as substrings).
+GENERAL_INSTITUTION_WHITELIST = (
     "Google",
     "DeepMind",
     "Meta",
@@ -46,6 +58,17 @@ DEFAULT_INSTITUTION_WHITELIST = (
     "OpenAI",
     "Apple",
     "Amazon",
+    "AI2",
+    "SenseTime",
+    "Megvii",
+    "DAMO",
+    "Tencent AI Lab",
+    "ByteDance",
+    "Noah",
+)
+
+# Autonomous-driving / robotics orgs — added only when is_ad_domain.
+AD_INSTITUTION_WHITELIST = (
     "Waymo",
     "Tesla",
     "Wayve",
@@ -54,19 +77,15 @@ DEFAULT_INSTITUTION_WHITELIST = (
     "Toyota Research",
     "TRI",
     "Boston Dynamics",
-    "AI2",
-    "SenseTime",
-    "Megvii",
     "Apollo",
-    "Noah",
     "Horizon",
-    "DAMO",
-    "Tencent AI Lab",
-    "ByteDance",
     "Momenta",
     "Pony.ai",
     "Unitree",
 )
+
+# Full default = general + AD (the historical list; used when is_ad_domain).
+DEFAULT_INSTITUTION_WHITELIST = GENERAL_INSTITUTION_WHITELIST + AD_INSTITUTION_WHITELIST
 
 # Thresholds (initial; tunable via config per ADR-0001 consequence note).
 _S1_CITE_FLOOR = 1000  # "classic high-cite"
@@ -96,10 +115,25 @@ def score_authority(
 
     A score of 0.0 means no signal fired (not authoritative). Higher is more
     authoritative; recency lifts equal-evidence recent papers.
+
+    Whitelist selection: an explicit `venue_allowlist` / `institution_whitelist`
+    in `config` always wins; otherwise the GENERAL set is used, plus the
+    AD/robotics extra when `is_ad_domain` is true. `is_ad_domain` defaults to
+    True when absent, so a discovery config that does not carry it keeps the
+    historical (general + AD) behaviour.
     """
     current_year = config.get("current_year", 2026)
-    venues = tuple(config.get("venue_allowlist", DEFAULT_VENUE_ALLOWLIST))
-    institutions_wl = tuple(config.get("institution_whitelist", DEFAULT_INSTITUTION_WHITELIST))
+    is_ad_domain = config.get("is_ad_domain", True)
+    if "venue_allowlist" in config:
+        venues = tuple(config["venue_allowlist"])
+    else:
+        venues = DEFAULT_VENUE_ALLOWLIST if is_ad_domain else GENERAL_VENUE_ALLOWLIST
+    if "institution_whitelist" in config:
+        institutions_wl = tuple(config["institution_whitelist"])
+    else:
+        institutions_wl = (
+            DEFAULT_INSTITUTION_WHITELIST if is_ad_domain else GENERAL_INSTITUTION_WHITELIST
+        )
 
     cites = candidate.get("cited_by_count") or 0
     year = candidate.get("year")

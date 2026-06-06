@@ -118,3 +118,42 @@ def test_venue_match_is_substring_case_insensitive():
     }
     sig, _ = score_authority(c, CFG)
     assert sig["s2_venue"] is True
+
+
+# --- is_ad_domain whitelist selection (foundation review: the flag must be a
+#     real consumer, not a dead config knob). No explicit override is given, so
+#     the flag itself selects the general vs general+AD whitelist set.
+
+
+def _bare(institutions=None, venue=None):
+    return {
+        "cited_by_count": 0,
+        "year": 2026,
+        "venue": venue,
+        "institutions": institutions or [],
+        "github_stars": None,
+        "upvotes": None,
+    }
+
+
+def test_is_ad_domain_false_drops_ad_only_institution_keeps_general():
+    waymo, google = _bare(institutions=["Waymo"]), _bare(institutions=["Google DeepMind"])
+    off = {"current_year": 2026, "is_ad_domain": False}
+    on = {"current_year": 2026, "is_ad_domain": True}
+    assert score_authority(waymo, off)[0]["s3_institution"] is False  # AD org dropped
+    assert score_authority(waymo, on)[0]["s3_institution"] is True  # AD org kept when AD
+    assert score_authority(google, off)[0]["s3_institution"] is True  # general lab always
+
+
+def test_is_ad_domain_false_drops_ad_only_venue_keeps_general():
+    off = {"current_year": 2026, "is_ad_domain": False}
+    assert score_authority(_bare(venue="CoRL"), off)[0]["s2_venue"] is False  # robotics dropped
+    assert score_authority(_bare(venue="CVPR"), off)[0]["s2_venue"] is True  # general kept
+
+
+def test_absent_is_ad_domain_preserves_full_default():
+    # A discovery config that does not carry is_ad_domain keeps the historical
+    # general+AD set (backward-compatible default).
+    assert score_authority(_bare(institutions=["Waymo"]), {"current_year": 2026})[0][
+        "s3_institution"
+    ]

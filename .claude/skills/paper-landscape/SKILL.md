@@ -37,6 +37,12 @@ and processing is blocked. Changing the topic or N re-fires the gate; a plain
 `/loop` tick on an unchanged campaign **reads the config and re-gates not at all
 — no re-gate** (吸收-D4). It runs autonomously.
 
+> **`is_ad_domain` wiring**: when you build the production `discover` seam, copy
+> `CampaignConfig.is_ad_domain` into the discovery `config` dict. `score_authority`
+> reads it to pick the authority whitelists — general AI/ML venues+labs always,
+> plus the autonomous-driving/robotics extra set only when `is_ad_domain` is true.
+> Omit it and the scorer defaults to the full (general+AD) set.
+
 ## Daily usage: /loop (the long-running cadence)
 
 This engine is long-running. The recommended cadence is **daily** (once per day):

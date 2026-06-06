@@ -93,9 +93,18 @@ def _mermaid_redraw(architecture_md: str) -> str:
 def _math_section(analysis: dict) -> str:
     eq = re.search(r"\$\$.*?\$\$", analysis["algorithm"], re.DOTALL)
     eq_text = eq.group(0) if eq else "$$L$$"
-    # NOTE: the toy example deliberately avoids bare matrix literals / metric
-    # tokens so it reads as illustration, not an (un-anchorable) performance
-    # claim — keeping the self-gate green.
+    # The analyzer may supply a paper-specific, number-free intuition; otherwise
+    # a neutral, domain-agnostic placeholder keeps the producer free of any
+    # paper-specific (and possibly false) domain claim. Both the derivation and
+    # the intuition deliberately avoid metric tokens / bare numbers so the
+    # section reads as illustration, not an (un-anchorable) performance claim —
+    # keeping the self-gate green regardless of which domain the paper is in.
+    intuition = analysis.get("math_intuition") or (
+        "该目标刻画了方法要最小化的误差;沿优化方向分步调整即可逐步逼近目标(直觉辅助,非严格对应)。"
+    )
+    toy = analysis.get("math_toy_example") or (
+        "取一个小规模输入,按上式迭代少数几步,即可观察到目标误差随步数下降的趋势(示意,非性能结论)。"
+    )
     return "\n".join(
         [
             "### 数学方法",
@@ -105,35 +114,41 @@ def _math_section(analysis: dict) -> str:
             f"源公式(引自 ai_package algorithm.md):{eq_text}",
             "",
             "**逐步推导**:",
-            f"- 由源公式 {eq_text} 出发,目标是最小化干净信号的重建误差。",
-            "- 截断到若干步后,期望在每一步上对噪声做去除,得到分阶段的去噪目标。",
+            f"- 由源公式 {eq_text} 出发,目标是最小化训练目标对应的误差。",
+            "- 沿优化方向迭代,在每一步上减小该误差,得到分阶段的优化目标。",
             "",
-            "**比喻(直觉辅助,非严格对应)**:像冲洗一张欠曝照片——",
-            "与其一次猛拉亮度,不如分几步逐步提亮,既快又不过曝。",
+            f"**比喻(直觉辅助,非严格对应)**:{intuition}",
             "",
-            "**玩具例子**:取一个小输入矩阵,按固定衰减系数迭代少数几步,",
-            "即可逼近干净信号,验证截断扩散仍然收敛。",
+            f"**玩具例子**:{toy}",
         ]
     )
 
 
-def _loss_section(key: str) -> str:
+def _loss_section(analysis: dict, key: str) -> str:
     # The paired ai_package shares the SAME vault key. From person_vault/{key}/
     # report.md, the paired evidence dir is ../../ai_package/{key}/ara/evidence/
     # (up to the repo root, then into ai_package). `key` is the real vault key,
     # threaded from produce_outputs — never the old "REPLACE_KEY" placeholder
     # (Codex Round-10: that placeholder + wrong depth broke the cross-link).
+    #
+    # The three explainer bullets are sourced from the analyzer's per-paper
+    # `loss_highlight` so the producer asserts NO fixed domain narrative; the
+    # neutral fallbacks (used when the analyzer omits a field) are number-free
+    # and metric-cue-free so the section never trips the anchor gate.
     evidence_link = f"../../ai_package/{key}/ara/evidence/"
+    lh = analysis.get("loss_highlight") or {}
+    direction = lh.get("direction") or "该损失针对方法要解决的核心训练目标设计。"
+    mechanism = (
+        lh.get("mechanism") or "通过对该目标的优化,模型习得论文主张的能力(链 数学方法 推导)。"
+    )
+    baseline = lh.get("baseline") or "相比基线方案,该设计在论文关注的方向上更契合任务目标。"
     return "\n".join(
         [
             "### Loss 亮点解释",
             "",
-            '- **修复方向**:去噪损失冲的是"轨迹多模态坍缩"这一弱点——'
-            "标准回归损失会把多个合理未来平均成一个模糊解。",
-            "- **机制**:在截断扩散链上施加分步去噪信号(链 数学方法 推导),"
-            "让模型保留多模态而非平均化。",
-            "- **对比基线**:标准回归在多模态下天然取均值,修不了该方向;"
-            "交叉熵则需离散化轨迹,损失精度。",
+            f"- **修复方向**:{direction}",
+            f"- **机制**:{mechanism}",
+            f"- **对比基线**:{baseline}",
             "- **证据**:对比数据见 "
             f"[ai_package evidence]({evidence_link})"
             "(branch1 不复制精确数字,交由审计层双分支一致性门核对)。",
@@ -211,10 +226,12 @@ def write_branch1(
         "",
         _math_section(analysis),
         "",
-        _loss_section(key),
+        _loss_section(analysis, key),
         "",
         "## 趋势与定位",
-        "该方法将扩散式规划推向实时区间,推动端到端规划向多模态保真演进。",
+        # Analyzer-sourced positioning; neutral fallback asserts no fixed domain.
+        analysis.get("trend")
+        or "该工作在其研究方向上推进了当前方法的能力边界(综述见配对 ai_package 分析)。",
     ]
     if _force_unanchored:
         sections.append("我们的方法在 KITTI 上提升了 9.9 个百分点。")  # no anchor → must fail gate

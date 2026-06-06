@@ -71,6 +71,19 @@ def analysis() -> dict:
     """The analyzer-spoke bundle (Chunk 3 contract) for one paper."""
     return {
         "overview": "A truncated-diffusion planning policy.",
+        # Per-paper domain narrative (branch2 domain stamp + branch1 prose). All
+        # number-free / metric-cue-free so branch1's anchor gate stays green.
+        "domain": "autonomous driving",
+        "math_intuition": "像分步打磨一块粗坯,每一步都更接近目标形状(直觉辅助,非严格对应)。",
+        "math_toy_example": (
+            "取一个小规模输入,按上式迭代少数几步,目标误差随步数下降(示意,非性能结论)。"
+        ),
+        "loss_highlight": {
+            "direction": "去噪损失针对轨迹多模态被平均化这一弱点设计。",
+            "mechanism": "在截断扩散链上施加分步去噪信号,让模型保留多模态(链 数学方法 推导)。",
+            "baseline": "相比标准回归在多模态下取均值,该设计更契合多模态目标。",
+        },
+        "trend": "该方法把扩散式规划推向更实用的运行区间。",
         # Headline contract → branch2 frontmatter → landscapes comparator.
         "headline_metric": "NDS",
         "headline_value": 0.61,
@@ -337,16 +350,12 @@ def analysis() -> dict:
     }
 
 
-@pytest.fixture(autouse=True)
-def _patch_analyzer(monkeypatch, analysis):
-    """Inject the analyzer-spoke bundle so produce_outputs is hermetic.
+@pytest.fixture
+def analyzer(analysis):
+    """The injected `resolve_analysis` seam for tests.
 
-    In production, Chunk 3's hub passes the real analysis bundle; in tests we
-    patch the resolver the orchestrator calls. Autouse + guarded import so it
-    is a no-op for the earlier tasks whose module does not yet exist.
+    produce_outputs takes `resolve_analysis` as a keyword parameter (no module
+    global), so tests pass this fixture explicitly instead of monkeypatching a
+    global. In production, Chunk 3's hub passes the real per-paper analyzer.
     """
-    try:
-        import scripts.output.produce as prod
-    except ModuleNotFoundError:
-        return
-    monkeypatch.setattr(prod, "resolve_analysis", lambda md_path, candidate: analysis)
+    return lambda md_path, candidate: analysis

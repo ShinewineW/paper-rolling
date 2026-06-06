@@ -7,9 +7,10 @@ moves BOTH into their vaults under one shared key (OT-5: both or neither).
 Re-processing the same paper-identity deletes any prior same-identity entries
 first (OT-2). Naming is deterministic (OT-3).
 
-The hub (Chunk 3/5) supplies the analyzer bundle via `resolve_analysis`; tests
-patch it. The contract is `produce_outputs(md_path, candidate, ledger) ->
-ProduceResult(key=...)`.
+The hub (Chunk 3/5) supplies the analyzer bundle via the injected
+`resolve_analysis` callable (a per-paper Agent-tool seam, passed as a keyword
+argument). The contract is `produce_outputs(md_path, candidate, ledger, *,
+resolve_analysis) -> ProduceResult(key=...)`.
 """
 
 from __future__ import annotations
@@ -48,24 +49,13 @@ class ProduceGateBlocked(Exception):
         super().__init__("branch2 hard-blocked by the G2 data-fidelity gate")
 
 
-def resolve_analysis(md_path: Path, candidate: Any) -> dict:  # pragma: no cover
-    """Return the analyzer-spoke bundle for this paper.
-
-    Overridden by the hub (Chunk 3) at runtime and patched in tests. Importing
-    the analyzer here would create a cross-chunk dependency, so the seam is a
-    module-level function the caller injects.
-    """
-    raise NotImplementedError(
-        "resolve_analysis must be provided by the hub (Chunk 3) before produce_outputs runs"
-    )
-
-
 def produce_outputs(
     md_path: Path,
     candidate: Any,
     ledger: Any,
     root: Path | None = None,
     *,
+    resolve_analysis: Callable[[Path, Any], dict],
     g2_gate: Callable[[Path], Any] | None = None,
 ) -> ProduceResult:
     """Produce branch2 + branch1 atomically into the two top-level vaults.
@@ -76,6 +66,9 @@ def produce_outputs(
         ledger: Ledger; provides `intake_date()` and `record_code_ref(key, path)`.
         root: Workspace root containing `person_vault/` and `ai_package/`.
               Defaults to the current working directory.
+        resolve_analysis: Injected per-paper seam `(md_path, candidate) -> dict`
+              returning the analyzer bundle. Passed as a keyword (no module-global
+              state) so concurrent spokes never share/mutate one analyzer.
         g2_gate: Optional G2 data-fidelity gate, called with the staged ai ENTRY
               dir (parent of `ara/`) AFTER branch2 + Seal-1 and BEFORE branch1.
               A blocked verdict raises ProduceGateBlocked, aborting before any

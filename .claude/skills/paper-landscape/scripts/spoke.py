@@ -34,7 +34,6 @@ from scripts.audit.gate_runner import run_with_budget
 from scripts.audit.types import EntailmentJudgeFn, RigorScoreFn, SkepticVoteFn
 from scripts.hub import SpokeFn, SpokeResult, _candidate_key
 from scripts.ingest.ingest import IngestFailed, IngestResult, ingest, quarantine
-from scripts.output import produce as produce_mod
 from scripts.output.branch1_report import AnchorGateError
 from scripts.output.produce import ProduceGateBlocked, ProduceResult, produce_outputs
 from scripts.paths import FAILURE_AUDIT_BLOCK, FAILURE_CONVERT_ERROR
@@ -101,10 +100,7 @@ def make_spoke(
         # 2. content_list.json: tier-2 emits one; tier-1 needs a synthetic stand-in.
         content_list_path = ing.content_list_path or _synthesize_content_list(ing.md_path)
 
-        # 3. Inject the analyzer-spoke bundle resolver for produce_outputs.
-        produce_mod.resolve_analysis = resolve_analysis
-
-        # 4. Wire G2 into produce_outputs (runs after branch2, before branch1).
+        # 3. Wire G2 into produce_outputs (runs after branch2, before branch1).
         def _g2(stage_ai_entry: Path):
             return run_g2(
                 stage_ai_entry,
@@ -113,8 +109,17 @@ def make_spoke(
                 n_skeptics=n_skeptics,
             )
 
+        # 4. The analyzer seam is passed as a parameter (no module-global
+        #    mutation) so concurrent spokes never share one analyzer.
         def _attempt() -> ProduceResult:
-            return produce_outputs(ing.md_path, candidate, ledger, root=workspace, g2_gate=_g2)
+            return produce_outputs(
+                ing.md_path,
+                candidate,
+                ledger,
+                root=workspace,
+                resolve_analysis=resolve_analysis,
+                g2_gate=_g2,
+            )
 
         # 5. branch2 -> G2 -> branch1. A G2 hard block aborts before promotion.
         try:

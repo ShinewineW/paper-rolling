@@ -27,7 +27,8 @@ def test_identity_key_strips_arxiv_version():
 def test_identity_key_doi_fallback_short_hash():
     k = naming.identity_key(arxiv_id=None, doi="10.1109/CVPR52688.2022.01164")
     assert k.startswith("doi-")
-    assert len(k) == len("doi-") + 12  # 12-char short hash, OT-1
+    # Delegates to output.naming.identity_base → one DOI-hash length (8-char).
+    assert len(k) == len("doi-") + 8
 
 
 def test_version_key_keeps_version():

@@ -49,7 +49,9 @@ def _paper_md(candidate: dict, analysis: dict) -> str:
         "doi": candidate.get("doi") or f"arXiv:{candidate['arxiv_id']}",
         "ara_version": ARA_VERSION,
         "schema_version": SCHEMA_VERSION,
-        "domain": "deep learning",
+        # Analyzer supplies the paper's domain; "deep learning" is a neutral
+        # fallback (never a fixed AD/diffusion stamp on an off-domain paper).
+        "domain": analysis.get("domain", "deep learning"),
         "keywords": [c["name"] for c in analysis["concepts"][:8]],
         "claims_summary": [c["statement"] for c in analysis["claims"][:3]],
         # Headline contract → landscapes.py cross-paper metric table.

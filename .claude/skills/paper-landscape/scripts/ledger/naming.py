@@ -9,12 +9,19 @@ NOTE — these helpers are SUPERSEDED on the live path (retained because they ar
 plan-built and unit-tested). The live ledger keys its rows by the hub-derived
 candidate key (arxiv_id→doi→title, see `hub._candidate_key` / `store.record`),
 not by these helpers; live vault naming is `scripts.output.naming.vault_key`.
+
+Identity derivation has a SINGLE authority: `identity_key` delegates to
+`scripts.output.naming.identity_base`, so there is exactly one arXiv-version-
+strip rule and one DOI-hash algorithm/length across the whole tree (no latent
+8-vs-12-hex divergence). `version_key` stays here — it is the version-AWARE skip
+key, a distinct idempotency concern with no equivalent in output.naming.
 """
 
 from __future__ import annotations
 
-import hashlib
 import re
+
+from scripts.output.naming import identity_base
 
 _ARXIV_VERSION_RE = re.compile(r"v\d+$")
 
@@ -27,18 +34,14 @@ def _strip_arxiv_version(arxiv_id: str) -> str:
 def identity_key(arxiv_id: str | None, doi: str | None) -> str:
     """Identity key for vault dedup/overwrite (version-STRIPPED).
 
-    arxiv_id base wins; else a stable short hash of the DOI (so the key is
-    filesystem-safe regardless of DOI slashes). One of the two must be set.
+    Delegates to `scripts.output.naming.identity_base` (the single identity
+    authority): arxiv_id base wins; else a stable short hash of the DOI (so the
+    key is filesystem-safe regardless of DOI slashes). One of the two must be set.
 
     Raises:
         ValueError: if both arxiv_id and doi are None/empty.
     """
-    if arxiv_id:
-        return _strip_arxiv_version(arxiv_id)
-    if doi:
-        digest = hashlib.sha256(doi.encode("utf-8")).hexdigest()[:12]
-        return f"doi-{digest}"
-    raise ValueError("identity_key requires arxiv_id or doi")
+    return identity_base(arxiv_id, doi)
 
 
 def version_key(arxiv_id: str | None, arxiv_version: str | None, doi: str | None) -> str:

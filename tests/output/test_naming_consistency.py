@@ -19,9 +19,9 @@ from scripts.output.naming import vault_key
 from scripts.output.produce import produce_outputs
 
 
-def test_live_authority_key_matches_output_naming(tmp_path, candidate, ledger, md_path, analysis):
+def test_live_authority_key_matches_output_naming(tmp_path, candidate, ledger, md_path, analyzer):
     """produce_outputs' returned key == output.naming.vault_key for same inputs."""
-    produced = produce_outputs(md_path, candidate, ledger, root=tmp_path)
+    produced = produce_outputs(md_path, candidate, ledger, root=tmp_path, resolve_analysis=analyzer)
 
     expected = vault_key(
         intake=ledger.intake_date(),
@@ -33,10 +33,10 @@ def test_live_authority_key_matches_output_naming(tmp_path, candidate, ledger, m
 
 
 def test_ledger_recorded_path_equals_on_disk_vault_dir(
-    tmp_path, candidate, ledger, md_path, analysis
+    tmp_path, candidate, ledger, md_path, analyzer
 ):
     """The recorded vault paths are the EXACT on-disk dirs (no re-derivation)."""
-    produced = produce_outputs(md_path, candidate, ledger, root=tmp_path)
+    produced = produce_outputs(md_path, candidate, ledger, root=tmp_path, resolve_analysis=analyzer)
 
     # produce_outputs returns the dirs it actually created.
     assert produced.person_path.is_dir()

@@ -61,6 +61,11 @@ def short_name(title: str, *, max_len: int = 40) -> str:
     """Deterministic CamelCase short name from a title (OT-3: no LLM naming).
 
     Strips non-word chars, CamelCases tokens, truncates. Stable across runs.
+
+    NOTE: deliberately DISTINCT from `scripts.output.naming.derive_name` — this
+    derives the corpus `{ID}` dir (full-title slug, max 40), while derive_name
+    derives the vault `{key}` (short-name-before-first-colon, max 60). They are
+    two separate stable ID spaces on purpose; do NOT consolidate them.
     """
     tokens = [t for t in _NONWORD.split(title) if t]
     camel = "".join(w[:1].upper() + w[1:] for w in tokens)
