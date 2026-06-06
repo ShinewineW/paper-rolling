@@ -1,11 +1,12 @@
 """Vault-key authority is unambiguous: the LIVE pipeline uses output.naming.
 
-FIX C guard. Three near-identical `vault_key`-shaped helpers exist
-(`scripts.paths`, `scripts.ledger.naming`, `scripts.output.naming`) with
-DIFFERENT colon-splitting semantics. Only `scripts.output.naming.vault_key` is
-the live authority: `produce_outputs` builds the key with it and returns the
-EXACT on-disk vault paths, which the spoke/hub record verbatim. This test pins
-that contract so a future caller can't silently pick a divergent helper.
+There is now exactly ONE vault-key authority — `scripts.output.naming.vault_key`.
+The divergent duplicates that used to live in `scripts.paths` and
+`scripts.ledger.naming` were removed (zero live callers). This test pins the
+single-authority contract: `produce_outputs` builds the key with
+`output.naming.vault_key` and returns the EXACT on-disk vault paths, which the
+spoke/hub record verbatim — so a future caller cannot silently pick a divergent
+helper (there is none to pick).
 
 Note: this file lives under tests/output/ to inherit the candidate/ledger/
 md_path/analysis fixtures (+ the autouse analyzer patch) from the output
@@ -14,8 +15,6 @@ conftest; the consistency claim it pins is naming-wide, not output-local.
 
 from __future__ import annotations
 
-import scripts.ledger.naming as ledger_naming
-import scripts.paths as paths
 from scripts.output.naming import vault_key
 from scripts.output.produce import produce_outputs
 
@@ -47,36 +46,19 @@ def test_ledger_recorded_path_equals_on_disk_vault_dir(
     assert produced.ai_path == tmp_path / "ai_package" / produced.key
 
 
-def test_dead_duplicate_helpers_diverge_from_live_authority(candidate, ledger):
-    """The dead duplicates yield a DIFFERENT name on colon titles — the footgun
-    the docstring NOTEs warn about. This pins WHY output.naming is authoritative.
+def test_output_naming_is_the_sole_vault_key_authority():
+    """The divergent duplicates are gone: scripts.paths and scripts.ledger.naming
+    no longer expose any vault-NAMING helper, so output.naming.vault_key is the
+    only authority a caller can reach (no silent divergence is possible).
     """
-    title = candidate["title"]  # "DiffusionDrive: Truncated Diffusion ..."
-    intake = ledger.intake_date()
+    import scripts.ledger.naming as ledger_naming
+    import scripts.paths as paths
 
-    live = vault_key(intake=intake, title=title, arxiv_id=candidate["arxiv_id"], doi=None)
-    # Live authority splits on ':' -> short paper-name only.
-    assert "_DiffusionDrive_" in live
-
-    # paths.vault_key / ledger.naming.vault_entry_name do NOT split on ':' -> the
-    # full title camel-cased. Same identity suffix, but a divergent {Name}.
-    paths_key = paths.vault_key(
-        intake_date=intake.isoformat(),
-        title=title,
-        arxiv_base=candidate["arxiv_id"],
-        doi=None,
-    )
-    ledger_key = ledger_naming.vault_entry_name(
-        ingest_date=intake.isoformat(),
-        title=title,
-        arxiv_id=candidate["arxiv_id"],
-        doi=None,
-    )
-    # Both dead helpers keep the full title camel-name (no ':' split) -> diverge
-    # from the live authority. (They also differ from EACH OTHER on truncation
-    # bound — paths caps at 48, ledger at 40 — underscoring there is exactly one
-    # authority, not three interchangeable ones.)
-    assert paths_key != live
-    assert ledger_key != live
-    assert "_DiffusionDriveTruncated" in paths_key
-    assert "_DiffusionDriveTruncated" in ledger_key
+    assert not hasattr(paths, "vault_key")
+    assert not hasattr(paths, "short_name")
+    assert not hasattr(paths, "vault_entry_glob")
+    assert not hasattr(ledger_naming, "vault_entry_name")
+    assert not hasattr(ledger_naming, "derive_name")
+    # The surviving ledger helpers are version/identity keys, a different concern.
+    assert hasattr(ledger_naming, "identity_key")
+    assert hasattr(ledger_naming, "version_key")

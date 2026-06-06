@@ -2,8 +2,12 @@
 """On-disk layout for the paper-rolling workspace — the single source of truth.
 
 Every engine module (discovery, ledger, ingest, dual-output, audit) imports the
-directory-name constants, path builders, and vault-keying helpers from here so
-the layout contract is defined exactly once.
+directory-name constants and path builders from here so the on-disk-layout
+contract is defined exactly once. This module is the on-disk-layout +
+status-enum source of truth. It is NOT the vault-keying authority: the single
+live vault-key authority is `scripts.output.naming.vault_key` (paths.py cannot
+delegate to output.naming because output imports paths — that would be an import
+cycle — so vault-keying lives entirely in output.naming).
 
 Layout (基调-D2 / 双输出-D5 / 中枢-D2):
     <root>/
@@ -18,18 +22,15 @@ Layout (基调-D2 / 双输出-D5 / 中枢-D2):
       config/campaign.yaml    locked campaign params (吸收-D4)
       .cache/citations.db     SQLite citation cache (gitignored)
 
-Vault keying (双输出-D5 / OT-1 / OT-3): entry name =
+Vault keying (双输出-D5 / OT-1 / OT-3): the entry name is
     {intake_date}_{Name}_{identity}
-where Name is a DETERMINISTIC CamelCase slug of the title (never LLM-named) and
-identity is the arxiv base id, or a short hash of the DOI for non-arXiv papers.
-This makes same-day same-title entries collision-free and lets reprocessing find
-the existing entry by identity, ignoring the date prefix (OT-2).
+built by `scripts.output.naming.vault_key` (the sole authority). See that module
+for the deterministic CamelCase Name derivation and the arxiv-base / DOI-hash
+identity suffix.
 """
 
 from __future__ import annotations
 
-import hashlib
-import re
 from pathlib import Path
 
 # --- directory-name constants (the contract) -------------------------------
@@ -48,12 +49,6 @@ LEDGER_LOCK_FILENAME = ".lock"  # LS-1 concurrency lock
 CAMPAIGN_FILENAME = "campaign.yaml"
 CITATIONS_DB_FILENAME = "citations.db"
 MD_CONTRACT_FILENAME = ".md_contract.json"
-
-# --- vault-keying knobs -----------------------------------------------------
-
-MAX_SHORT_NAME_LEN = 48  # OT-3 truncation bound
-DOI_HASH_LEN = 8  # OT-1 DOI disambiguator length
-_FALLBACK_NAME = "Untitled"
 
 
 # --- root resolution --------------------------------------------------------
@@ -122,82 +117,6 @@ def cache_dir(root: Path) -> Path:
 
 def citations_db(root: Path) -> Path:
     return cache_dir(root) / CITATIONS_DB_FILENAME
-
-
-# --- deterministic vault keying (OT-1 / OT-3) -------------------------------
-
-_NON_ALNUM = re.compile(r"[^0-9A-Za-z]+")
-
-
-def short_name(title: str) -> str:
-    """Deterministic CamelCase slug of a paper title (OT-3: never LLM-named).
-
-    Splits on any run of non-alphanumeric characters, capitalizes each token's
-    first letter, concatenates, and truncates to MAX_SHORT_NAME_LEN. Returns a
-    stable fallback for empty/junk titles so the result is never empty.
-    """
-    tokens = [t for t in _NON_ALNUM.split(title or "") if t]
-    if not tokens:
-        return _FALLBACK_NAME
-    camel = "".join(t[0].upper() + t[1:] for t in tokens)
-    return camel[:MAX_SHORT_NAME_LEN]
-
-
-def doi_short_hash(doi: str) -> str:
-    """Stable short hex hash of a DOI for vault-key disambiguation (OT-1)."""
-    digest = hashlib.sha256(doi.strip().lower().encode("utf-8")).hexdigest()
-    return digest[:DOI_HASH_LEN]
-
-
-def _identity_suffix(arxiv_base: str | None, doi: str | None) -> str:
-    """Identity disambiguator: arxiv base id, else DOI short hash.
-
-    Identity = arxiv_id(base) || DOI per the '同篇判定' rule. Raises if neither
-    is present, because a paper with no canonical identity cannot be keyed.
-    """
-    if arxiv_base:
-        return arxiv_base
-    if doi:
-        return doi_short_hash(doi)
-    raise ValueError("vault_key requires an identity: arxiv_base or doi must be set")
-
-
-def vault_key(
-    intake_date: str,
-    title: str,
-    arxiv_base: str | None = None,
-    doi: str | None = None,
-) -> str:
-    """Build the collision-proof vault entry name (OT-1).
-
-    Format: {intake_date}_{ShortName}_{identity}, e.g.
-        2026-06-05_DiffusionDriveEndToEndDriving_2411.15139
-
-    intake_date is the ingest day (not the publication date) per 双输出-D5.
-
-    NOTE — NOT the live vault-key authority. The live pipeline
-    (produce_outputs → spoke → ledger.record) builds keys with
-    `scripts.output.naming.vault_key`, which SPLITS the title on the first ':'
-    (yielding the conventional paper short-name) and records the path
-    produce_outputs returns verbatim. This `short_name` does NOT split on ':',
-    so it yields a DIFFERENT name for colon-titled papers. Pinned by its own
-    tests; kept only for those. Use `scripts.output.naming.vault_key` for any
-    new caller.
-    """
-    suffix = _identity_suffix(arxiv_base, doi)
-    return f"{intake_date}_{short_name(title)}_{suffix}"
-
-
-def vault_entry_glob(arxiv_base: str | None = None, doi: str | None = None) -> str:
-    """Glob that matches an existing vault entry by identity, ignoring the date
-    prefix and short name (OT-2 reprocessing: delete-old + write-new).
-
-    NOTE — NOT the live vault-key authority. The live OT-2 reprocessing path uses
-    `scripts.output.naming.find_existing_entries`; this glob is pinned only by
-    its own test. Use `scripts.output.naming` for any new caller.
-    """
-    suffix = _identity_suffix(arxiv_base, doi)
-    return f"*_{suffix}"
 
 
 # --- status + failure-class enums (used by ledger + audit slices) ----------
