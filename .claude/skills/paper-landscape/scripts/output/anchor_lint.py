@@ -184,3 +184,41 @@ def lint_text(text: str) -> list[AnchorViolation]:
             )
 
     return violations
+
+
+def _main() -> int:
+    """CLI: lint markdown files for the three-layer citation contract.
+
+    Exit 0 = all conform; 1 = violations; 2 = invocation error.
+    """
+    import argparse
+    import sys
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(
+        description="paper-rolling three-layer citation lint (HARD gate)"
+    )
+    parser.add_argument("paths", nargs="+", type=Path, help="markdown files to lint")
+    args = parser.parse_args()
+
+    total: list[str] = []
+    for p in args.paths:
+        if not p.exists():
+            print(f"{p}: file does not exist", file=sys.stderr)
+            return 2
+        for v in lint_text(p.read_text(encoding="utf-8")):
+            total.append(f"{p}:{v.line}: {v.message}")
+
+    if total:
+        print("\n".join(total), file=sys.stderr)
+        print(
+            f"\n[paper-rolling three-layer-citation lint] FAILED ({len(total)} violation(s))",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"[paper-rolling three-layer-citation lint] PASSED ({len(args.paths)} file(s))")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())
