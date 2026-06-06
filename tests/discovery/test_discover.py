@@ -37,6 +37,16 @@ class FakeSource:
         return iter(self._candidates)
 
 
+class FakeDblp:
+    """Venue-enrichment source: maps a title -> a confirmed venue (or None)."""
+
+    def __init__(self, venues: dict[str, str] | None = None):
+        self._venues = venues or {}
+
+    def venue_for_title(self, title: str) -> str | None:
+        return self._venues.get(title)
+
+
 def fake_llm(prompt):
     return ["topic", "MethodX"]
 
@@ -78,7 +88,7 @@ def make_sources():
         ]
     )
     arxiv = FakeSource([])
-    dblp = FakeSource([])
+    dblp = FakeDblp()  # no venue confirmations by default (preserves prior behavior)
     hf = FakeSource(
         [
             _c(
@@ -142,6 +152,69 @@ def test_discover_tags_preprint_flag_and_signals():
     assert hot["preprint_flag"] is True  # arxiv_id, no reviewed venue
     assert hot["authority_signals"]["s4_heat"] is True
     assert "authority_score" in hot
+
+
+def test_discover_dblp_enriches_venue_and_fires_s2_signal():
+    # A candidate with NO venue would normally fire no signal and be dropped by
+    # the ADR-0001 any-signal filter. DBLP confirms its venue is "CVPR" -> the
+    # S2 venue signal fires, so it survives, AND its venue is the DBLP venue.
+    oa = FakeSource(
+        [
+            _c(
+                arxiv_id="2601.00001",
+                title="Venueless Authoritative Work",
+                year=2026,
+                venue=None,  # no venue from the search sources
+                discovery_sources=["openalex"],
+            ),
+        ]
+    )
+    dblp = FakeDblp({"Venueless Authoritative Work": "CVPR"})
+    sources = {
+        "openalex": oa,
+        "s2": FakeSource([]),
+        "arxiv": FakeSource([]),
+        "dblp": dblp,
+        "hf_papers": FakeSource([]),
+    }
+    out = discover(base_config(), sources=sources, llm=fake_llm)
+
+    enriched = next(c for c in out if c["title"] == "Venueless Authoritative Work")
+    # DBLP wrote the confirmed venue back onto the candidate...
+    assert enriched["venue"] == "CVPR"
+    # ...the S2 venue signal fired (so it survived the any-signal filter)...
+    assert enriched["authority_signals"]["s2_venue"] is True
+    # ...and "dblp" was appended to the candidate's discovery sources (deduped).
+    assert "dblp" in enriched["discovery_sources"]
+    assert enriched["discovery_sources"].count("dblp") == 1
+
+
+def test_discover_dblp_does_not_overwrite_existing_venue():
+    # A candidate that ALREADY has a usable venue is not re-queried against DBLP.
+    oa = FakeSource(
+        [
+            _c(
+                arxiv_id="2601.00002",
+                title="Already Has Venue",
+                year=2026,
+                venue="CVPR",
+                discovery_sources=["openalex"],
+            ),
+        ]
+    )
+    dblp = FakeDblp({"Already Has Venue": "ICCV"})  # would differ if it ran
+    sources = {
+        "openalex": oa,
+        "s2": FakeSource([]),
+        "arxiv": FakeSource([]),
+        "dblp": dblp,
+        "hf_papers": FakeSource([]),
+    }
+    out = discover(base_config(), sources=sources, llm=fake_llm)
+
+    cand = next(c for c in out if c["title"] == "Already Has Venue")
+    assert cand["venue"] == "CVPR"  # untouched
+    assert "dblp" not in cand["discovery_sources"]
 
 
 def test_discover_each_candidate_has_full_interface_shape():

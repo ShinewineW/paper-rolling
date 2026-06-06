@@ -92,6 +92,21 @@ def discover(
 
     merged = dedup_candidates(raw)
 
+    # DBLP venue ENRICHMENT (D-发现-3, signal S2): for candidates that arrived
+    # without a usable venue, ask DBLP to confirm one by title match. A
+    # DBLP-confirmed top venue then lets authority.score_authority's S2 signal
+    # fire, so the candidate can survive the ADR-0001 any-signal filter below.
+    dblp = sources.get("dblp")
+    if dblp is not None:
+        for cand in merged:
+            if not cand.get("venue"):
+                venue = dblp.venue_for_title(cand["title"])
+                if venue:
+                    cand["venue"] = venue
+                    srcs = cand.setdefault("discovery_sources", [])
+                    if "dblp" not in srcs:
+                        srcs.append("dblp")
+
     scored: list[dict[str, Any]] = []
     for cand in merged:
         signals, score = score_authority(cand, campaign_config)
