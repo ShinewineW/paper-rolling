@@ -58,6 +58,10 @@ _SOURCE_MD = (
 # numbers all appear in _SOURCE_MD above.
 _ANALYSIS = {
     "overview": "A truncated-diffusion planning policy.",
+    # Headline contract → branch2 frontmatter → landscapes comparator.
+    "headline_metric": "NDS",
+    "headline_value": 0.61,
+    "params_million": 60.0,
     "problem": {
         "observations": [
             {
@@ -563,6 +567,10 @@ def test_campaign_tick_runs_spoke_and_builds_landscape(tmp_path, fake_http, fake
     # Landscape was generated for the locked topic slug.
     assert tick.landscape.index_path.exists()
     assert tick.landscape.report_path.exists()
+    # End-to-end proof: branch2's headline frontmatter now FEEDS landscapes, so
+    # the cross-paper table is non-empty for a real processed paper (not silently
+    # skipped for lacking the headline keys).
+    assert tick.landscape.paper_count >= 1
     # The ledger recorded a true-done row with both vault paths.
     done_rows = [r for r in ledger.entries() if r["status"] == "done"]
     assert done_rows

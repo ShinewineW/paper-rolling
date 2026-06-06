@@ -9,6 +9,14 @@ Seal-1 on self-check:
 
 OT-4: PAPER.md frontmatter carries `schema_version` so mixed-schema vaults
 stay machine-distinguishable.
+
+Analysis-bundle headline contract (consumed by landscapes.py): the bundle
+carries three flat keys the analyzer fills as the paper's leaderboard headline
+for cross-paper comparison — `headline_metric: str` (e.g. "NDS"),
+`headline_value: float` (the paper's headline number), and `params_million:
+float` (model size in millions). _paper_md mirrors them into the PAPER.md
+frontmatter (plus the logical `key`) so the corpus-batch-comparator can build
+the unified metric table without re-parsing evidence tables.
 """
 
 from __future__ import annotations
@@ -32,6 +40,8 @@ def _w(path: Path, text: str) -> None:
 def _paper_md(candidate: dict, analysis: dict) -> str:
     # Round 1 F7: candidate is a plain dict — dict access, never attribute access.
     fm = {
+        # Logical key for the cross-paper comparator (arxiv_id, DOI fallback).
+        "key": candidate.get("arxiv_id") or candidate.get("doi"),
         "title": candidate["title"],
         "authors": list(candidate.get("authors", [])),
         "year": candidate["year"],
@@ -42,6 +52,10 @@ def _paper_md(candidate: dict, analysis: dict) -> str:
         "domain": "deep learning",
         "keywords": [c["name"] for c in analysis["concepts"][:8]],
         "claims_summary": [c["statement"] for c in analysis["claims"][:3]],
+        # Headline contract → landscapes.py cross-paper metric table.
+        "headline_metric": analysis["headline_metric"],
+        "headline_value": analysis["headline_value"],
+        "params_million": analysis["params_million"],
     }
     front = yaml.safe_dump(fm, allow_unicode=True, sort_keys=False).strip()
     claims = analysis["claims"]

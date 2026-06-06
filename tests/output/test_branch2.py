@@ -21,6 +21,20 @@ def test_paper_md_has_schema_version(tmp_path, candidate, analysis):
     assert "Layer Index" in body
 
 
+def test_paper_md_carries_headline_frontmatter_for_landscapes(tmp_path, candidate, analysis):
+    # The producer→consumer contract: branch2 frontmatter feeds landscapes.py.
+    import yaml
+
+    ara = tmp_path / "ara"
+    write_branch2(ara, candidate, analysis)
+    body = (ara / "PAPER.md").read_text(encoding="utf-8")
+    fm = yaml.safe_load(body.split("---", 2)[1])
+    assert fm["key"] == candidate["arxiv_id"]
+    assert fm["headline_metric"] == analysis["headline_metric"]
+    assert fm["headline_value"] == analysis["headline_value"]
+    assert fm["params_million"] == analysis["params_million"]
+
+
 def test_experiments_carry_no_exact_numbers(tmp_path, candidate, analysis):
     ara = tmp_path / "ara"
     write_branch2(ara, candidate, analysis)

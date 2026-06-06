@@ -71,6 +71,10 @@ def analysis() -> dict:
     """The analyzer-spoke bundle (Chunk 3 contract) for one paper."""
     return {
         "overview": "A truncated-diffusion planning policy.",
+        # Headline contract → branch2 frontmatter → landscapes comparator.
+        "headline_metric": "NDS",
+        "headline_value": 0.61,
+        "params_million": 60.0,
         "problem": {
             "observations": [
                 {
