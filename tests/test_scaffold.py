@@ -134,10 +134,14 @@ def test_gitignore_tracks_products_and_ignores_inputs():
 def test_campaign_yaml_template_has_all_locked_fields():
     import yaml
 
-    cfg = yaml.safe_load((ROOT / "config" / "campaign.yaml").read_text(encoding="utf-8"))
-    # Hard-Gate-confirmed fields (中枢-D1 / 吸收-D4).
+    # The repo ships a TEMPLATE (.example), not a live config — a fresh clone has
+    # no live config/campaign.yaml so the Hard Gate fires (load_campaign -> None).
+    cfg = yaml.safe_load((ROOT / "config" / "campaign.yaml.example").read_text(encoding="utf-8"))
+    # Hard-Gate-confirmed fields the runtime CampaignConfig actually reads
+    # (中枢-D1 / 吸收-D4): topic, n_per_tick, is_ad_domain — must match campaign.py.
     assert "topic" in cfg
-    assert isinstance(cfg["per_round_count"], int) and cfg["per_round_count"] > 0
+    assert isinstance(cfg["n_per_tick"], int) and cfg["n_per_tick"] > 0
+    assert isinstance(cfg["is_ad_domain"], bool)
     # 中枢-D5a: preprint policy default is strict.
     assert cfg["preprint_policy"] == "strict"
     # D-发现-2: polite-pool email present (canonical value from the spec).

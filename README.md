@@ -123,7 +123,7 @@ scripts/          the engine code (packages below)
 | `landscapes/{topic}/` | cross-paper synthesis (`INDEX.md` + `report.md`) |
 | `_ledger/` | `processed_ledger.yaml` (single-writer) + `.lock` |
 | `_failed/` | per-paper failure records for manual follow-up |
-| `config/` | `campaign.yaml` (locked campaign parameters) |
+| `config/` | `campaign.yaml.example` (shipped template). The Hard Gate writes the live `campaign.yaml` (locked `topic` / `n_per_tick` / `is_ad_domain`) on first run; a fresh clone has no live config, so the gate fires. |
 
 ## Develop / run / test / lint
 

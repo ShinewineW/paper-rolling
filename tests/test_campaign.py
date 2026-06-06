@@ -53,3 +53,26 @@ def test_vague_topic_rejected(tmp_path: Path):
 def test_nonpositive_n_rejected(tmp_path: Path):
     with pytest.raises(GateError, match="must be a positive"):
         CampaignConfig(topic="some sufficiently specific topic", n_per_tick=0, is_ad_domain=False)
+
+
+def test_shipped_template_loads_with_runtime_schema(tmp_path: Path):
+    # Regression (Codex Round-4 reject): the shipped config/campaign.yaml.example
+    # MUST use the exact schema load_campaign reads (topic / n_per_tick /
+    # is_ad_domain). The original template used `per_round_count` (+ no
+    # is_ad_domain), so load_campaign KeyError'd on the real file — an
+    # uncontrolled crash instead of the recoverable Hard Gate. Copy the shipped
+    # template in as the live config and confirm it loads cleanly.
+    import shutil
+
+    import scripts.paths as paths
+
+    template = paths.repo_root() / "config" / "campaign.yaml.example"
+    assert template.exists(), "shipped template config/campaign.yaml.example missing"
+    (tmp_path / "config").mkdir(parents=True, exist_ok=True)
+    shutil.copy(template, tmp_path / "config" / "campaign.yaml")
+
+    cfg = load_campaign(tmp_path)  # must NOT raise KeyError on the shipped schema
+    assert cfg is not None
+    assert cfg.topic
+    assert isinstance(cfg.n_per_tick, int) and cfg.n_per_tick > 0
+    assert isinstance(cfg.is_ad_domain, bool)
