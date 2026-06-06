@@ -181,7 +181,9 @@ class Watchdog:
             if candidate is None:
                 break
             refires += 1
-            result = spoke(candidate)
+            # Same per-paper isolation as the main dispatch (Codex Round-15): a
+            # hung/crashing spoke on the re-fire path must not abort/hang the tick.
+            result = _run_spoke_guarded(spoke, candidate, stall_seconds=self.stall_seconds)
             if result.status == "done" and result.person_vault_path and result.ai_package_path:
                 ledger.record(
                     key,

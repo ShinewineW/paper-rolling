@@ -273,3 +273,39 @@ def test_discover_survives_a_source_outage():
 
     # No crash, and the surviving s2 candidate came through.
     assert any(c["title"] == "Survivor" for c in out)
+
+
+def test_discover_survives_dblp_outage_during_enrichment():
+    # Codex Round-15 / LS-5: a DBLP HttpUnavailable during venue enrichment must
+    # NOT abort discovery. A venue-less but otherwise-authoritative candidate
+    # (whitelisted institution -> S3 signal) triggers the DBLP call; the outage is
+    # swallowed and the candidate still survives.
+    from scripts.discovery.http_client import HttpUnavailable
+
+    class _DownDblp:
+        def venue_for_title(self, title):
+            raise HttpUnavailable("dblp is down this tick")
+
+    sources = {
+        "openalex": FakeSource(
+            [
+                _c(
+                    arxiv_id="2601.08888",
+                    title="NoVenueButFamous",
+                    year=2026,
+                    venue=None,  # venue-less -> triggers DBLP enrichment
+                    cited_by_count=500,
+                    institutions=["Google"],  # S3 institution signal -> authoritative
+                    discovery_sources=["openalex"],
+                )
+            ]
+        ),
+        "s2": FakeSource([]),
+        "arxiv": FakeSource([]),
+        "dblp": _DownDblp(),
+        "hf_papers": FakeSource([]),
+    }
+    out = discover(base_config(), sources=sources, llm=fake_llm)
+
+    # discover did not crash on the DBLP outage; the candidate survived (via S3).
+    assert any(c["title"] == "NoVenueButFamous" for c in out)

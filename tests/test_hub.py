@@ -436,3 +436,41 @@ def test_run_tick_isolates_a_stalled_spoke(tmp_path: Path):
     )
     assert res.done_count == 1  # p0 timed out -> failed; p1 back-filled
     assert res.failed_count == 1
+
+
+def test_watchdog_recover_isolates_a_crashing_refire(tmp_path: Path):
+    # Codex Round-15: the watchdog RE-FIRE path must use the same per-paper
+    # isolation as the main dispatch — a crashing re-fire spoke must NOT abort
+    # the unattended tick.
+    led = FakeLedger()
+    pool = [_candidate("p0")]
+    calls = {"n": 0}
+
+    def spoke(cand: dict) -> SpokeResult:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            # First dispatch: claim 'done' but leave no vault paths -> false-done,
+            # which the watchdog will try to re-fire.
+            return SpokeResult(
+                status="done",
+                person_vault_path=None,
+                ai_package_path=None,
+                failure_class=None,
+                failure_reason=None,
+                source_url=None,
+                attempted_tier=None,
+            )
+        raise RuntimeError("refire boom")  # the re-fire crashes
+
+    wd = Watchdog(stall_seconds=0, max_refires=2)
+    # Must NOT raise — recover() isolates the crashing re-fire (bounded by max_refires).
+    res = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=1,
+        ledger=led,
+        discover=lambda topic, n: pool,
+        spoke=spoke,
+        watchdog=wd,
+    )
+    assert res.exhausted is True  # p0 never truly done; tick completed without crashing

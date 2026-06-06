@@ -116,13 +116,19 @@ def discover(
     dblp = sources.get("dblp")
     if dblp is not None:
         for cand in merged:
-            if not cand.get("venue"):
+            if cand.get("venue"):
+                continue
+            try:
                 venue = dblp.venue_for_title(cand["title"])
-                if venue:
-                    cand["venue"] = venue
-                    srcs = cand.setdefault("discovery_sources", [])
-                    if "dblp" not in srcs:
-                        srcs.append("dblp")
+            except HttpUnavailable:
+                # LS-5: DBLP is down this tick — skip venue enrichment for the
+                # rest rather than abort discovery (Codex Round-15).
+                break
+            if venue:
+                cand["venue"] = venue
+                srcs = cand.setdefault("discovery_sources", [])
+                if "dblp" not in srcs:
+                    srcs.append("dblp")
 
     scored: list[dict[str, Any]] = []
     for cand in merged:
