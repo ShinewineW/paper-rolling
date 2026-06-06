@@ -37,5 +37,12 @@ __pycache__/
 # oh-my-codex review log (scratch, not a product)
 /attn_sink/
 
+# --- reference provenance archive (docs/reference/) ---
+# The cloned upstream repos we drew from carry their OWN .git and are large;
+# they are local-only provenance, not paper-rolling products. Track ONLY the
+# hand-written index.md (the manifest: URLs, licenses, what each was used for).
+/docs/reference/*
+!/docs/reference/index.md
+
 # LS-1 runtime lock (persistent inode; flock state is the lock) — not a product
 _ledger/.lock
