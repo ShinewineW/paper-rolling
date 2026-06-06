@@ -3,6 +3,13 @@
 The `Name` derivation is a FIXED algorithm so vault keys are stable across
 runs — re-deriving the same arXiv title always yields the same entry name,
 which is what keeps person_vault ↔ ai_package pairing intact (OT-3).
+
+NOTE — SUPERSEDED on the live path (retained because it is plan-built and
+unit-tested). The live pipeline does NOT call any helper in this module: the
+ledger keys its rows by the hub-derived candidate key (arxiv_id→doi→title, see
+`hub._candidate_key` / `store.record`), and live vault naming is
+`scripts.output.naming.vault_key`. New callers should use `scripts.output.naming`
+(naming/keying) — these helpers exist only for their own tests.
 """
 
 from __future__ import annotations
@@ -31,7 +38,8 @@ def derive_name(title: str) -> str:
     / `derive_name`, which SPLIT the title on the first ':' (this one does NOT),
     yielding a DIFFERENT name for colon-titled papers. Pinned by its own test;
     use `scripts.output.naming` for any new caller. (`identity_key` /
-    `version_key` below ARE the live idempotency keys — no such caveat.)
+    `version_key` below are likewise NOT called on the live path — the ledger
+    keys rows by the hub-derived candidate key; see the module docstring.)
 
     Args:
         title: Raw paper title (typically the arXiv title).
