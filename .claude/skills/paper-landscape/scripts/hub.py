@@ -23,6 +23,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from scripts.campaign import gate_needed, load_campaign
+from scripts.landscapes import LandscapeResult, generate_landscapes
+
 FAILED_REL = Path("_failed")
 
 
@@ -241,3 +244,58 @@ def run_tick(
 
     exhausted = done < n_target
     return HubResult(done_count=done, failed_count=failed, exhausted=exhausted)
+
+
+class GateRequired(RuntimeError):
+    """Raised when a /loop tick is attempted before the campaign Hard Gate.
+
+    The harness catches this and runs the HITL campaign-setup flow (SKILL.md):
+    confirm topic + N, write config/campaign.yaml, then retry the tick.
+    """
+
+
+@dataclass(frozen=True)
+class TickResult:
+    hub: HubResult
+    landscape: LandscapeResult
+
+
+def run_campaign_tick(
+    *,
+    workspace: Path,
+    ledger: Ledger,
+    discover: DiscoverFn,
+    spoke: SpokeFn,
+    requested_topic: str | None = None,
+    requested_n: int | None = None,
+    max_concurrent: int = 5,
+    watchdog: Watchdog | None = None,
+) -> TickResult:
+    """One /loop tick end-to-end: gate-check -> dispatch batch -> rebuild landscape.
+
+    On an established campaign with no topic/N change this runs fully autonomously
+    (no re-gate, no mid-pipeline questions — 中枢-D2 / 吸收-D4). If no campaign is
+    locked (or topic/N changed), raises GateRequired so the harness runs the HITL
+    setup gate first.
+    """
+    if gate_needed(workspace, requested_topic=requested_topic, requested_n=requested_n):
+        raise GateRequired(
+            "campaign Hard Gate required: confirm topic + per-tick N "
+            "(write config/campaign.yaml) before processing"
+        )
+    cfg = load_campaign(workspace)
+    assert cfg is not None  # gate_needed False guarantees a locked config
+    if watchdog is None:
+        watchdog = Watchdog()
+    hub = run_tick(
+        workspace=workspace,
+        topic=cfg.topic,
+        n_target=cfg.n_per_tick,
+        ledger=ledger,
+        discover=discover,
+        spoke=spoke,
+        max_concurrent=max_concurrent,
+        watchdog=watchdog,
+    )
+    landscape = generate_landscapes(workspace, topic=cfg.topic)
+    return TickResult(hub=hub, landscape=landscape)

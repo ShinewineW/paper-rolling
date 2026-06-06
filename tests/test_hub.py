@@ -215,3 +215,62 @@ def test_watchdog_is_bounded_not_a_daemon(tmp_path: Path):
     # 1 initial dispatch + at most 2 re-fires = 3 spoke calls; then it gives up.
     assert calls["n"] <= 3
     assert res.exhausted is True
+
+
+# tests/test_hub.py  (append)
+from scripts.campaign import CampaignConfig, write_campaign  # noqa: E402
+from scripts.hub import GateRequired, run_campaign_tick  # noqa: E402
+
+
+def test_run_campaign_tick_blocks_when_no_campaign(tmp_path: Path):
+    # First-time: no campaign config → the gate MUST block (中枢-D1).
+    import pytest
+
+    ledger = FakeLedger()
+    with pytest.raises(GateRequired):
+        run_campaign_tick(
+            workspace=tmp_path,
+            ledger=ledger,
+            discover=lambda topic, n: [_candidate("p0")],
+            spoke=_ok,
+        )
+
+
+def test_run_campaign_tick_runs_and_builds_landscape(tmp_path: Path):
+    # Established campaign → /loop tick runs autonomously and regenerates the
+    # landscape after the batch (no re-gate, zero mid-pipeline questions).
+    write_campaign(
+        tmp_path, CampaignConfig(topic="multi object tracking", n_per_tick=2, is_ad_domain=False)
+    )
+    ledger = FakeLedger()
+
+    # Spoke writes a minimal ai_package entry so landscapes has something to read.
+    def spoke(cand: dict) -> SpokeResult:
+        k = cand["key"]
+        ara = tmp_path / "ai_package" / f"2026-06-05_{k}" / "ara"
+        ara.mkdir(parents=True, exist_ok=True)
+        (ara / "PAPER.md").write_text(
+            "---\n"
+            f"title: T{k}\nyear: 2025\nkey: {k}\nschema_version: 1\n"
+            "headline_metric: mota\nheadline_value: 70.0\nparams_million: 50.0\n---\n",
+            encoding="utf-8",
+        )
+        return SpokeResult(
+            status="done",
+            person_vault_path=f"person_vault/2026-06-05_{k}",
+            ai_package_path=f"ai_package/2026-06-05_{k}",
+            failure_class=None,
+            failure_reason=None,
+            source_url=cand["source_url"],
+            attempted_tier="tier1",
+        )
+
+    res = run_campaign_tick(
+        workspace=tmp_path,
+        ledger=ledger,
+        discover=lambda topic, n: [_candidate(f"p{i}") for i in range(4)],
+        spoke=spoke,
+    )
+    assert res.hub.done_count == 2
+    # Landscape regenerated for the campaign topic slug.
+    assert (tmp_path / "landscapes" / "multi-object-tracking" / "report.md").exists()
