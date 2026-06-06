@@ -109,6 +109,8 @@ class OpenAlexSource:
             "doi": _strip_doi(work.get("doi")),
             "title": work.get("title") or "",
             "year": work.get("publication_year"),
+            # OpenAlex retraction flag (ROADMAP B1): discovery drops retracted work.
+            "is_retracted": bool(work.get("is_retracted", False)),
             "cited_by_count": work.get("cited_by_count", 0),
             "influential_citation_count": None,
             "venue": ((work.get("primary_location") or {}).get("source") or {}).get("display_name"),

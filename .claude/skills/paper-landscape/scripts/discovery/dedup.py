@@ -27,6 +27,10 @@ _FIRST_FIELDS = (
     "github_repo",
     "oa_pdf_url",
     "abstract",
+    # ROADMAP B1: a retraction flag from ANY source wins (True is truthy, so the
+    # first-non-falsy merge keeps it — a paper retracted per OpenAlex stays
+    # retracted even when merged with an arXiv record that lacks the flag).
+    "is_retracted",
 )
 
 

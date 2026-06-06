@@ -275,6 +275,42 @@ def test_discover_survives_a_source_outage():
     assert any(c["title"] == "Survivor" for c in out)
 
 
+def test_discover_drops_retracted_papers():
+    # ROADMAP B1: a paper flagged is_retracted (OpenAlex/Crossref) is excluded
+    # even when it would otherwise be authoritative (high cites + top venue).
+    oa = FakeSource(
+        [
+            _c(
+                doi="10.1/retracted",
+                title="Retracted But Famous",
+                year=2024,
+                cited_by_count=5000,
+                venue="CVPR",
+                is_retracted=True,
+                discovery_sources=["openalex"],
+            ),
+            _c(
+                doi="10.1/ok",
+                title="Clean Authoritative Work",
+                year=2026,
+                venue="CVPR",
+                cited_by_count=100,
+                discovery_sources=["openalex"],
+            ),
+        ]
+    )
+    sources = {
+        "openalex": oa,
+        "s2": FakeSource([]),
+        "arxiv": FakeSource([]),
+        "dblp": FakeDblp({}),
+        "hf_papers": FakeSource([]),
+    }
+    titles = [c["title"] for c in discover(base_config(), sources=sources, llm=fake_llm)]
+    assert "Retracted But Famous" not in titles
+    assert "Clean Authoritative Work" in titles
+
+
 def test_search_source_registry_lists_the_fanout_sources():
     """The fan-out is driven by the _SEARCH_SOURCES registry (ADR-0002 seam),
     not a hardcoded body. DBLP is absent — it is venue-enrichment, not fan-out.

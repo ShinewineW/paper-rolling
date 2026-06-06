@@ -130,6 +130,8 @@ def discover(
 
     scored: list[dict[str, Any]] = []
     for cand in merged:
+        if cand.get("is_retracted"):
+            continue  # ROADMAP B1: drop retracted work (OpenAlex/Crossref flag)
         signals, score = score_authority(cand, campaign_config)
         if not any(signals.values()):
             continue  # ADR-0001: no signal fired -> not authoritative
