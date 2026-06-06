@@ -8,6 +8,9 @@ corpus/**/*.pdf
 corpus/**/images/
 # MinerU structured intermediate.
 corpus/**/content_list.json
+# MinerU per-paper work dir (paper.md + intermediates); the canonical {ID}.md
+# product is written at the paper-dir root, not inside mineru/.
+corpus/**/mineru/
 
 # Citation-lookup cache + secrets.
 .cache/
