@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from scripts.audit.types import (
     ClaimRecord,
+    ClaimType,
     Finding,
     GateOutcome,
     GateVerdict,
@@ -19,6 +20,7 @@ from scripts.audit.types import (
 
 __all__ = [
     "ClaimRecord",
+    "ClaimType",
     "Finding",
     "GateOutcome",
     "GateVerdict",
