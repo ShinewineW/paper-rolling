@@ -61,7 +61,7 @@ MD_CONTRACT_FILENAME = ".md_contract.json"
 # The producer's staging/promotion is intentionally NOT generalized (rule-of-
 # three: only 2 branches exist; a 3rd's shape — keying, atomic co-promotion,
 # which gates apply — is unknown). Adding a co-promoted branch: see
-# docs/EXTENDING.md + ADR-0002.
+# docs/guides/EXTENDING.md + ADR-0002.
 #
 # NOTE: the vault entry NAME is the output.naming vault_key, which DIFFERS from
 # the ledger ROW key (hub._candidate_key). Completeness is therefore checked via

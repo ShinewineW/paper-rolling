@@ -150,7 +150,7 @@ def produce_outputs(
         # SEAM (ADR-0002, deferred): this promotion is written for exactly TWO
         # co-promoted branches (person + ai). Only the branch SET is centralized
         # (paths.VAULT_BRANCHES); generalizing this block to N-or-neither awaits a
-        # real 3rd branch — see docs/EXTENDING.md "Add an output branch".
+        # real 3rd branch — see docs/guides/EXTENDING.md "Add an output branch".
         person_dest = person_vault / key
         ai_dest = ai_package / key
         person_vault.mkdir(parents=True, exist_ok=True)

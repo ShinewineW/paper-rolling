@@ -1,8 +1,14 @@
 # paper-rolling — capability roadmap (the "trustworthiness rail")
 
+> **创建日期**: 2026-06-07
+> **更新日期**: 2026-06-07
+> **适用环境**: `~/Coding/paper-rolling/` 仓库；配合 `docs/guides/EXTENDING.md` 阅读；状态随能力落地持续更新。
+
+---
+
 > Two rails. **Extensibility rail (done):** how easy it is to *add* parts —
 > Source registry, `audit/ara_tree.py`, the centralized vault-branch set,
-> `docs/EXTENDING.md` (ADR-0002). **Capability / trustworthiness rail (this
+> `docs/guides/EXTENDING.md` (ADR-0002). **Capability / trustworthiness rail (this
 > doc):** how *strong and trustworthy* the engine's output is. These are
 > field-standard patterns surfaced by benchmarking against the ≥20k★ tools and
 > the project's three research references — present in the field, not yet in

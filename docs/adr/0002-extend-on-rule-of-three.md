@@ -44,7 +44,7 @@ Applying the rule:
 - **Intentional asymmetry**: discovery sources sit behind a `Source` seam, but
   ingest tiers and output branches stay concrete. A future maintainer who finds
   this asymmetry should read this ADR before "fixing" it.
-- `docs/EXTENDING.md` documents how to open each deferred seam when its
+- `docs/guides/EXTENDING.md` documents how to open each deferred seam when its
   rule-of-three threshold is reached.
 - The cross-vertical engine-core/vertical split is out of scope until a concrete
   second vertical (e.g. news) actually lands.

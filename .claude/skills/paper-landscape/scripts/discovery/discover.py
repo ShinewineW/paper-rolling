@@ -209,7 +209,7 @@ def _run_hf(source, queries, cfg) -> list[dict[str, Any]]:
 # `.search(topic, ...) -> Iterable[candidate-dict]`, add a `_run_<name>(source,
 # queries, cfg)` adapter above, and append one `("<key>", _run_<name>)` entry
 # here. The `<key>` is the dict key the production wiring registers the source
-# under. See docs/EXTENDING.md.
+# under. See docs/guides/EXTENDING.md.
 #
 # DBLP is intentionally NOT here: it is a venue-ENRICHMENT source (queried per
 # candidate by title after dedup), not a query fan-out source.

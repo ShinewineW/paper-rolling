@@ -34,9 +34,9 @@ If you are taking this over with no prior context:
 - Tests are the executable spec. Start at `tests/test_spoke.py` (full per-paper
   pipeline with fake seams) and `tests/test_run_campaign.py` (the driver).
 - To **extend** the engine (new source / tier / gate / branch / cross-paper step),
-  read `docs/EXTENDING.md`. Why the architecture is shaped the way it is —
+  read `docs/guides/EXTENDING.md`. Why the architecture is shaped the way it is —
   including which seams are abstracted vs kept concrete — is recorded in
-  `docs/adr/`.
+  `docs/adr/`. The full documentation map is `docs/INDEX.md`.
 
 ## File-tree / module map
 

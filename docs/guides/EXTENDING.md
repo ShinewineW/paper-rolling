@@ -1,5 +1,11 @@
 # Extending paper-rolling
 
+> **创建日期**: 2026-06-06
+> **更新日期**: 2026-06-07
+> **适用环境**: `~/Coding/paper-rolling/` 仓库；扩展引擎前阅读；改动后保持 `uv run pytest` 绿 + `uv run ruff check .` 干净。
+
+---
+
 How to add capabilities **within the paper vertical**. Cross-vertical extension
 (news, other content domains) is deliberately out of scope until a real second
 vertical exists — see [ADR-0002](adr/0002-extend-on-rule-of-three.md).
