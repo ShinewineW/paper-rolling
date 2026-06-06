@@ -137,13 +137,20 @@ def _collect_evidence_numbers(ara_dir: Path) -> tuple[str, ...]:
     tables_dir = ara_dir / "evidence" / "tables"
     if tables_dir.exists():
         for md_file in sorted(tables_dir.glob("*.md")):
+            in_data = False
             for line in md_file.read_text(encoding="utf-8").splitlines():
                 stripped = line.strip()
-                # Only real markdown table rows (data + header); skip the
-                # `# title` / `- **Source**` / `- **Caption**` metadata lines and
-                # the `| --- |` separator. Header cells are column names, not
-                # numbers, so including them is harmless.
-                if stripped.startswith("|") and not _TABLE_SEP.match(stripped):
+                if not stripped.startswith("|"):
+                    in_data = False  # left the table (# title / - Source / - Caption / blank)
+                    continue
+                if _TABLE_SEP.match(stripped):
+                    in_data = True  # the `| --- |` separator: rows AFTER it are DATA
+                    continue
+                # Only DATA rows (after the separator). The HEADER row (before it)
+                # is skipped — a column label can be a numeric metric name like
+                # `Recall@10` / `mAP@0.5`, which is NOT an evidence value and must
+                # not be verified against the source MD (Codex Round-12).
+                if in_data:
                     _add(stripped)
     for rec in extract_claim_registry(ara_dir):
         _add(rec.statement)

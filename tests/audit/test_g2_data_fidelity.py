@@ -158,3 +158,26 @@ def test_run_g2_ignores_evidence_metadata_locators(tmp_path: Path) -> None:
 
     verdict = run_g2(ara.parent, md, skeptic_votes=honest, n_skeptics=3)
     assert not verdict.blocked  # locators excluded; only the metric 28.4 (present) verified
+
+
+def test_run_g2_ignores_numeric_header_labels(tmp_path: Path) -> None:
+    # Codex Round-12: a column HEADER can be a numeric metric label (Recall@10 /
+    # mAP@0.5) — NOT an evidence value. Only DATA rows (after the |---| separator)
+    # are verified, so the header digit "10" must not be collected.
+    ara = tmp_path / "ai_package" / "2026-06-05_X_1" / "ara"
+    (ara / "logic").mkdir(parents=True)
+    (ara / "evidence" / "tables").mkdir(parents=True)
+    (ara / "logic" / "claims.md").write_text("# Claims\n", encoding="utf-8")
+    (ara / "evidence" / "tables" / "main.md").write_text(
+        "| Model | Recall@10 |\n|---|---|\n| Ours | 0.61 |\n",
+        encoding="utf-8",
+    )
+    md = tmp_path / "src.md"
+    # Source MD has the data value 0.61 but NOT the header label digit 10.
+    md.write_text("Ours reaches 0.61 recall.\n", encoding="utf-8")
+
+    def honest(numbers, source_md, claim_context):
+        return tuple(SkepticVote(number=n, found_in_source=(n in source_md)) for n in numbers)
+
+    verdict = run_g2(ara.parent, md, skeptic_votes=honest, n_skeptics=3)
+    assert not verdict.blocked  # header label "10" excluded; only data 0.61 verified
