@@ -272,3 +272,29 @@ class Ledger:
         for key in demoted:
             self.record_status(key, status="failed", failure_class="convert_error")
         return demoted
+
+
+def overwrite_vault_entry(vault_dir: Path, identity: str, new_entry_name: str) -> Path:
+    """OT-2: ensure exactly one vault entry per paper identity.
+
+    Globs `*_{identity}` to find any existing dated folder for this paper
+    (ignoring its date prefix), deletes every match, then creates the new
+    dated entry. Reprocessing thus refreshes the date and bubbles the paper to
+    the top of the vault's time order (双输出-D5 / OT-2).
+
+    Args:
+        vault_dir: person_vault/ or ai_package/ root.
+        identity: version-stripped identity (arxiv_id base or doi-<hash>).
+        new_entry_name: full target entry name `{ingest_date}_{Name}_{identity}`.
+
+    Returns:
+        Path to the freshly created (empty) entry directory.
+    """
+    vault_dir = Path(vault_dir)
+    vault_dir.mkdir(parents=True, exist_ok=True)
+    for existing in vault_dir.glob(f"*_{identity}"):
+        if existing.is_dir():
+            shutil.rmtree(existing)
+    target = vault_dir / new_entry_name
+    target.mkdir(parents=True)
+    return target
