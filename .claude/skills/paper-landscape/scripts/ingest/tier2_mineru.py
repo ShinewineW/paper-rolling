@@ -1,9 +1,9 @@
 """Tier-2 ingest: download PDF + MinerU CLI (CPU backend) -> MD + images + content_list.
 
 摄取-D1 / 吸收-D6: fallback when arXiv HTML is missing/broken or non-arXiv PDFs
-(CVF/OpenReview). MinerU is an external CLI runtime dep (NOT a per-skill venv,
-spec §8 R1) invoked as a subprocess via the injected run_cli seam. CPU/pipeline
-backend on Apple Silicon (MPS slower than CPU, spec §2.2).
+(CVF/OpenReview). MinerU is an external CLI runtime dep (NOT a per-skill venv)
+invoked as a subprocess via the injected run_cli seam. CPU/pipeline
+backend on Apple Silicon (MPS slower than CPU).
 """
 
 from __future__ import annotations

@@ -1,9 +1,8 @@
 # 1. Multi-signal OR authority, no citation hard gate
 
 - Status: Accepted — back-filled 2026-06-06 to resolve the in-code `ADR-0001`
-  references (`scripts/discovery/authority.py`). The decision itself predates
-  this file; its full rationale lives in
-  `docs/specs/2026-06-05-paper-landscape-v2-impl.md` (skills_workspace).
+  references (`scripts/discovery/authority.py`). The decision predates this
+  file; its full rationale is recorded below.
 
 ## Context
 

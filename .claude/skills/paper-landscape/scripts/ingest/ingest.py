@@ -81,7 +81,7 @@ def short_name(title: str, *, max_len: int = 40) -> str:
 
 
 def _paper_id(candidate: dict) -> str:
-    """Stable corpus ID. arXiv: ``{arxiv_id}{version}_{ShortName}`` (spec §2.3).
+    """Stable corpus ID. arXiv: ``{arxiv_id}{version}_{ShortName}``.
 
     Non-arXiv (DOI-only, e.g. an OpenAlex venue paper with no arXiv id): use the
     shared DOI-hash identity ``{doi-hash}_{ShortName}`` — never ``None_...``,

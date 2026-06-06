@@ -1,6 +1,6 @@
 """MD-only contract: provenance record + content hashing + equation-block counting.
 
-Contract fields (摄取-D1 / spec §2.3): source_pdf_sha256, converter,
+Contract fields (摄取-D1): source_pdf_sha256, converter,
 converter_version, md_sha256, image_count, equation_block_count.
 Tier-1 (arXiv HTML, no PDF download) leaves source_pdf_sha256 = None.
 """

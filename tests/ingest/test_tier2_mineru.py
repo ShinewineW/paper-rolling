@@ -29,7 +29,7 @@ def test_tier2_success_collects_md_images_and_content_list(tmp_path, fake_http, 
     assert sorted(res.images) == ["a.png", "b.png"]
     assert res.content_list_path.name == "content_list.json"
     assert res.source_pdf_sha256 == sha256_bytes(pdf_bytes)
-    # CPU backend must be requested (摄取-D1 / spec §2.2 Apple-Silicon caveat).
+    # CPU backend must be requested (摄取-D1: Apple-Silicon caveat — MPS slower than CPU).
     argv = fake_cli.calls[0].argv
     assert argv[0] == "mineru"
     assert "-b" in argv and argv[argv.index("-b") + 1] in {"pipeline", "cpu"}

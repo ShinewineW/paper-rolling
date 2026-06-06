@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Persistent verification cache for the bibliographic resolvers (Delta 2).
+"""Persistent verification cache for the bibliographic resolvers.
 
 A local SQLite-backed cache so the same paper cited across multiple drafts
 does not re-hit Crossref / OpenAlex / Semantic Scholar / arXiv every run.
@@ -12,13 +12,12 @@ Cache value: the resolver's structured response (any JSON-serializable dict)
 plus a verification_timestamp.
 
 TTL: entries older than 90 days are treated as a miss. The 90-day window is a
-guess pending empirical tuning (spec OQ-1, deferred).
+guess pending empirical tuning (deferred).
 
 Concurrency: SQLite WAL mode (single-writer-many-readers). The audit pipeline
-is single-process; multi-user shared cache is out of scope (spec Delta 2).
-
-Spec: docs/design/2026-05-21-v3.10-182-promote-citation-gate-spec.md §2 Delta 2.
+is single-process; a multi-user shared cache is out of scope.
 """
+
 from __future__ import annotations
 
 import json
@@ -29,7 +28,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-# Spec OQ-1: 90-day window is a guess, deferred for empirical tuning.
+# 90-day window is a guess, deferred for empirical tuning.
 _TTL_DAYS = 90
 
 _DEFAULT_PATH = Path.home() / ".cache" / "ars" / "verification.db"
@@ -75,14 +74,17 @@ class VerificationCache:
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path)
-        # WAL: single-writer-many-readers safety (spec Delta 2). Persistent
+        # WAL: single-writer-many-readers safety. Persistent
         # journal-mode pragma — set on every connection (cheap; no-op when
         # already WAL).
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
 
     def get(
-        self, citation_key: str, resolver_name: str, query_form: str,
+        self,
+        citation_key: str,
+        resolver_name: str,
+        query_form: str,
     ) -> dict[str, Any] | None:
         """Return the cached response, or None on miss / expired entry.
 
@@ -141,8 +143,9 @@ class VerificationCache:
         stored = datetime.fromisoformat(verification_timestamp)
         return datetime.now(UTC) - stored > timedelta(days=_TTL_DAYS)
 
+
 # --- paper-rolling vendor trailer (Round 6) -----------------------------------
 # Vendored verbatim from academic-research-skills (CC-BY-NC, see NOTICE).
 # Public aliases for the names our discovery layer imports; no logic change.
-CitationCache = VerificationCache   # get/put/invalidate, table verification_cache
-TTL_DAYS = _TTL_DAYS                # 90
+CitationCache = VerificationCache  # get/put/invalidate, table verification_cache
+TTL_DAYS = _TTL_DAYS  # 90
