@@ -27,3 +27,6 @@ __pycache__/
 # NOTE: everything else is tracked on purpose — *.md knowledge products,
 # person_vault/, ai_package/, _ledger/, landscapes/, config/, .md_contract.json,
 # and curated branch1 figures. Do NOT add blanket ignores for those.
+
+# oh-my-codex review log (scratch, not a product)
+/attn_sink/
