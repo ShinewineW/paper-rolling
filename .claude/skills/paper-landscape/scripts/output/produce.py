@@ -176,12 +176,17 @@ def produce_outputs(
         # store.consistency_check) prunes any vault dir not backed by a `done`
         # row regardless.
         #
-        # RESIDUAL: a cancel landing in the CPU-instruction gap between the final
-        # check and the worker's return — a thread-scheduling microgap with no
-        # injectable app-code, so not reproducible by delay injection. The
-        # reconciliation backstop makes even that self-heal within one tick. The
-        # only way to a literal zero-residual is moving promotion out of the spoke
-        # thread into the single-writer hub (a larger change; ADR if pursued).
+        # RESIDUAL (Codex R20): once promotion succeeds here, the vault dirs exist
+        # for the rest of the abandoned worker's life — not just until this
+        # function returns, but through the spoke's post-promotion G3 pass too.
+        # So a stalled worker can briefly leave a promoted vault for a paper the
+        # hub has recorded `failed`. This is the irreducible cost of cancelling a
+        # non-killable thread mid-commit; it is NOT reproducible by app-code delay
+        # injection beyond this point, and store.consistency_check prunes any such
+        # orphan (vault dir without a complete `done` row) at the next tick start,
+        # so it self-heals within one tick (eventual consistency). A literal
+        # zero-residual would require moving promotion out of the spoke thread into
+        # the single-writer hub (a larger change; ADR if pursued).
         if cancel is not None and cancel.is_set():
             shutil.rmtree(person_dest, ignore_errors=True)
             shutil.rmtree(ai_dest, ignore_errors=True)
