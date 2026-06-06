@@ -203,32 +203,34 @@ class Ledger:
     def acquire(self):
         """LS-1: exclusive ledger lock. A second instance raises LedgerLockError.
 
-        Uses a non-blocking flock on _ledger/.lock so a second hub fails fast
-        rather than silently racing the single-writer ledger.
+        Uses a non-blocking flock on a PERSISTENT ``_ledger/.lock`` so a second
+        hub fails fast rather than silently racing the single-writer ledger.
+
+        The lock file is intentionally NEVER unlinked: its flock state on a
+        stable inode IS the lock. Unlinking it (even "best effort" on release)
+        lets a refused contender drop the path out from under the live holder —
+        then a third instance ``O_CREAT``s a fresh inode and flocks *that*
+        successfully, so two writers run concurrently. Leaving the file in place
+        keeps every contender on the same inode, so a second start is always
+        refused while the first holds the lock.
         """
         self.ledger_dir.mkdir(parents=True, exist_ok=True)
         fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o644)
         try:
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError as exc:
-                os.close(fd)
-                raise LedgerLockError(
-                    f"another paper-landscape instance holds {self.lock_path}; "
-                    "refusing to start a second hub"
-                ) from exc
-            self._lock_fd = fd
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            os.close(fd)  # release only our own fd; never unlink — we are not the holder
+            raise LedgerLockError(
+                f"another paper-landscape instance holds {self.lock_path}; "
+                "refusing to start a second hub"
+            ) from exc
+        self._lock_fd = fd
+        try:
             yield self
         finally:
-            if self._lock_fd is not None:
-                fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
-                os.close(self._lock_fd)
-                self._lock_fd = None
-            # Best-effort removal; another waiting instance recreates it.
-            try:
-                os.unlink(self.lock_path)
-            except FileNotFoundError:
-                pass
+            fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
+            os.close(self._lock_fd)
+            self._lock_fd = None
 
     # -- LS-3 crash-resume sweep --------------------------------------------
 

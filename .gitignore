@@ -30,3 +30,6 @@ __pycache__/
 
 # oh-my-codex review log (scratch, not a product)
 /attn_sink/
+
+# LS-1 runtime lock (persistent inode; flock state is the lock) — not a product
+_ledger/.lock

@@ -134,8 +134,12 @@ def test_acquire_creates_and_releases_lock(tmp_path):
     led = Ledger(tmp_path)
     with led.acquire():
         assert led.lock_path.exists()
-    # Lock file removed on release.
-    assert not led.lock_path.exists()
+    # The lock FILE persists by design (its flock state IS the lock — never
+    # unlinked, see acquire() docstring). What must hold after release is that
+    # the lock is FREE: immediately re-acquirable.
+    assert led.lock_path.exists()
+    with led.acquire():
+        assert led.lock_path.exists()
 
 
 def test_second_instance_refused(tmp_path):
@@ -148,6 +152,31 @@ def test_second_instance_refused(tmp_path):
         except LedgerLockError:
             raised = True
         assert raised is True
+
+
+def test_refused_contender_does_not_release_holders_lock(tmp_path):
+    # Codex Round-2 regression: a refused second instance must NOT unlink the
+    # lock file. If it did, a third instance would O_CREAT a fresh inode and
+    # flock it successfully while the first still holds the original — two
+    # concurrent writers. After ANY number of refusals, a new start must STILL
+    # be refused while the original holder is active.
+    holder = Ledger(tmp_path)
+    with holder.acquire():
+        second_refused = False
+        try:
+            with Ledger(tmp_path).acquire():
+                pass
+        except LedgerLockError:
+            second_refused = True
+        assert second_refused is True
+
+        third_refused = False
+        try:
+            with Ledger(tmp_path).acquire():
+                pass
+        except LedgerLockError:
+            third_refused = True
+        assert third_refused is True
 
 
 def test_lock_reusable_after_release(tmp_path):
