@@ -103,12 +103,26 @@ def _insufficiently_confirmed(
     return found * 2 <= n_skeptics
 
 
+def _cross_model_flags(cross_votes: tuple[SkepticVote, ...], number: str) -> bool:
+    """True iff the cross-model verifier AFFIRMATIVELY voted `number` NOT found.
+
+    The cross-model pass is a heterogeneous-family OVERLAY that can only ADD a
+    block — catching a fabrication the in-family majority wrongly 'confirmed'
+    (the conformity / premature-convergence failure mode of same-family voting,
+    ROADMAP C2). It does NOT block on cross-model silence, so a partial/missing
+    cross-model response cannot false-block a number the in-family vote cleared;
+    the in-family check remains the fail-closed primary.
+    """
+    return any(v.number == number and not v.found_in_source for v in cross_votes)
+
+
 def run_g2(
     ai_package_dir: Path,
     md_path: Path,
     *,
     skeptic_votes: SkepticVoteFn,
     n_skeptics: int = 3,
+    cross_model_votes: SkepticVoteFn | None = None,
 ) -> GateVerdict:
     """Run the G2 data-fidelity gate for one paper's ai_package.
 
@@ -116,6 +130,12 @@ def run_g2(
     `md_path` is the source MD (ground truth). Hard-blocks any evidence number
     NOT affirmatively confirmed present by a strict majority of skeptics — so the
     gate fails CLOSED if the skeptic seam misbehaves (returns no/partial votes).
+
+    `cross_model_votes` (ROADMAP C2): an OPTIONAL second skeptic seam backed by a
+    DIFFERENT model family. When supplied, a number is also blocked if the
+    cross-model verifier disagrees (votes it missing) — catching fabrications the
+    same-family majority's conformity bias let through. It only strengthens the
+    gate; it never clears a number the in-family vote blocked.
     """
     ara_dir = find_ara_dir(ai_package_dir)
     source_md = md_path.read_text(encoding="utf-8")
@@ -129,10 +149,24 @@ def run_g2(
         votes_per_round.append(
             skeptic_votes(candidate_numbers, source_md, claim_context="G2 data-fidelity audit")
         )
+    cross_votes: tuple[SkepticVote, ...] = ()
+    if cross_model_votes is not None:
+        cross_votes = tuple(
+            cross_model_votes(
+                candidate_numbers, source_md, claim_context="G2 cross-model verification"
+            )
+        )
 
     findings: list[Finding] = []
     for idx, number in enumerate(candidate_numbers, start=1):
-        if _insufficiently_confirmed(votes_per_round, number, n_skeptics):
+        in_family_bad = _insufficiently_confirmed(votes_per_round, number, n_skeptics)
+        cross_bad = _cross_model_flags(cross_votes, number)
+        if in_family_bad or cross_bad:
+            by = (
+                "the cross-model verifier"
+                if cross_bad and not in_family_bad
+                else "a skeptic majority"
+            )
             findings.append(
                 Finding(
                     finding_id=f"G2F{idx:02d}",
@@ -140,8 +174,8 @@ def run_g2(
                     target=str(ara_dir.relative_to(ai_package_dir.parent)),
                     observation=(
                         f"evidence number {number!r} not confirmed present in the "
-                        f"source MD by a majority of skeptics — likely fabricated, "
-                        f"mis-transcribed, or unverifiable"
+                        f"source MD by {by} — likely fabricated, mis-transcribed, "
+                        f"or unverifiable"
                     ),
                     is_hard_block=True,
                     reasoning=(

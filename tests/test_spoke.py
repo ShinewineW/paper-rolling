@@ -719,3 +719,14 @@ def test_campaign_tick_runs_spoke_and_builds_landscape(tmp_path, fake_http, fake
     row = done_rows[-1]
     assert row["person_vault_path"] and Path(row["person_vault_path"]).is_dir()
     assert row["ai_package_path"] and Path(row["ai_package_path"]).is_dir()
+
+
+def test_sampled_is_deterministic_and_rate_bounded():
+    """ROADMAP C2: cross-model sampling is deterministic per key and ~rate-bounded."""
+    from scripts.spoke import _sampled
+
+    assert _sampled("k", 0.0) is False  # off
+    assert _sampled("k", 1.0) is True  # always
+    assert _sampled("k", 0.5) == _sampled("k", 0.5)  # stable across calls
+    hits = sum(_sampled(f"paper-{i}", 0.3) for i in range(1000))
+    assert 200 <= hits <= 400  # ~30% within a loose band

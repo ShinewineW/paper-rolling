@@ -141,6 +141,50 @@ def test_run_g2_fails_closed_on_partial_skeptic_coverage(tmp_path: Path) -> None
     assert any("28.4" in f.observation for f in verdict.hard_findings)
 
 
+def test_run_g2_cross_model_catches_in_family_false_negative(tmp_path: Path) -> None:
+    """ROADMAP C2: the cross-model overlay blocks a fabricated number that the
+    in-family majority wrongly 'confirmed' (the conformity-bias failure mode)."""
+    ara = _make_ai_package(tmp_path)  # evidence carries 28.4 (and 24.6)
+    md = tmp_path / "src.md"
+    md.write_text("The model reaches 24.6 (no improvement).\n", encoding="utf-8")  # 28.4 absent
+
+    def conformist(numbers, source_md, claim_context):
+        # In-family skeptics all CONFORM — wrongly report everything found.
+        return tuple(SkepticVote(number=n, found_in_source=True) for n in numbers)
+
+    def cross(numbers, source_md, claim_context):
+        # A heterogeneous verifier checks honestly against the source MD.
+        return tuple(SkepticVote(number=n, found_in_source=(n in source_md)) for n in numbers)
+
+    # Without cross-model, the conformist majority clears the fabrication.
+    assert run_g2(ara.parent, md, skeptic_votes=conformist, n_skeptics=3).blocked is False
+    # With cross-model, the disagreement hard-blocks the fabricated 28.4.
+    verdict = run_g2(
+        ara.parent, md, skeptic_votes=conformist, n_skeptics=3, cross_model_votes=cross
+    )
+    assert verdict.blocked is True
+    assert any("28.4" in f.observation for f in verdict.hard_findings)
+
+
+def test_run_g2_cross_model_does_not_false_block_on_silence(tmp_path: Path) -> None:
+    """The cross-model overlay only ADDS blocks on disagreement — it never blocks
+    a clean number on cross-model silence (the in-family vote stays primary)."""
+    ara = _make_ai_package(tmp_path)
+    md = tmp_path / "src.md"
+    md.write_text("The model achieves a BLEU of 28.4 versus 24.6.\n", encoding="utf-8")
+
+    def honest(numbers, source_md, claim_context):
+        return tuple(SkepticVote(number=n, found_in_source=(n in source_md)) for n in numbers)
+
+    def silent_cross(numbers, source_md, claim_context):
+        return ()  # cross-model returns nothing
+
+    verdict = run_g2(
+        ara.parent, md, skeptic_votes=honest, n_skeptics=3, cross_model_votes=silent_cross
+    )
+    assert verdict.blocked is False  # clean numbers not false-blocked by cross-model silence
+
+
 def test_run_g2_skeptic_seam_never_receives_evidence_path(tmp_path: Path) -> None:
     """Ground-truth isolation: the skeptic seam gets candidate numbers + source
     text only, never a handle to the evidence file (the 'answer')."""

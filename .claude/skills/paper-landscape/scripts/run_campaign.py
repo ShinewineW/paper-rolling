@@ -64,6 +64,8 @@ def run_campaign(
     entailment_judge: EntailmentJudgeFn,
     http: Callable,
     run_cli: Callable,
+    cross_model_votes: SkepticVoteFn | None = None,
+    cross_model_sample: float = 0.0,
     requested_topic: str | None = None,
     requested_n: int | None = None,
 ) -> TickResult:
@@ -128,6 +130,8 @@ def run_campaign(
         rigor_scores=rigor_scores,
         entailment_judge=entailment_judge,
         ledger=ledger,
+        cross_model_votes=cross_model_votes,
+        cross_model_sample=cross_model_sample,
     )
     # LS-1 single-writer lock: hold _ledger/.lock for the whole tick so a second
     # concurrent instance fails fast (LedgerLockError) instead of racing the

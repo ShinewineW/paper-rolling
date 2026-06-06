@@ -22,6 +22,7 @@ produce_outputs returned — it never re-derives a key).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from collections.abc import Callable
@@ -56,6 +57,18 @@ def _synthesize_content_list(md_path: Path) -> Path:
     return path
 
 
+def _sampled(key: str, rate: float) -> bool:
+    """Deterministic per-key sampling for the G2 cross-model pass (ROADMAP C2):
+    True for ~`rate` of keys (≤0 never, ≥1 always), stable across runs so a paper
+    is consistently sampled — bounds the extra cross-model cost to a fraction."""
+    if rate <= 0:
+        return False
+    if rate >= 1:
+        return True
+    bucket = int(hashlib.sha256(key.encode("utf-8")).hexdigest(), 16) % 1000
+    return bucket < rate * 1000
+
+
 def make_spoke(
     *,
     workspace: Path,
@@ -69,6 +82,8 @@ def make_spoke(
     now=None,
     n_skeptics: int = 3,
     max_gate_rounds: int = 2,
+    cross_model_votes: SkepticVoteFn | None = None,
+    cross_model_sample: float = 0.0,
 ) -> SpokeFn:
     """Build the production SpokeFn that runs the full gated pipeline per paper.
 
@@ -104,12 +119,23 @@ def make_spoke(
         content_list_path = ing.content_list_path or _synthesize_content_list(ing.md_path)
 
         # 3. Wire G2 into produce_outputs (runs after branch2, before branch1).
+        #    A sampled fraction of papers also gets the cross-model verification
+        #    overlay (ROADMAP C2) — a heterogeneous-family skeptic that catches
+        #    fabrications the in-family majority's conformity bias let through.
+        use_cross = (
+            cross_model_votes
+            if cross_model_votes is not None
+            and _sampled(_candidate_key(candidate), cross_model_sample)
+            else None
+        )
+
         def _g2(stage_ai_entry: Path):
             return run_g2(
                 stage_ai_entry,
                 ing.md_path,
                 skeptic_votes=skeptic_votes,
                 n_skeptics=n_skeptics,
+                cross_model_votes=use_cross,
             )
 
         # 4. The analyzer seam is passed as a parameter (no module-global

@@ -14,10 +14,17 @@ def test_public_gate_entrypoints_are_importable() -> None:
 
 def test_run_g2_signature_is_stable_for_hub() -> None:
     sig = inspect.signature(g2_data_fidelity.run_g2)
-    # Round 2 F3/F6: baseline signature. B8/B10 (defect-stage + cross-model) are
-    # DEFERRED post-MVP (see Revision §"Deferred"), so run_g2 stays at the baseline
-    # — no cross_model_fn/cross_model_sample params in the buildable MVP.
-    assert list(sig.parameters) == ["ai_package_dir", "md_path", "skeptic_votes", "n_skeptics"]
+    # Baseline + the cross-model overlay (B10 / ROADMAP C2 is now SHIPPED): the
+    # optional `cross_model_votes` heterogeneous-family verifier strengthens the
+    # gate. It is keyword-only with a None default, so the hub's existing calls
+    # stay back-compatible.
+    assert list(sig.parameters) == [
+        "ai_package_dir",
+        "md_path",
+        "skeptic_votes",
+        "n_skeptics",
+        "cross_model_votes",
+    ]
 
 
 def test_run_g3_signature_is_stable_for_hub() -> None:
