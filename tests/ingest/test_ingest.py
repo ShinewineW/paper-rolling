@@ -110,36 +110,95 @@ def test_ingest_demotes_to_tier2_when_html_missing(tmp_path, fake_http, fake_cli
     assert contract["image_count"] == 1
 
 
-def test_ingest_equation_gate_demotes_when_math_dropped(tmp_path, fake_http, fake_cli, candidate):
-    """HTML had math but pandoc produced 0 $$ blocks -> equation-count gate demotes."""
-    aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
-    html = b"<html><body><p><math><mi>z</mi></math> text</p></body></html>"
-    fake_http.add(f"https://arxiv.org/html/{aid}{ver}", 200, html)
-    fake_http.add(candidate["oa_pdf_url"], 200, b"%PDF body")
+def _eq_gate_runner(calls, pandoc_md):
+    """A run_cli that emits `pandoc_md` for pandoc and a MinerU fallback."""
+    from pathlib import Path
 
-    calls = {"pandoc": 0}
+    from conftest import FakeCliResult
 
     def runner(argv, cwd):
-        from pathlib import Path
-
-        from conftest import FakeCliResult
-
         if argv[0] == "pandoc":
             calls["pandoc"] += 1
             out = argv[argv.index("-o") + 1]
-            Path(cwd, out).write_text("Body with no display math at all.\n")
+            Path(cwd, out).write_text(pandoc_md)
             return FakeCliResult(returncode=0)
-        # mineru
         out = argv[argv.index("-o") + 1]
         write_mineru_output(Path(cwd, out), md="$$z = 1$$\n", images=[], content_list="[]")
         return FakeCliResult(returncode=0)
 
-    res = ingest(candidate, tmp_path, http=fake_http, run_cli=runner, now=_now)
+    return runner
+
+
+def test_ingest_equation_gate_demotes_when_math_dropped(tmp_path, fake_http, fake_cli, candidate):
+    """Source had DISPLAY equations but pandoc produced 0 $$ -> gate demotes."""
+    aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
+    html = b'<html><body><math display="block"><mi>z</mi></math>'
+    html += b'<math display="block"><mi>w</mi></math></body></html>'  # 2 display eqs
+    fake_http.add(f"https://arxiv.org/html/{aid}{ver}", 200, html)
+    fake_http.add(candidate["oa_pdf_url"], 200, b"%PDF body")
+    calls = {"pandoc": 0}
+
+    res = ingest(
+        candidate,
+        tmp_path,
+        http=fake_http,
+        run_cli=_eq_gate_runner(calls, "Body with no display math at all.\n"),
+        now=_now,
+    )
 
     assert calls["pandoc"] == 1  # Tier-1 ran
-    assert res.tier == 2  # but demoted because math was dropped
-    contract = json.loads((res.md_path.parent / ".md_contract.json").read_text())
-    assert contract["equation_block_count"] == 1
+    assert res.tier == 2  # demoted: 0/2 display equations survived
+
+
+def test_ingest_equation_gate_demotes_on_partial_loss(tmp_path, fake_http, fake_cli, candidate):
+    """ROADMAP A1: even PARTIAL display-equation loss (< 50% survive) demotes."""
+    aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
+    html = b"<html><body>" + b'<math display="block"><mi>a</mi></math>' * 4 + b"</body></html>"
+    fake_http.add(f"https://arxiv.org/html/{aid}{ver}", 200, html)
+    fake_http.add(candidate["oa_pdf_url"], 200, b"%PDF body")
+    calls = {"pandoc": 0}
+
+    # Source has 4 display equations; pandoc emits only 1 (25% < 50%) -> demote.
+    res = ingest(
+        candidate, tmp_path, http=fake_http, run_cli=_eq_gate_runner(calls, "$$a$$\n"), now=_now
+    )
+    assert res.tier == 2
+
+
+def test_ingest_equation_gate_keeps_when_most_survive(tmp_path, fake_http, fake_cli, candidate):
+    """≥ 50% display equations surviving is trustworthy — keep Tier-1."""
+    aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
+    html = b"<html><body>" + b'<math display="block"><mi>a</mi></math>' * 4 + b"</body></html>"
+    fake_http.add(f"https://arxiv.org/html/{aid}{ver}", 200, html)
+    calls = {"pandoc": 0}
+
+    # Source 4 display eqs; pandoc emits 3 (75% ≥ 50%) -> keep Tier-1.
+    res = ingest(
+        candidate,
+        tmp_path,
+        http=fake_http,
+        run_cli=_eq_gate_runner(calls, "$$a$$\n$$b$$\n$$c$$\n"),
+        now=_now,
+    )
+    assert res.tier == 1
+
+
+def test_ingest_does_not_demote_inline_only_math(tmp_path, fake_http, fake_cli, candidate):
+    """ROADMAP A1 fix: inline-only math (no display equations) legitimately emits
+    0 $$ — it must NOT be demoted (the old all-or-nothing gate wrongly did)."""
+    aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
+    html = b"<html><body><p>inline <math><mi>z</mi></math> only</p></body></html>"
+    fake_http.add(f"https://arxiv.org/html/{aid}{ver}", 200, html)
+    calls = {"pandoc": 0}
+
+    res = ingest(
+        candidate,
+        tmp_path,
+        http=fake_http,
+        run_cli=_eq_gate_runner(calls, "Body with inline math, no display equations.\n"),
+        now=_now,
+    )
+    assert res.tier == 1  # not demoted — inline-only math has no display equations
 
 
 def test_ingest_both_tiers_fail_raises_ingestfailed(tmp_path, fake_http, fake_cli, candidate):

@@ -17,9 +17,14 @@ from pathlib import Path
 _LATEXML_ERROR = re.compile(rb"ltx_ERROR|LaTeXML\s+error|\bUnable to process\b", re.IGNORECASE)
 # Extract <img src="..."> targets (single or double quotes).
 _IMG_SRC = re.compile(rb"""<img\b[^>]*\bsrc=["']([^"']+)["']""", re.IGNORECASE)
-# Presence of MathML / LaTeXML math in the source HTML — used by the orchestrator's
-# equation-count gate: if HTML had math but pandoc emitted 0 $$ blocks -> demote.
+# Presence of MathML / LaTeXML math in the source HTML (any: inline or display).
 _HTML_MATH = re.compile(rb"<math\b|ltx_Math|ltx_equation", re.IGNORECASE)
+# DISPLAY equations specifically (`<math display="block">`) — the source-side
+# count the orchestrator's equation-fidelity gate compares against emitted `$$`
+# blocks, so it can catch PARTIAL loss (ROADMAP A1), not just all-or-nothing.
+# Inline math (`$...$`) does NOT produce `$$`, so it is deliberately excluded —
+# counting it would falsely demote inline-only-math papers.
+_DISPLAY_MATH = re.compile(rb"""<math\b[^>]*\bdisplay\s*=\s*["']block["']""", re.IGNORECASE)
 
 
 class Tier1Unavailable(Exception):
@@ -31,6 +36,9 @@ class Tier1Output:
     md_text: str
     images: list[str]
     html_had_math: bool
+    # Count of DISPLAY equations in the source HTML (`<math display="block">`),
+    # for the orchestrator's equation-fidelity ratio gate (ROADMAP A1).
+    html_math_count: int = 0
 
 
 def _arxiv_html_url(arxiv_id: str, version: str) -> str:
@@ -104,4 +112,10 @@ def run_tier1(
         raise Tier1Unavailable("pandoc_no_output")
     md_text = md_path.read_text(encoding="utf-8")
     html_had_math = bool(_HTML_MATH.search(body))
-    return Tier1Output(md_text=md_text, images=downloaded, html_had_math=html_had_math)
+    html_math_count = len(_DISPLAY_MATH.findall(body))
+    return Tier1Output(
+        md_text=md_text,
+        images=downloaded,
+        html_had_math=html_had_math,
+        html_math_count=html_math_count,
+    )

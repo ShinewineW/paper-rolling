@@ -31,6 +31,12 @@ from scripts.ingest.tier2_mineru import Tier2Failed, run_tier2
 PANDOC_VERSION = "3.1.2"
 MINERU_VERSION = "2.0.0"
 
+# Equation-fidelity gate (摄取-D1 / ROADMAP A1): a Tier-1 conversion must preserve
+# at least this fraction of the source's DISPLAY equations, else it is demoted to
+# Tier-2 (MinerU). Catches PARTIAL loss (e.g. 50 source equations, 5 survive), not
+# just the all-or-nothing case.
+EQUATION_SURVIVAL_RATIO = 0.5
+
 _NONWORD = re.compile(r"[^0-9A-Za-z]+")
 
 
@@ -154,10 +160,18 @@ def ingest(
                 aid, ver, paper_dir, http=http, run_cli=run_cli, pandoc_version=PANDOC_VERSION
             )
             eq_blocks = count_equation_blocks(t1.md_text)
-            # Equation-count gate (摄取-D1): HTML had math but pandoc dropped all
-            # display equations -> the conversion is untrustworthy -> demote.
-            if t1.html_had_math and eq_blocks == 0:
-                tier1_reason = "equation_gate: html had math but 0 $$ blocks emitted"
+            # Equation-FIDELITY gate (摄取-D1 / ROADMAP A1): the conversion is
+            # untrustworthy if pandoc dropped more than (1 - EQUATION_SURVIVAL_RATIO)
+            # of the source's DISPLAY equations — demote to Tier-2. This catches
+            # PARTIAL loss (e.g. 6 source eqs, 1 survives), not just all-or-nothing.
+            # Uses the DISPLAY-equation count (not html_had_math) so inline-only-math
+            # papers (legitimately 0 `$$`) are NOT falsely demoted.
+            src_eq = t1.html_math_count
+            if src_eq > 0 and eq_blocks < src_eq * EQUATION_SURVIVAL_RATIO:
+                tier1_reason = (
+                    f"equation_gate: only {eq_blocks}/{src_eq} display equations "
+                    f"survived (< {EQUATION_SURVIVAL_RATIO:.0%})"
+                )
             else:
                 return _finalize(
                     paper_dir,
