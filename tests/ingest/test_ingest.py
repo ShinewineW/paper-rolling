@@ -201,6 +201,35 @@ def test_ingest_does_not_demote_inline_only_math(tmp_path, fake_http, fake_cli, 
     assert res.tier == 1  # not demoted — inline-only math has no display equations
 
 
+def test_ingest_table_gate_demotes_when_tables_dropped(tmp_path, fake_http, fake_cli, candidate):
+    """ROADMAP A2: source had data tables but pandoc dropped them (< 50% survive)."""
+    aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
+    html = b"<html><body>" + b"<table><tr><td>x</td></tr></table>" * 2 + b"</body></html>"
+    fake_http.add(f"https://arxiv.org/html/{aid}{ver}", 200, html)
+    fake_http.add(candidate["oa_pdf_url"], 200, b"%PDF body")
+    calls = {"pandoc": 0}
+
+    res = ingest(
+        candidate,
+        tmp_path,
+        http=fake_http,
+        run_cli=_eq_gate_runner(calls, "Body — tables all dropped.\n"),
+        now=_now,
+    )
+    assert res.tier == 2  # 0/2 tables survived -> demoted to MinerU
+
+
+def test_ingest_table_gate_keeps_when_tables_survive(tmp_path, fake_http, fake_cli, candidate):
+    aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
+    html = b"<html><body>" + b"<table><tr><td>x</td></tr></table>" * 2 + b"</body></html>"
+    fake_http.add(f"https://arxiv.org/html/{aid}{ver}", 200, html)
+    calls = {"pandoc": 0}
+    md = "| A |\n| --- |\n| 1 |\n\n| B |\n| --- |\n| 2 |\n"  # 2 GFM tables survive
+
+    res = ingest(candidate, tmp_path, http=fake_http, run_cli=_eq_gate_runner(calls, md), now=_now)
+    assert res.tier == 1  # 2/2 tables survived -> Tier-1 kept
+
+
 def test_ingest_both_tiers_fail_raises_ingestfailed(tmp_path, fake_http, fake_cli, candidate):
     aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
     fake_http.add(f"https://arxiv.org/html/{aid}{ver}", 404, b"")

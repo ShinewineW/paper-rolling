@@ -17,6 +17,9 @@ from pathlib import Path
 # We pair fences greedily: every 2 occurrences of a "$$" fence = one block.
 # Inline math uses single "$"; a dangling unpaired "$$" does not complete a pair.
 _FENCE = re.compile(r"\$\$")
+# A GFM table carries exactly one header-separator row (| --- | --- |), so
+# counting separator rows counts emitted tables (ROADMAP A2 table-fidelity gate).
+_TABLE_SEP = re.compile(r"^\|[\s:|-]+\|$")
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -39,6 +42,11 @@ def count_equation_blocks(md: str) -> int:
     Inline math ($x$) is ignored; a dangling unpaired $$ does not count.
     """
     return len(_FENCE.findall(md)) // 2
+
+
+def count_table_blocks(md: str) -> int:
+    """Count GFM tables in markdown — one per `| --- |` header-separator row."""
+    return sum(1 for line in md.splitlines() if _TABLE_SEP.match(line.strip()))
 
 
 @dataclass(frozen=True)

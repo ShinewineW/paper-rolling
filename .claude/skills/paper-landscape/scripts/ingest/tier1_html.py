@@ -25,6 +25,9 @@ _HTML_MATH = re.compile(rb"<math\b|ltx_Math|ltx_equation", re.IGNORECASE)
 # Inline math (`$...$`) does NOT produce `$$`, so it is deliberately excluded —
 # counting it would falsely demote inline-only-math papers.
 _DISPLAY_MATH = re.compile(rb"""<math\b[^>]*\bdisplay\s*=\s*["']block["']""", re.IGNORECASE)
+# Source data tables (`<table>`), for the equation gate's sibling table-fidelity
+# ratio gate (ROADMAP A2): pandoc HTML→GFM table conversion is lossy.
+_HTML_TABLE = re.compile(rb"<table\b", re.IGNORECASE)
 
 
 class Tier1Unavailable(Exception):
@@ -39,6 +42,8 @@ class Tier1Output:
     # Count of DISPLAY equations in the source HTML (`<math display="block">`),
     # for the orchestrator's equation-fidelity ratio gate (ROADMAP A1).
     html_math_count: int = 0
+    # Count of source data tables (`<table>`), for the table-fidelity gate (A2).
+    html_table_count: int = 0
 
 
 def _arxiv_html_url(arxiv_id: str, version: str) -> str:
@@ -113,9 +118,11 @@ def run_tier1(
     md_text = md_path.read_text(encoding="utf-8")
     html_had_math = bool(_HTML_MATH.search(body))
     html_math_count = len(_DISPLAY_MATH.findall(body))
+    html_table_count = len(_HTML_TABLE.findall(body))
     return Tier1Output(
         md_text=md_text,
         images=downloaded,
         html_had_math=html_had_math,
         html_math_count=html_math_count,
+        html_table_count=html_table_count,
     )

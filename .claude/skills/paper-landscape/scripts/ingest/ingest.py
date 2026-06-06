@@ -21,6 +21,7 @@ from pathlib import Path
 from scripts.ingest.contract import (
     MdContract,
     count_equation_blocks,
+    count_table_blocks,
     sha256_bytes,
     write_contract,
 )
@@ -31,11 +32,12 @@ from scripts.ingest.tier2_mineru import Tier2Failed, run_tier2
 PANDOC_VERSION = "3.1.2"
 MINERU_VERSION = "2.0.0"
 
-# Equation-fidelity gate (摄取-D1 / ROADMAP A1): a Tier-1 conversion must preserve
-# at least this fraction of the source's DISPLAY equations, else it is demoted to
-# Tier-2 (MinerU). Catches PARTIAL loss (e.g. 50 source equations, 5 survive), not
-# just the all-or-nothing case.
+# Fidelity gates (摄取-D1 / ROADMAP A1+A2): a Tier-1 conversion must preserve at
+# least this fraction of the source's DISPLAY equations / data tables, else it is
+# demoted to Tier-2 (MinerU). Catches PARTIAL loss (e.g. 50 source equations, 5
+# survive; or 8 tables, 1 survives), not just the all-or-nothing case.
 EQUATION_SURVIVAL_RATIO = 0.5
+TABLE_SURVIVAL_RATIO = 0.5
 
 _NONWORD = re.compile(r"[^0-9A-Za-z]+")
 
@@ -159,18 +161,24 @@ def ingest(
             t1 = run_tier1(
                 aid, ver, paper_dir, http=http, run_cli=run_cli, pandoc_version=PANDOC_VERSION
             )
+            # Fidelity gates (摄取-D1 / ROADMAP A1+A2): the conversion is
+            # untrustworthy if pandoc dropped more than half of the source's
+            # DISPLAY equations OR data tables — demote to Tier-2. Catches PARTIAL
+            # loss, not just all-or-nothing. Uses DISPLAY-equation / <table> counts
+            # so inline-only-math papers (legitimately 0 `$$`) are not falsely
+            # demoted.
             eq_blocks = count_equation_blocks(t1.md_text)
-            # Equation-FIDELITY gate (摄取-D1 / ROADMAP A1): the conversion is
-            # untrustworthy if pandoc dropped more than (1 - EQUATION_SURVIVAL_RATIO)
-            # of the source's DISPLAY equations — demote to Tier-2. This catches
-            # PARTIAL loss (e.g. 6 source eqs, 1 survives), not just all-or-nothing.
-            # Uses the DISPLAY-equation count (not html_had_math) so inline-only-math
-            # papers (legitimately 0 `$$`) are NOT falsely demoted.
-            src_eq = t1.html_math_count
+            tbl_blocks = count_table_blocks(t1.md_text)
+            src_eq, src_tbl = t1.html_math_count, t1.html_table_count
             if src_eq > 0 and eq_blocks < src_eq * EQUATION_SURVIVAL_RATIO:
                 tier1_reason = (
                     f"equation_gate: only {eq_blocks}/{src_eq} display equations "
                     f"survived (< {EQUATION_SURVIVAL_RATIO:.0%})"
+                )
+            elif src_tbl > 0 and tbl_blocks < src_tbl * TABLE_SURVIVAL_RATIO:
+                tier1_reason = (
+                    f"table_gate: only {tbl_blocks}/{src_tbl} tables survived "
+                    f"(< {TABLE_SURVIVAL_RATIO:.0%})"
                 )
             else:
                 return _finalize(
