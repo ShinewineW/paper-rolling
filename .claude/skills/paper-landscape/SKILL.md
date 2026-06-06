@@ -13,6 +13,17 @@ landscapes. It is **not** a general installable skill — it hard-assumes the
 paper-rolling workspace layout (`corpus/`, `_ledger/`, `person_vault/`,
 `ai_package/`, `landscapes/`, `config/`).
 
+## Knowledge layer (read on demand)
+
+The agent-facing knowledge lives in `references/` (load the doc you need) and
+`sub-skills/` (one focused role per LLM seam — what a fresh sub-agent loads):
+
+- `references/wiring-the-seams.md` — how to compose + **invoke** the engine (start here).
+- `references/ara-schema.md` — the ARA bundle `resolve_analysis` must return.
+- `references/discovery-and-authority.md` · `ingest-fidelity.md` · `naming-and-ledger.md` · `landscapes.md` — per-subsystem depth.
+- `references/glossary.md` — domain terms.
+- `sub-skills/{analyze-paper,g2-skeptic,g3-rigor-reviewer,entailment-judge}/` — the four independent LLM-seam roles.
+
 ## Entry: the campaign Hard Gate (HITL, once per campaign) — MUST
 
 The **first action** on a new campaign is a blocking **Hard Gate** (中枢-D1).
@@ -124,6 +135,10 @@ entailment_judge, http, run_cli, ...)`; it builds the ledger, wires the seams in
 `make_spoke`, and calls `run_campaign_tick` (which raises `GateRequired` if the
 campaign Hard Gate is not
 satisfied). Do **not** hard-code an LLM call — the seams are provider-agnostic.
+The **3 infra adapters ship as tested defaults** in `scripts/adapters.py`
+(`build_http` / `build_run_cli` / `build_discover`) — so the runtime only
+constructs the LLM seams (see "Invoke the engine (quickstart)" below). Full
+contract: `references/wiring-the-seams.md`; per-role: `sub-skills/<role>/SKILL.md`.
 
 1. **`resolve_analysis(md_path, candidate) -> dict`** — the analyzer sub-agent.
    - **Input**: the frozen `corpus/{ID}/{ID}.md` path + the discovery `candidate`
@@ -132,7 +147,7 @@ satisfied). Do **not** hard-code an LLM call — the seams are provider-agnostic
      `landscapes` comparator consume (`overview`, `problem`, `claims`, `concepts`,
      `experiments`, `related_work`, `architecture`, `algorithm`, `heuristics`,
      `configs_training`, `configs_model`, `environment`, `execution_stub`,
-     `innovations`, `exploration_tree`, `evidence_tables`, `highlights`, …). It
+     `innovations`, `exploration_tree`, `evidence_tables`, …). It
      **MUST** include the headline-metric keys the landscape table needs:
      `headline_metric` (str, e.g. `"NDS"`), `headline_value` (float), and
      `params_million` (float) — without them branch2's `PAPER.md` frontmatter is
@@ -169,6 +184,34 @@ satisfied). Do **not** hard-code an LLM call — the seams are provider-agnostic
    - **Input**: a `ClaimRecord` + the linked experiment text.
    - **Output**: `(entailed: bool, reason: str)`.
    - **MUST**: an independent Agent-tool invocation.
+
+## Invoke the engine (quickstart)
+
+The infra plumbing ships; the runtime only constructs the LLM seams, then calls
+`run_campaign(...)`. Run with `PYTHONPATH=.claude/skills/paper-landscape`:
+
+```python
+from scripts.run_campaign import run_campaign
+from scripts.adapters import build_http, build_run_cli, build_discover
+
+# resolve_analysis / skeptic_votes / rigor_scores / entailment_judge / expand_llm
+# are each an INDEPENDENT Agent-tool invocation — construct per
+# references/wiring-the-seams.md + sub-skills/<role>/SKILL.md.
+result = run_campaign(
+    workspace=".",
+    resolve_analysis=resolve_analysis,
+    skeptic_votes=skeptic_votes,
+    rigor_scores=rigor_scores,
+    entailment_judge=entailment_judge,
+    discover=build_discover(llm=expand_llm, is_ad_domain=True),  # is_ad_domain from campaign.yaml
+    http=build_http(),
+    run_cli=build_run_cli(),
+)
+```
+
+`run_campaign` raises `GateRequired` until `config/campaign.yaml` is locked (the
+campaign Hard Gate above) — establish the campaign once, then a `/loop` tick just
+runs this. The four LLM seams + `expand_llm` are the only things the agent builds.
 
 ## Failure handling (中枢-D2)
 

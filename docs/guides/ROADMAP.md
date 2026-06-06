@@ -16,10 +16,11 @@
 
 Status keys: `planned` · `in-progress` · `done`.
 
-> **Status (2026-06-07): the capability rail is COMPLETE.** A1, A2, B1, B2, C1,
-> C2, C3, C4 are all `done` and committed, each with regression tests. The only
-> remaining item is **W1 (production wiring)**, which is an owner decision carried
-> over from the oh-my-codex audit (R21), not a capability gap.
+> **Status (2026-06-07): the capability rail is COMPLETE, and W1 is now shipped.**
+> A1, A2, B1, B2, C1, C2, C3, C4 are all `done` and committed, each with regression
+> tests. **W1 (production wiring)** is also `done` (ADR-0003): the deterministic infra
+> adapters ship (`scripts/adapters.py`) and the agent-facing knowledge layer
+> (`references/` + `sub-skills/`) is built, so the skill is invoke-and-go.
 
 ## Phase A — ingest-layer fidelity (self-contained, low-risk)
 
@@ -70,25 +71,25 @@ Status keys: `planned` · `in-progress` · `done`.
   trained NLI / factual-consistency check that generalizes beyond keyword cues.
   *Source:* ARS uncited-assertion guarded detector; factual-consistency models.
 
-## Carried from the oh-my-codex audit (R21) — RESOLVED (owner overrule, evidence-based)
+## Carried from the oh-my-codex audit (R21) — RESOLVED + SHIPPED (ADR-0003)
 
-- **W1. Production wiring** — `optional` (BLOCKING severity OVERRULED by the owner,
-  2026-06-07, grounded in open-source evidence). Codex's R21 BLOCKING ("not runnable
-  without writing adapter code") misjudges the SKILL operating model: `anthropics/skills`
-  ship no standalone runner and rely on the host agent harness to orchestrate, so the
-  absence of a standalone autonomous `main()` is by design, not a defect — and the
-  LLM seams must be the agent (correctly already injected). The remaining ~40 lines of
-  deterministic glue (`build_http`/`build_run_cli`/`build_discover`) are an OPTIONAL,
-  norm-aligned convenience: every comparable project (gpt-researcher, paper-qa, STORM,
-  smolagents) AND Anthropic's own skills (docx/pdf) ship deterministic helper scripts,
-  and `ingest(http=…, run_cli=…)` needs Python callables the agent's WebFetch/Bash tools
-  cannot directly be — so shipping the factories is the norm, but it is low-priority
-  polish, NOT a gate. See `attn_sink/oh-my-codex-review-log.md` (R21) + the 2026-06-07
-  evidence pass.
+- **W1. Production wiring** — `done` (2026-06-07, ADR-0003). History: Codex's R21
+  rated this BLOCKING ("not runnable without writing adapter code"). The *prescription*
+  (a standalone runner / scaffolding for the LLM seams) was a misread of the skill model
+  — no reference skill ships a standalone `main()`, and the LLM seams MUST be the agent
+  (injected, not coded), confirmed by `AI-Research-SKILLs` shipping 98 skills with 0
+  `scripts/`. But the audit's *smell* — an incomplete, hard-to-invoke skill — was real
+  and was under-weighted. **Remedy shipped**: (1) the three deterministic infra adapters
+  now ship as tested factories in `scripts/adapters.py`
+  (`build_http`/`build_run_cli`/`build_discover`; +7 unit tests + a live-discovery
+  smoke), and (2) the agent-facing knowledge layer is built (`references/` ×7 +
+  `sub-skills/` ×4). Invoking `/paper-landscape` now only requires constructing the 4
+  LLM seams; everything deterministic is wired. See `docs/adr/0003-skill-knowledge-layer-and-shipped-adapters.md`
+  + `.claude/skills/paper-landscape/references/wiring-the-seams.md` + `attn_sink/oh-my-codex-review-log.md` (R21).
 
 ## Recommended execution order
 
 A1 → A2 → B1 → B2 → C1 → C2 → C3 → C4. Rationale: the clean, self-contained
 fidelity gates first (momentum, low risk); the eval harness (C1) before
 cross-model (C2) so C2's value is measurable; C2 is the headline gap; C3/C4 deepen
-the audit semantics. W1 (wiring) is an independent owner decision.
+the audit semantics. W1 (wiring) is now shipped (ADR-0003), not a deferred decision.
