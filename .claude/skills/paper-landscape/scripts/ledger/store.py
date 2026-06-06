@@ -8,8 +8,11 @@ record_status.
 
 from __future__ import annotations
 
+import fcntl
 import os
+import shutil
 import tempfile
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -191,3 +194,81 @@ class Ledger:
         if days is None:
             return None
         return _iso(now + timedelta(days=days))
+
+    # -- LS-1 concurrency lock ----------------------------------------------
+
+    @contextmanager
+    def acquire(self):
+        """LS-1: exclusive ledger lock. A second instance raises LedgerLockError.
+
+        Uses a non-blocking flock on _ledger/.lock so a second hub fails fast
+        rather than silently racing the single-writer ledger.
+        """
+        self.ledger_dir.mkdir(parents=True, exist_ok=True)
+        fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as exc:
+                os.close(fd)
+                raise LedgerLockError(
+                    f"another paper-landscape instance holds {self.lock_path}; "
+                    "refusing to start a second hub"
+                ) from exc
+            self._lock_fd = fd
+            yield self
+        finally:
+            if self._lock_fd is not None:
+                fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
+                os.close(self._lock_fd)
+                self._lock_fd = None
+            # Best-effort removal; another waiting instance recreates it.
+            try:
+                os.unlink(self.lock_path)
+            except FileNotFoundError:
+                pass
+
+    # -- LS-3 crash-resume sweep --------------------------------------------
+
+    def crash_resume_sweep(self) -> list[str]:
+        """LS-3: clean partial artifacts of every non-done row, return removed paths.
+
+        Removes half-written vault entries recorded on non-done rows plus the
+        whole transient clone dir (/.clones), so resume retries from a clean
+        slate. Done rows are never touched.
+        """
+        removed: list[str] = []
+        for _key, row in self._latest_by_key().items():
+            if row["status"] == _DONE or row.get("rescinded_at"):
+                continue
+            for path_key in ("person_vault_path", "ai_package_path"):
+                p = row.get(path_key)
+                if p and Path(p).exists():
+                    shutil.rmtree(p)
+                    removed.append(p)
+        clones = self.topic_dir / ".clones"
+        if clones.exists():
+            shutil.rmtree(clones)
+        return removed
+
+    # -- LS-4 startup consistency self-heal ---------------------------------
+
+    def consistency_check(self) -> list[str]:
+        """LS-4: demote any `done` row missing a vault half; return demoted keys.
+
+        A `done` row MUST have both person_vault and ai_package on disk. If
+        either is absent (ledger↔FS drift), append a `failed` row so the key
+        leaves the skip-set and is reprocessed next run.
+        """
+        demoted: list[str] = []
+        for key, row in self._latest_by_key().items():
+            if row["status"] != _DONE or row.get("rescinded_at"):
+                continue
+            pv = row.get("person_vault_path")
+            ai = row.get("ai_package_path")
+            ok = bool(pv) and Path(pv).exists() and bool(ai) and Path(ai).exists()
+            if not ok:
+                demoted.append(key)
+        for key in demoted:
+            self.record_status(key, status="failed", failure_class="convert_error")
+        return demoted

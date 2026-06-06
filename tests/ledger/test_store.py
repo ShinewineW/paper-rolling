@@ -125,3 +125,106 @@ def test_negative_cache_ttl_by_failure_class(tmp_path):
     assert led.retry_after_for("not_indexed_yet", now) == _iso(now + timedelta(days=21))
     assert led.retry_after_for("convert_error", now) == _iso(now + timedelta(days=1))
     assert led.retry_after_for(None, now) is None
+
+
+# ---- LS-1 concurrency lock --------------------------------------------------
+
+
+def test_acquire_creates_and_releases_lock(tmp_path):
+    led = Ledger(tmp_path)
+    with led.acquire():
+        assert led.lock_path.exists()
+    # Lock file removed on release.
+    assert not led.lock_path.exists()
+
+
+def test_second_instance_refused(tmp_path):
+    led_a = Ledger(tmp_path)
+    led_b = Ledger(tmp_path)
+    with led_a.acquire():
+        try:
+            with led_b.acquire():
+                raised = False
+        except LedgerLockError:
+            raised = True
+        assert raised is True
+
+
+def test_lock_reusable_after_release(tmp_path):
+    led = Ledger(tmp_path)
+    with led.acquire():
+        pass
+    # A fresh acquire after clean release must succeed.
+    with led.acquire():
+        assert led.lock_path.exists()
+
+
+# ---- LS-3 crash-resume sweep ------------------------------------------------
+
+
+def test_crash_resume_cleans_partial_vault(tmp_path):
+    led = Ledger(tmp_path)
+    # A paper got to 'analyzed' (not done) and left half a vault entry + clone.
+    pv = tmp_path / "person_vault" / "2026-06-05_Foo_1234.5678"
+    pv.mkdir(parents=True)
+    (pv / "report.md").write_text("partial", encoding="utf-8")
+    clone = tmp_path / ".clones" / "1234.5678"
+    clone.mkdir(parents=True)
+    led.record_status(
+        "1234.5678v1",
+        status="analyzed",
+        person_vault_path=str(pv),
+    )
+    removed = led.crash_resume_sweep()
+    assert str(pv) in removed
+    assert not pv.exists()
+    assert not clone.exists()  # whole .clones dir swept
+
+
+def test_crash_resume_keeps_done_artifacts(tmp_path):
+    led = Ledger(tmp_path)
+    pv = tmp_path / "person_vault" / "2026-06-05_Bar_9999.0000"
+    pv.mkdir(parents=True)
+    led.record_status("9999.0000v1", status="done", person_vault_path=str(pv))
+    led.crash_resume_sweep()
+    assert pv.exists()  # done rows are never swept
+
+
+# ---- LS-4 startup consistency self-heal ------------------------------------
+
+
+def test_consistency_check_demotes_done_missing_vault(tmp_path):
+    led = Ledger(tmp_path)
+    pv = tmp_path / "person_vault" / "2026-06-05_Baz_1111.2222"
+    ai = tmp_path / "ai_package" / "2026-06-05_Baz_1111.2222"
+    pv.mkdir(parents=True)
+    # ai_package missing → inconsistent done row.
+    led.record_status(
+        "1111.2222v1",
+        status="done",
+        md_sha256="h",
+        person_vault_path=str(pv),
+        ai_package_path=str(ai),
+    )
+    demoted = led.consistency_check()
+    assert "1111.2222v1" in demoted
+    # Demoted key is no longer in the skip-set → will be reprocessed.
+    assert "1111.2222v1" not in led.load_skip_set()
+
+
+def test_consistency_check_keeps_complete_done(tmp_path):
+    led = Ledger(tmp_path)
+    pv = tmp_path / "person_vault" / "2026-06-05_Q_3333.4444"
+    ai = tmp_path / "ai_package" / "2026-06-05_Q_3333.4444"
+    pv.mkdir(parents=True)
+    ai.mkdir(parents=True)
+    led.record_status(
+        "3333.4444v1",
+        status="done",
+        md_sha256="h",
+        person_vault_path=str(pv),
+        ai_package_path=str(ai),
+    )
+    demoted = led.consistency_check()
+    assert demoted == []
+    assert "3333.4444v1" in led.load_skip_set()
