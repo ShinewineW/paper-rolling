@@ -69,3 +69,28 @@ uv sync --group dev      # set up the venv
 uv run pytest            # run the test suite
 uv run ruff check .      # lint
 ```
+
+## Ingest layer — external CLI runtime dependencies
+
+The ingest layer (`.claude/skills/paper-landscape/scripts/ingest/`) shells out to
+two **external command-line tools**. These are runtime dependencies installed at
+the OS level (or the shared `~/.claude/skills/.venv`) and invoked as subprocesses
+— they are NOT bundled as a per-skill virtualenv (see spec §8 R1).
+
+| Tool | Used by | Install | Notes |
+|------|---------|---------|-------|
+| `pandoc` | Tier-1 (arXiv HTML → GFM) | `brew install pandoc` / GitHub release binary | Converts MathML → LaTeX `$$` in `--to gfm`. |
+| `mineru` | Tier-2 (PDF → MD) | `uv pip install -U "mineru[core]"` into shared venv | CPU backend (`-b pipeline`); first run downloads multi-GB model weights (proxy/CDN fallback). On Apple Silicon, CPU is faster than MPS. |
+
+### 2-tier ingest contract (摄取-D1 + 吸收-D6)
+
+1. **Tier-1** — fetch `https://arxiv.org/html/{id}`, quality-gate (HTML missing /
+   LaTeXML error markers / equation-block-count anomaly), download original
+   figures, `pandoc --from html --to gfm`. No PDF downloaded.
+2. **Tier-2** — download the PDF, run MinerU (CPU) → MD + `images/` +
+   `content_list.json`.
+3. **Both fail** → quarantine to `_failed/{ID}.json` (no pymupdf4llm fallback).
+
+Every success writes `corpus/{ID}/.md_contract.json`:
+`{source_pdf_sha256, converter, converter_version, md_sha256, image_count, equation_block_count}`.
+**Downstream reads only `{ID}.md`** (MD-only contract; the PDF is frozen after conversion).
