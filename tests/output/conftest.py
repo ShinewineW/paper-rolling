@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 # Round 2 F7: candidate is a plain dict (the discovery-layer output), not an object.
 _CANDIDATE = {
     "arxiv_id": "2411.15139",
@@ -59,7 +58,7 @@ def md_path(tmp_path: Path) -> Path:
         "We propose a truncated diffusion policy that reaches 0.61 NDS on nuScenes, "
         "improving over the baseline by 3.2 points while running in real time.\n\n"
         "## Method\n"
-        "The loss is a denoising objective $$L = \\mathbb{E}\\|x - \\hat{x}\\|^2$$ truncated to k steps.\n\n"
+        "The loss is a denoising objective $$L = \\mathbb{E}\\|x - \\hat{x}\\|^2$$ truncated to k steps.\n\n"  # noqa: E501
         "## Experiments\n"
         "Table 1 reports 0.61 NDS and 0.52 mAP on the nuScenes validation split.\n",
         encoding="utf-8",
@@ -209,7 +208,7 @@ def analysis() -> dict:
                 "adopted": "BEV encoder",
             },
         ],
-        "architecture": "## Encoder\nBEV encoder.\n\n## TruncatedDiffusion\nDenoiser truncated to k steps.\n",
+        "architecture": "## Encoder\nBEV encoder.\n\n## TruncatedDiffusion\nDenoiser truncated to k steps.\n",  # noqa: E501
         "algorithm": "$$L = \\mathbb{E}\\|x-\\hat{x}\\|^2$$\nPseudocode: denoise k steps.\n",
         "constraints": "Assumes BEV inputs; limited to k>0.\n",
         "heuristics": [
@@ -250,7 +249,7 @@ def analysis() -> dict:
             "deps": ["torch==2.3.0"],
             "seeds": "0",
         },
-        "execution_stub": 'import torch\n\n\ndef truncated_denoise(x: torch.Tensor, k: int) -> torch.Tensor:\n    """Denoise x for k truncated steps."""\n    for _ in range(k):\n        x = x - 0.1 * x\n    return x\n',
+        "execution_stub": 'import torch\n\n\ndef truncated_denoise(x: torch.Tensor, k: int) -> torch.Tensor:\n    """Denoise x for k truncated steps."""\n    for _ in range(k):\n        x = x - 0.1 * x\n    return x\n',  # noqa: E501
         "innovations": [{"name": "Truncated diffusion", "grep": "truncated_denoise"}],
         "exploration_tree": [
             {

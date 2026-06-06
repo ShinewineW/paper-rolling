@@ -5,12 +5,11 @@ from __future__ import annotations
 import datetime
 
 import pytest
-
 from scripts.output.naming import (
     derive_name,
+    find_existing_entries,
     identity_base,
     vault_key,
-    find_existing_entries,
 )
 
 

@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
-
-from scripts.output.produce import produce_outputs
 from scripts.output.ara_schema import validate_ara_tree
+from scripts.output.produce import produce_outputs
 
 
 def test_produce_writes_both_vaults_with_same_key(tmp_path, candidate, ledger, md_path):

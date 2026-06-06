@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from scripts.output.ara_schema import validate_ara_tree
 from scripts.output.branch2_ara import write_branch2
 

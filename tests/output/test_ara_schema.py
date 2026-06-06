@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import textwrap
 
-import pytest
-
-from scripts.output.ara_schema import validate_exploration_tree, validate_ara_tree
+from scripts.output.ara_schema import validate_ara_tree, validate_exploration_tree
 
 
 def _good_tree() -> str:

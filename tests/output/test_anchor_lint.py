@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from scripts.output.anchor_lint import lint_text, AnchorViolation
+from scripts.output.anchor_lint import AnchorViolation, lint_text
 
 
 def test_well_formed_ref_anchor_passes() -> None:

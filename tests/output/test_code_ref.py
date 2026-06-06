@@ -5,9 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-import pytest
-
-from scripts.output.code_ref import build_code_ref, Innovation
+from scripts.output.code_ref import Innovation, build_code_ref
 
 
 def _fake_git(monkeypatch, clone_root: Path):
@@ -19,7 +17,7 @@ def _fake_git(monkeypatch, clone_root: Path):
             dest = Path(cmd[-1])
             dest.mkdir(parents=True, exist_ok=True)
             (dest / "model.py").write_text(
-                "class TruncatedDiffusion:\n    def forward(self):\n        return self.denoise()\n",
+                "class TruncatedDiffusion:\n    def forward(self):\n        return self.denoise()\n",  # noqa: E501
                 encoding="utf-8",
             )
             return subprocess.CompletedProcess(cmd, 0, "", "")

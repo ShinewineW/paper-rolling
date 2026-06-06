@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.output.anchor_lint import lint_text
+from scripts.output.branch1_report import AnchorGateError, write_branch1
 from scripts.output.branch2_ara import write_branch2
-from scripts.output.branch1_report import write_branch1, AnchorGateError
 
 
 def test_report_passes_anchor_lint(tmp_path, candidate, analysis, md_path):
