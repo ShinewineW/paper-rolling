@@ -8,7 +8,6 @@ punctuation-normalized SequenceMatcher ratio).
 from __future__ import annotations
 
 import pytest
-
 from scripts.discovery._text import THRESHOLD, normalize_title, similarity
 
 
