@@ -27,7 +27,7 @@ from typing import Protocol
 
 from scripts.campaign import gate_needed, load_campaign
 from scripts.landscapes import LandscapeResult, generate_landscapes
-from scripts.paths import FAILURE_STALLED
+from scripts.paths import FAILURE_STALLED, VAULT_BRANCH_PATH_FIELDS
 
 FAILED_REL = Path("_failed")
 
@@ -126,11 +126,12 @@ def _is_truly_done(record: dict) -> bool:
 
     'non-done-but-claimed-done' (吸收-D3): status=='done' yet a vault path is
     missing — the spoke lied/crashed mid-emit. Such records are re-fired.
+
+    Iterates the centralized branch set (paths.VAULT_BRANCH_PATH_FIELDS, ADR-0002)
+    so adding an output branch extends this check automatically.
     """
-    return (
-        record.get("status") == "done"
-        and bool(record.get("person_vault_path"))
-        and bool(record.get("ai_package_path"))
+    return record.get("status") == "done" and all(
+        bool(record.get(field)) for field in VAULT_BRANCH_PATH_FIELDS
     )
 
 

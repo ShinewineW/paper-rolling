@@ -88,10 +88,8 @@ def discover(
     queries = expand_queries(topic, llm=llm)
 
     raw: list[dict[str, Any]] = []
-    raw.extend(_safe_source(_run_openalex, sources.get("openalex"), queries, campaign_config))
-    raw.extend(_safe_source(_run_s2, sources.get("s2"), queries, campaign_config))
-    raw.extend(_safe_source(_run_arxiv, sources.get("arxiv"), queries, campaign_config))
-    raw.extend(_safe_source(_run_hf, sources.get("hf_papers"), queries, campaign_config))
+    for key, adapter in _SEARCH_SOURCES:
+        raw.extend(_safe_source(adapter, sources.get(key), queries, campaign_config))
 
     # second-round expansion from any HF ai_keywords harvested above
     harvested_keywords: list[str] = []
@@ -199,3 +197,23 @@ def _run_hf(source, queries, cfg) -> list[dict[str, Any]]:
     for q in queries:
         out.extend(source.search(q, max_results=cfg.get("hf_page", 50)))
     return out
+
+
+# Discovery-source registry — the extension seam (ADR-0002). discover() fans the
+# expanded queries across these in order; each adapter owns its source's search
+# params (date floor, page size), so discover()'s body stays source-agnostic.
+#
+# ADD A SOURCE (drop-in, no discover()-body edit): write a source class exposing
+# `.search(topic, ...) -> Iterable[candidate-dict]`, add a `_run_<name>(source,
+# queries, cfg)` adapter above, and append one `("<key>", _run_<name>)` entry
+# here. The `<key>` is the dict key the production wiring registers the source
+# under. See docs/EXTENDING.md.
+#
+# DBLP is intentionally NOT here: it is a venue-ENRICHMENT source (queried per
+# candidate by title after dedup), not a query fan-out source.
+_SEARCH_SOURCES: tuple[tuple[str, Callable[..., list[dict[str, Any]]]], ...] = (
+    ("openalex", _run_openalex),
+    ("s2", _run_s2),
+    ("arxiv", _run_arxiv),
+    ("hf_papers", _run_hf),
+)

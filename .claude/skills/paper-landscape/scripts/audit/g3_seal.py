@@ -21,9 +21,9 @@ import re
 from pathlib import Path
 
 from scripts.audit.anchor_resolution import check_branch1_md_anchors
+from scripts.audit.ara_tree import extract_claim_registry, find_ara_dir
 from scripts.audit.entailment import check_entailment
 from scripts.audit.equation_fidelity import check_equation_fidelity
-from scripts.audit.g2_data_fidelity import _find_ara_dir, extract_claim_registry
 from scripts.audit.rigor_rubric import score_rigor
 from scripts.audit.types import (
     EntailmentJudgeFn,
@@ -84,7 +84,7 @@ def run_g3(
     entailment_judge: EntailmentJudgeFn,
 ) -> GateVerdict:
     """Run the four-part G3 seal for one paper; write level2_report.json."""
-    ara_dir = _find_ara_dir(ai_package_entry)
+    ara_dir = find_ara_dir(ai_package_entry)
     findings: list[Finding] = []
 
     # (d) MECHANICAL equation fidelity (Round 15 #3 — wire the built gate):

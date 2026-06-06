@@ -2,11 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scripts.audit.g2_data_fidelity import (
-    extract_claim_registry,
-    extract_numbers,
-    run_g2,
-)
+from scripts.audit.ara_tree import extract_claim_registry, extract_numbers
+from scripts.audit.g2_data_fidelity import run_g2
 from scripts.audit.types import SkepticVote
 
 

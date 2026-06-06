@@ -132,6 +132,9 @@ def ingest(
     ver = candidate.get("arxiv_version") or ""
     tier1_reason: str | None = None
 
+    # SEAM (ADR-0002, deferred): the tier chain below is a hardcoded
+    # Tier-1 -> Tier-2 -> raise sequence (n=2, kept concrete). To add a Tier-3
+    # converter, insert another try/except after Tier-2 — see docs/EXTENDING.md.
     # --- Tier 1: arXiv HTML -> pandoc GFM ---
     try:
         t1 = run_tier1(

@@ -51,6 +51,29 @@ CITATIONS_DB_FILENAME = "citations.db"
 MD_CONTRACT_FILENAME = ".md_contract.json"
 
 
+# --- output-branch set (双输出 / ADR-0002) ---------------------------------
+# A fully-processed ("done") paper is promoted to these vault branches, all
+# under the SAME output.naming vault_key. Centralized so the completeness checks
+# — the ledger LS-4 self-heal (store.consistency_check) and the watchdog
+# false-done detection (hub._is_truly_done) — iterate this set instead of
+# hardcoding person+ai across files.
+#
+# The producer's staging/promotion is intentionally NOT generalized (rule-of-
+# three: only 2 branches exist; a 3rd's shape — keying, atomic co-promotion,
+# which gates apply — is unknown). Adding a co-promoted branch: see
+# docs/EXTENDING.md + ADR-0002.
+#
+# NOTE: the vault entry NAME is the output.naming vault_key, which DIFFERS from
+# the ledger ROW key (hub._candidate_key). Completeness is therefore checked via
+# the row's RECORDED path fields below, never derived from the row key.
+VAULT_BRANCHES: tuple[tuple[str, str], ...] = (
+    (PERSON_VAULT_DIRNAME, "person_vault_path"),
+    (AI_PACKAGE_DIRNAME, "ai_package_path"),
+)
+# The ledger-row field recording each branch's absolute path (one per branch).
+VAULT_BRANCH_PATH_FIELDS: tuple[str, ...] = tuple(field for _, field in VAULT_BRANCHES)
+
+
 # --- root resolution --------------------------------------------------------
 
 

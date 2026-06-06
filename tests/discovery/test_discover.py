@@ -275,6 +275,44 @@ def test_discover_survives_a_source_outage():
     assert any(c["title"] == "Survivor" for c in out)
 
 
+def test_search_source_registry_lists_the_fanout_sources():
+    """The fan-out is driven by the _SEARCH_SOURCES registry (ADR-0002 seam),
+    not a hardcoded body. DBLP is absent — it is venue-enrichment, not fan-out.
+    """
+    from scripts.discovery import discover as disc
+
+    assert [k for k, _ in disc._SEARCH_SOURCES] == ["openalex", "s2", "arxiv", "hf_papers"]
+
+
+def test_registering_a_new_source_is_drop_in(monkeypatch):
+    """Appending one entry to _SEARCH_SOURCES fans a new source in — no edit to
+    discover()'s body. Proves the source seam is genuinely drop-in (ADR-0002)."""
+    from scripts.discovery import discover as disc
+
+    extra = FakeSource(
+        [
+            _c(
+                arxiv_id="2601.07777",
+                title="Registered Source Paper",
+                year=2026,
+                venue="CVPR",  # fires S2 → authoritative
+                discovery_sources=["extra"],
+            )
+        ]
+    )
+
+    def _run_extra(source, queries, cfg):
+        out = []
+        for q in queries:
+            out.extend(source.search(q))
+        return out
+
+    monkeypatch.setattr(disc, "_SEARCH_SOURCES", disc._SEARCH_SOURCES + (("extra", _run_extra),))
+    sources = {**make_sources(), "extra": extra}
+    out = discover(base_config(), sources=sources, llm=fake_llm)
+    assert any(c["title"] == "Registered Source Paper" for c in out)
+
+
 def test_discover_survives_dblp_outage_during_enrichment():
     # Codex Round-15 / LS-5: a DBLP HttpUnavailable during venue enrichment must
     # NOT abort discovery. A venue-less but otherwise-authoritative candidate

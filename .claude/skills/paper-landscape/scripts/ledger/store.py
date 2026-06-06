@@ -20,6 +20,8 @@ from pathlib import Path
 
 import yaml
 
+from scripts import paths
+
 # Negative-cache TTL by failure class (§3.2). not_indexed_yet re-attempted
 # after the OpenAlex-lag estimate; below_threshold re-checked after citation
 # growth; convert_error is transient.
@@ -260,17 +262,20 @@ class Ledger:
     def consistency_check(self) -> list[str]:
         """LS-4: demote any `done` row missing a vault half; return demoted keys.
 
-        A `done` row MUST have both person_vault and ai_package on disk. If
-        either is absent (ledger↔FS drift), append a `failed` row so the key
-        leaves the skip-set and is reprocessed next run.
+        A `done` row MUST have EVERY output branch (paths.VAULT_BRANCH_PATH_FIELDS)
+        recorded AND present on disk. If any is absent (ledger↔FS drift), append a
+        `failed` row so the key leaves the skip-set and is reprocessed next run.
+        Iterating the centralized branch set (ADR-0002) means adding a branch
+        extends the self-heal automatically — no edit here.
         """
         demoted: list[str] = []
         for key, row in self._latest_by_key().items():
             if row["status"] != _DONE or row.get("rescinded_at"):
                 continue
-            pv = row.get("person_vault_path")
-            ai = row.get("ai_package_path")
-            ok = bool(pv) and Path(pv).exists() and bool(ai) and Path(ai).exists()
+            ok = all(
+                bool(row.get(field)) and Path(row[field]).exists()
+                for field in paths.VAULT_BRANCH_PATH_FIELDS
+            )
             if not ok:
                 demoted.append(key)
         for key in demoted:

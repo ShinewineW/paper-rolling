@@ -241,6 +241,36 @@ def test_consistency_check_demotes_done_missing_vault(tmp_path):
     assert "1111.2222v1" not in led.load_skip_set()
 
 
+def test_consistency_check_iterates_the_branch_field_set(tmp_path, monkeypatch):
+    """consistency_check is driven by paths.VAULT_BRANCH_PATH_FIELDS (ADR-0002):
+    extending the branch set makes the self-heal require the new branch too —
+    with zero edit to consistency_check itself."""
+    from scripts import paths
+
+    led = Ledger(tmp_path)
+    pv = tmp_path / "person_vault" / "2026-06-05_R_5555.6666"
+    ai = tmp_path / "ai_package" / "2026-06-05_R_5555.6666"
+    pv.mkdir(parents=True)
+    ai.mkdir(parents=True)
+    led.record_status(
+        "5555.6666v1",
+        status="done",
+        md_sha256="h",
+        person_vault_path=str(pv),
+        ai_package_path=str(ai),
+    )
+    # Standard 2-branch set: the row is complete.
+    assert led.consistency_check() == []
+    # Add a 3rd branch field the row does not record → the SAME row is now
+    # incomplete and demoted, proving the set is the single control point.
+    monkeypatch.setattr(
+        paths,
+        "VAULT_BRANCH_PATH_FIELDS",
+        paths.VAULT_BRANCH_PATH_FIELDS + ("slides_path",),
+    )
+    assert "5555.6666v1" in led.consistency_check()
+
+
 def test_consistency_check_keeps_complete_done(tmp_path):
     led = Ledger(tmp_path)
     pv = tmp_path / "person_vault" / "2026-06-05_Q_3333.4444"
