@@ -17,6 +17,8 @@ ledger (single-writer, avoids YAML corruption — logging.md).
 
 from __future__ import annotations
 
+import re
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -25,6 +27,7 @@ from typing import Protocol
 
 from scripts.campaign import gate_needed, load_campaign
 from scripts.landscapes import LandscapeResult, generate_landscapes
+from scripts.paths import FAILURE_STALLED
 
 FAILED_REL = Path("_failed")
 
@@ -69,14 +72,28 @@ DiscoverFn = Callable[[str, int], list[dict]]
 SpokeFn = Callable[[dict], SpokeResult]
 
 
+def _safe_key(raw: str) -> str:
+    """Filesystem- and ledger-safe form of an identity string.
+
+    A DOI fallback contains '/' (e.g. ``10.1234/example.paper``) and a title
+    fallback contains spaces, so the raw value cannot be used directly as a
+    ``_failed/{key}.md`` filename or a ledger row key. Map any char outside
+    ``[A-Za-z0-9._-]`` to '_' so the key is path-safe and stable (Codex
+    Round-14: a DOI-only failure crashed the tick with FileNotFoundError when the
+    '/' was treated as a path separator).
+    """
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", raw).strip("_") or "unknown"
+
+
 def _candidate_key(candidate: dict) -> str:
     """Round 2 F7: derive the ledger/skip key from candidate identity.
 
     Discovery emits a plain dict and does NOT carry a `key`; the hub derives one
     (arxiv_id preferred, doi fallback) and attaches it at intake. A pre-attached
-    `key` (e.g. a test fixture) is honored for determinism.
+    `key` (e.g. a test fixture) is honored for determinism. The result is always
+    filesystem-safe (see ``_safe_key``).
     """
-    return (
+    return _safe_key(
         candidate.get("key")
         or candidate.get("arxiv_id")
         or candidate.get("doi")
@@ -178,6 +195,58 @@ class Watchdog:
         return recovered
 
 
+def _run_spoke_guarded(
+    spoke: SpokeFn, candidate: dict, *, stall_seconds: int | None
+) -> SpokeResult:
+    """Run one paper's spoke ISOLATED from the tick (中枢-D2 failure isolation).
+
+    Bounds the spoke to ``stall_seconds`` wall-clock via a daemon worker thread
+    and catches any unexpected exception, so a hung or crashing spoke can never
+    abort the unattended /loop tick — it becomes a failed SpokeResult the hub
+    quarantines + back-fills. ``stall_seconds`` None/<=0 means no wall-clock cap
+    (the spoke's own injected seams enforce their timeouts). The synchronous
+    reference uses one worker; the production harness fans spokes out concurrently
+    with the same per-paper budget (Codex Round-14).
+    """
+    box: dict[str, object] = {}
+
+    def _worker() -> None:
+        try:
+            box["result"] = spoke(candidate)
+        except Exception as exc:  # noqa: BLE001 — per-paper isolation; never abort the tick
+            box["error"] = exc
+
+    worker = threading.Thread(target=_worker, daemon=True)
+    worker.start()
+    worker.join(timeout=stall_seconds if stall_seconds and stall_seconds > 0 else None)
+
+    src = candidate.get("oa_pdf_url") or candidate.get("source_url")
+    if worker.is_alive():
+        # Still running past the budget — abandon it (the daemon dies at process
+        # exit) and move on so the tick keeps making progress.
+        return SpokeResult(
+            status="failed",
+            person_vault_path=None,
+            ai_package_path=None,
+            failure_class=FAILURE_STALLED,
+            failure_reason=f"spoke exceeded the {stall_seconds}s wall-clock budget",
+            source_url=src,
+            attempted_tier=None,
+        )
+    if "error" in box:
+        exc = box["error"]
+        return SpokeResult(
+            status="failed",
+            person_vault_path=None,
+            ai_package_path=None,
+            failure_class=FAILURE_STALLED,
+            failure_reason=f"spoke raised {type(exc).__name__}: {exc}",
+            source_url=src,
+            attempted_tier=None,
+        )
+    return box["result"]  # type: ignore[return-value]
+
+
 def run_tick(
     *,
     workspace: Path,
@@ -205,12 +274,15 @@ def run_tick(
         )  # Round 2 F7: hub derives + attaches key (discovery does not emit it)
     queue = [c for c in pool if c["key"] not in skip]
 
+    stall_seconds = watchdog.stall_seconds if watchdog is not None else None
     done = 0
     failed = 0
     for candidate in queue:
         if done >= n_target:
             break
-        result = spoke(candidate)
+        # Per-paper isolation (中枢-D2): a hung or crashing spoke must not abort
+        # the unattended tick — it becomes a failed result we quarantine + backfill.
+        result = _run_spoke_guarded(spoke, candidate, stall_seconds=stall_seconds)
         if result.status == "done" and result.person_vault_path and result.ai_package_path:
             ledger.record(
                 candidate["key"],

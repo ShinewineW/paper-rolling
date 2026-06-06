@@ -132,3 +132,4 @@ FAILURE_NOT_INDEXED_YET = "not_indexed_yet"  # preprint, retry after OpenAlex la
 FAILURE_CONVERT_ERROR = "convert_error"  # both ingest tiers failed
 FAILURE_DOWNLOAD_ERROR = "download_error"  # PDF/HTML fetch failed
 FAILURE_AUDIT_BLOCK = "audit_block"  # G2/G3 hard block, N rounds unmet
+FAILURE_STALLED = "stalled"  # spoke exceeded the wall-clock budget or crashed (中枢-D2)

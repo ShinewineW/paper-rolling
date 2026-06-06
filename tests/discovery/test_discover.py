@@ -239,3 +239,37 @@ def test_discover_each_candidate_has_full_interface_shape():
     }
     for cand in out:
         assert required.issubset(cand.keys())
+
+
+def test_discover_survives_a_source_outage():
+    # Codex Round-14 / LS-5: one source raising HttpUnavailable must NOT abort
+    # multi-source discovery (and the tick) — the surviving sources still
+    # contribute. Before the fix, discover() propagated the exception and crashed.
+    from scripts.discovery.http_client import HttpUnavailable
+
+    class _DownSource:
+        def search(self, *args, **kwargs):
+            raise HttpUnavailable("openalex is down this tick")
+
+    sources = {
+        "openalex": _DownSource(),  # primary source is down
+        "s2": FakeSource(
+            [
+                _c(
+                    arxiv_id="2601.09999",
+                    title="Survivor",
+                    year=2026,
+                    venue="CVPR",  # fires the S2 venue signal -> authoritative
+                    cited_by_count=100,
+                    discovery_sources=["s2"],
+                )
+            ]
+        ),
+        "arxiv": FakeSource([]),
+        "dblp": FakeDblp({}),
+        "hf_papers": FakeSource([]),
+    }
+    out = discover(base_config(), sources=sources, llm=fake_llm)
+
+    # No crash, and the surviving s2 candidate came through.
+    assert any(c["title"] == "Survivor" for c in out)

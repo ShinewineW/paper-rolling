@@ -22,7 +22,22 @@ from typing import Any
 from scripts.discovery.authority import score_authority
 from scripts.discovery.contamination import preprint_flag
 from scripts.discovery.dedup import dedup_candidates
+from scripts.discovery.http_client import HttpUnavailable
 from scripts.discovery.query_expand import expand_queries
+
+
+def _safe_source(fn: Callable[..., list], *args: Any) -> list:
+    """LS-5: a degraded source (HttpUnavailable) is treated as MISSING, not fatal.
+
+    One source going down must NOT abort multi-source discovery (and the tick);
+    the other sources still contribute (Codex Round-14). ``HttpUnavailable`` is
+    the documented "this source is unavailable for this query" signal.
+    """
+    try:
+        return fn(*args)
+    except HttpUnavailable:
+        return []
+
 
 # Public interface field set — every returned candidate carries exactly these.
 _INTERFACE_FIELDS = (
@@ -73,10 +88,10 @@ def discover(
     queries = expand_queries(topic, llm=llm)
 
     raw: list[dict[str, Any]] = []
-    raw.extend(_run_openalex(sources.get("openalex"), queries, campaign_config))
-    raw.extend(_run_s2(sources.get("s2"), queries, campaign_config))
-    raw.extend(_run_arxiv(sources.get("arxiv"), queries, campaign_config))
-    raw.extend(_run_hf(sources.get("hf_papers"), queries, campaign_config))
+    raw.extend(_safe_source(_run_openalex, sources.get("openalex"), queries, campaign_config))
+    raw.extend(_safe_source(_run_s2, sources.get("s2"), queries, campaign_config))
+    raw.extend(_safe_source(_run_arxiv, sources.get("arxiv"), queries, campaign_config))
+    raw.extend(_safe_source(_run_hf, sources.get("hf_papers"), queries, campaign_config))
 
     # second-round expansion from any HF ai_keywords harvested above
     harvested_keywords: list[str] = []
@@ -88,7 +103,9 @@ def discover(
             for q in expand_queries(topic, llm=llm, ai_keywords=harvested_keywords)
             if q not in queries
         ]
-        raw.extend(_run_openalex(sources.get("openalex"), extra_queries, campaign_config))
+        raw.extend(
+            _safe_source(_run_openalex, sources.get("openalex"), extra_queries, campaign_config)
+        )
 
     merged = dedup_candidates(raw)
 

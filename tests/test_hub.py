@@ -364,3 +364,75 @@ def test_run_campaign_tick_self_heals_stale_done_row(tmp_path: Path):
         r["key"] == "p0" and r["status"] == "failed" for r in ledger.entries()
     )  # demoted by consistency_check
     assert res.hub.done_count == 1
+
+
+def test_doi_only_failure_quarantines_with_pathsafe_key(tmp_path: Path):
+    # Codex Round-14: a DOI-only candidate (arxiv_id None) derived the raw DOI as
+    # its key; the '/' broke the `_failed/{key}.md` write (FileNotFoundError) and
+    # crashed the tick. The key is now sanitized to a path-safe form.
+    led = FakeLedger()
+    cand = {"arxiv_id": None, "doi": "10.1234/example.paper", "title": "Some Paper"}
+    res = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=1,
+        ledger=led,
+        discover=lambda topic, n: [cand],
+        spoke=_fail,
+    )
+    assert res.failed_count == 1  # quarantined, not crashed
+    failed = list((tmp_path / "_failed").glob("*.md"))
+    assert len(failed) == 1
+    assert failed[0].name == "10.1234_example.paper.md"  # '/' sanitized to '_'
+
+
+def test_run_tick_isolates_a_crashing_spoke(tmp_path: Path):
+    # Codex Round-14 (中枢-D2 failure isolation): a spoke that raises an
+    # unexpected exception must NOT abort the unattended tick — it is isolated as
+    # a failure and the next candidate back-fills toward N.
+    led = FakeLedger()
+    pool = [_candidate("p0"), _candidate("p1")]
+
+    def spoke(cand: dict) -> SpokeResult:
+        if cand["key"] == "p0":
+            raise RuntimeError("boom")  # unexpected crash mid-spoke
+        return _ok(cand)
+
+    res = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=1,
+        ledger=led,
+        discover=lambda topic, n: pool,
+        spoke=spoke,
+    )
+    assert res.done_count == 1  # p0 crash isolated -> p1 back-filled (tick not aborted)
+    assert res.failed_count == 1
+
+
+def test_run_tick_isolates_a_stalled_spoke(tmp_path: Path):
+    # Codex Round-14: a spoke that hangs past the watchdog's wall-clock budget
+    # must NOT hang the unattended tick — it is abandoned as a failure and the
+    # next candidate back-fills.
+    import time as _time
+
+    led = FakeLedger()
+    pool = [_candidate("p0"), _candidate("p1")]
+
+    def spoke(cand: dict) -> SpokeResult:
+        if cand["key"] == "p0":
+            _time.sleep(30)  # hang well past the 1s budget (daemon thread; abandoned)
+        return _ok(cand)
+
+    wd = Watchdog(stall_seconds=1, max_refires=0)
+    res = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=1,
+        ledger=led,
+        discover=lambda topic, n: pool,
+        spoke=spoke,
+        watchdog=wd,
+    )
+    assert res.done_count == 1  # p0 timed out -> failed; p1 back-filled
+    assert res.failed_count == 1
