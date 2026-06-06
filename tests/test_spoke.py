@@ -389,6 +389,17 @@ def _ledger(tmp_path: Path) -> Ledger:
     return Ledger(tmp_path)
 
 
+def _low_rigor(ara_bundle):
+    # All dims score 1 -> any-dim==1 -> Reject -> G3 SEAL2 hard-block (seal fails).
+    return {
+        "dimensions": {
+            k: {"score": 1, "strengths": [], "weaknesses": ["insufficient"], "suggestions": []}
+            for k in DIMENSION_KEYS
+        },
+        "findings": [],
+    }
+
+
 def _make_spoke(
     tmp_path,
     fake_http,
@@ -396,6 +407,7 @@ def _make_spoke(
     *,
     analysis_md,
     skeptic_votes=_all_found_skeptic,
+    rigor_scores=_good_rigor,
     max_gate_rounds=2,
 ):
     fake_cli.program(returncode=0, side_effect=_mineru_emitting(analysis_md))
@@ -405,7 +417,7 @@ def _make_spoke(
         run_cli=fake_cli,
         resolve_analysis=_resolve_analysis,
         skeptic_votes=skeptic_votes,
-        rigor_scores=_good_rigor,
+        rigor_scores=rigor_scores,
         entailment_judge=_entailed,
         ledger=_ledger(tmp_path),
         n_skeptics=3,
@@ -501,6 +513,45 @@ def test_spoke_g2_block_aborts_before_any_vault(tmp_path, fake_http, fake_cli):
     assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
     # A _failed/ hand-off record exists.
     assert any((tmp_path / "_failed").glob("*.md"))
+
+
+# --- G3 SEAL FAIL (post-promotion cleanup) ---------------------------------
+
+
+def test_spoke_g3_failure_removes_promoted_vault(tmp_path, fake_http, fake_cli):
+    # Codex Round-6 regression: G3 runs AFTER produce_outputs already promoted
+    # both vaults. If the seal fails for the whole budget, the promoted
+    # ai_package/ + person_vault/ products MUST be removed — otherwise a
+    # failed-seal paper pollutes the library AND the cross-paper landscape (which
+    # scans ai_package/*/ara/PAPER.md, not ledger status).
+    from scripts.landscapes import generate_landscapes
+
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    spoke = _make_spoke(
+        tmp_path,
+        fake_http,
+        fake_cli,
+        analysis_md=_SOURCE_MD,
+        rigor_scores=_low_rigor,  # every dim scores 1 -> seal hard-fails every round
+        max_gate_rounds=2,
+    )
+
+    result = spoke(dict(_CANDIDATE))
+
+    assert result.status == "failed"
+    assert result.failure_class == FAILURE_AUDIT_BLOCK
+    assert result.person_vault_path is None
+    assert result.ai_package_path is None
+    # No vault products remain — the seal-failed paper left NOTHING behind.
+    ai_root = tmp_path / "ai_package"
+    pv_root = tmp_path / "person_vault"
+    assert not ai_root.exists() or not any(p for p in ai_root.iterdir() if p.name != ".gitkeep")
+    assert not pv_root.exists() or not any(p for p in pv_root.iterdir() if p.name != ".gitkeep")
+    # Quarantine record written.
+    assert any((tmp_path / "_failed").glob("*.md"))
+    # And the cross-paper landscape does NOT include the failed paper.
+    land = generate_landscapes(tmp_path, topic="real-time planning")
+    assert land.paper_count == 0
 
 
 # --- INGEST FAIL -----------------------------------------------------------

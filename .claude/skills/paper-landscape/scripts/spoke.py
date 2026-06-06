@@ -23,6 +23,7 @@ produce_outputs returned — it never re-derives a key).
 from __future__ import annotations
 
 import json
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -162,7 +163,15 @@ def make_spoke(
             },
         )
         if outcome.escalated:
-            # _failed/{key}.md already written by run_with_budget.
+            # G3 ran AFTER produce_outputs already promoted both vaults. The seal
+            # failed for the whole budget, so this paper is unprocessable
+            # (中枢-D2): REMOVE the promoted products so a failed-seal paper does
+            # NOT pollute ai_package/ or the cross-paper landscape (which scans
+            # ai_package/*/ara/PAPER.md). The _failed/{key}.md record was already
+            # written by run_with_budget. Idempotent: ignore_errors covers a prior
+            # re-emit having already swapped the dirs.
+            shutil.rmtree(produced.person_path, ignore_errors=True)
+            shutil.rmtree(produced.ai_path, ignore_errors=True)
             return SpokeResult(
                 status="failed",
                 person_vault_path=None,
