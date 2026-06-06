@@ -9,11 +9,18 @@
 
 ## What this is
 
-paper-rolling vendored / cherry-picked from three open-source research-skill
-repositories. This directory holds full clones of those repos so the provenance
-is **self-contained**: you can inspect exactly what was drawn from, and trace the
-in-repo attribution (root `NOTICE`) back to its upstream source, without
-depending on the original development workspace (`skills_workspace`).
+This directory holds full clones of the upstream repos behind paper-rolling, in
+two groups:
+
+1. **Provenance sources (3)** — the research-skill repos paper-rolling vendored /
+   cherry-picked from. Holding full clones makes the provenance **self-contained**:
+   you can inspect exactly what was drawn from, and trace the in-repo attribution
+   (root `NOTICE`) back to its upstream source, without depending on the original
+   development workspace (`skills_workspace`).
+2. **Domain benchmark repos (6, ≥20k★)** — the highest-signal open-source tools
+   for automated paper reading / research. They are the field reference the engine
+   is measured against (ingest fidelity, research-agent paradigm); some are used
+   directly (the engine's Tier-2 ingest *is* MinerU).
 
 **Decoupling note**: paper-rolling no longer depends on `skills_workspace` for
 these references. They were re-cloned fresh from GitHub on **2026-06-07**.
@@ -27,12 +34,13 @@ these references. They were re-cloned fresh from GitHub on **2026-06-07**.
   /docs/reference/*
   !/docs/reference/index.md
   ```
-- **Rationale**: the repos are large (~152 MB total) and regenerable from the
-  URLs below; they are local-only provenance inputs, not paper-rolling products.
-  The manifest records the exact URL + pinned commit so the clones are
+- **Rationale**: the repos are large (~885 MB total — 3 source repos ≈150 MB +
+  6 benchmark repos ≈735 MB; `docling` alone is ~400 MB) and regenerable from the
+  URLs below; they are local-only provenance/reference inputs, not paper-rolling
+  products. The manifest records the exact URL + pinned commit so the clones are
   reproducible.
 
-## The three repositories
+## Provenance sources — repos paper-rolling drew from (3)
 
 | Repo | Upstream | License | Cloned | Pinned HEAD (clone-time) |
 |------|----------|---------|--------|--------------------------|
@@ -84,6 +92,32 @@ this module — do not relicense the vendored files permissively.
   recipes used by `discovery/openalex.py`.
 - The markdown-mermaid `classDef` palette (Apache-2.0) embedded in
   `output/branch1_report.py` for the illustrated Chinese reports.
+
+## Domain benchmark repositories (≥20k★ — automated paper reading / research)
+
+The highest-signal open-source tools in the engine's domain, cloned as field
+reference and paradigm benchmark. Star counts verified via the GitHub API on
+2026-06-07; all clear the ≥20k bar.
+
+| Repo | Upstream | ★ | Cloned HEAD | Why it's here |
+|------|----------|---|-------------|---------------|
+| `markitdown` | github.com/microsoft/markitdown | 146k | `e144e0a` | Any-document → Markdown; the conversion problem our ingest layer solves. |
+| `MinerU` | github.com/opendatalab/MinerU | 67k | `fc7034cb` | PDF/Office → LLM-ready MD. **Used directly**: the engine's Tier-2 ingest runs MinerU. |
+| `docling` | github.com/docling-project/docling | 61k | `b613414` | IBM document parsing for gen-AI; the TableFormer/layout benchmark behind ROADMAP A2. |
+| `marker` | github.com/datalab-to/marker | 36k | `627a873` | High-accuracy PDF → markdown + JSON; the table-converter benchmark (ROADMAP A2). |
+| `storm` | github.com/stanford-oval/storm | 28k | `fb951af` | LLM knowledge-curation: research a topic → a cited article. Paradigm for branch1/landscapes. |
+| `gpt-researcher` | github.com/assafelovic/gpt-researcher | 28k | `b364917f` | Autonomous deep-research agent; the closest paradigm to this engine's `/loop` campaign. |
+
+> These are domain reference / benchmarks, **not** sources paper-rolling vendored
+> code from (the only vendored code is from `academic-research-skills`; see the
+> `NOTICE`). They inform the `references/` knowledge layer (e.g. ingest-fidelity
+> draws on the MinerU/docling/marker comparison) and let future work measure the
+> engine against the field without re-cloning.
+>
+> **Considered but not cloned**: `Future-House/paper-qa` (8.6k), `SakanaAI/AI-Scientist`
+> (13.9k), `zotero/zotero` (14.4k) — all highly relevant but **below the 20k★ bar**.
+> `khoj` (35k), `HKUDS/LightRAG` (36k), `paperless-ngx` (42k) clear 20k★ but are
+> general second-brain / RAG / document-management, not paper-reading-specific.
 
 ## Excluded (deliberately)
 
