@@ -35,6 +35,7 @@ from scripts.audit.types import EntailmentJudgeFn, RigorScoreFn, SkepticVoteFn
 from scripts.hub import SpokeFn, SpokeResult, _candidate_key
 from scripts.ingest.ingest import IngestFailed, IngestResult, ingest, quarantine
 from scripts.output import produce as produce_mod
+from scripts.output.branch1_report import AnchorGateError
 from scripts.output.produce import ProduceGateBlocked, ProduceResult, produce_outputs
 from scripts.paths import FAILURE_AUDIT_BLOCK, FAILURE_CONVERT_ERROR
 
@@ -126,6 +127,28 @@ def make_spoke(
             failed_dir.mkdir(parents=True, exist_ok=True)
             (failed_dir / f"{key}.md").write_text(
                 f"# Quarantined: {key}\n\n- **gate**: G2\n- **reason**: {reason}\n",
+                encoding="utf-8",
+            )
+            return SpokeResult(
+                status="failed",
+                person_vault_path=None,
+                ai_package_path=None,
+                failure_class=FAILURE_AUDIT_BLOCK,
+                failure_reason=reason,
+                source_url=source_url,
+                attempted_tier=str(ing.tier),
+            )
+        except AnchorGateError as exc:
+            # branch1's self-anchor lint hard-failed (an empirical claim could not
+            # be grounded in the MD). This happens in staging, BEFORE promotion, so
+            # nothing reached the vault (OT-5). Quarantine instead of letting the
+            # exception escape and crash the unattended /loop tick (中枢-D2 failure
+            # isolation): the hub then skips this paper and back-fills the next.
+            key = _candidate_key(candidate)
+            reason = f"branch1 three-layer anchor hard-gate: {exc}"
+            failed_dir.mkdir(parents=True, exist_ok=True)
+            (failed_dir / f"{key}.md").write_text(
+                f"# Quarantined: {key}\n\n- **gate**: branch1-anchor\n- **reason**: {reason}\n",
                 encoding="utf-8",
             )
             return SpokeResult(

@@ -554,6 +554,62 @@ def test_spoke_g3_failure_removes_promoted_vault(tmp_path, fake_http, fake_cli):
     assert land.paper_count == 0
 
 
+# --- branch1 ANCHOR GATE (failure isolation) ------------------------------
+
+
+def test_spoke_unanchorable_claim_quarantines_not_crash(tmp_path, fake_http, fake_cli):
+    # Codex Round-8 regression: a branch1 empirical claim that cannot be grounded
+    # in the MD raises AnchorGateError in staging (pre-promotion). The spoke MUST
+    # quarantine + return failed — NOT let the exception escape and crash the
+    # unattended /loop tick.
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    bad = copy.deepcopy(_ANALYSIS)
+    # The ONLY claim cites "99 NDS", which never appears in _SOURCE_MD, so branch1
+    # cannot anchor it. (The anchor lint is line-based, so the claim must stand
+    # alone — an anchored sibling claim on the same paragraph line would mask it.)
+    # The single unanchored number + metric cue makes the three-layer lint
+    # hard-fail -> AnchorGateError inside write_branch1 (staging, pre-promotion).
+    bad["claims"] = [
+        {
+            "id": "C99",
+            "title": "Unanchorable perf",
+            "statement": "Reaches 99 NDS on the held-out split.",
+            "status": "supported",
+            "falsification": "NDS < baseline",
+            "proof": ["E01"],
+            "evidence_basis": "Table 1 NDS column",
+            "interpretation": "",
+            "tags": "planning",
+        },
+    ]
+
+    def _bad_analysis(md_path, candidate):
+        return copy.deepcopy(bad)
+
+    fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
+    spoke = make_spoke(
+        workspace=tmp_path,
+        http=fake_http,
+        run_cli=fake_cli,
+        resolve_analysis=_bad_analysis,
+        skeptic_votes=_all_found_skeptic,
+        rigor_scores=_good_rigor,
+        entailment_judge=_entailed,
+        ledger=_ledger(tmp_path),
+    )
+
+    result = spoke(dict(_CANDIDATE))  # must NOT raise AnchorGateError
+
+    assert result.status == "failed"
+    assert result.failure_class == FAILURE_AUDIT_BLOCK
+    assert "anchor" in result.failure_reason.lower()
+    # Pre-promotion: nothing reached the vaults (OT-5 holds for the anchor gate too).
+    assert not (tmp_path / "ai_package").exists() or not any(
+        p for p in (tmp_path / "ai_package").iterdir() if p.name != ".gitkeep"
+    )
+    assert any((tmp_path / "_failed").glob("*.md"))
+
+
 # --- INGEST FAIL -----------------------------------------------------------
 
 

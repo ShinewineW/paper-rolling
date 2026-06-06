@@ -140,7 +140,13 @@ def _body_with_anchors(md_text: str, analysis: dict) -> str:
     out: list[str] = ["## 摘要翻译", ""]
     para: list[str] = []
     for c in analysis["claims"]:
-        nums = re.findall(r"\d+\.\d+", c["statement"])
+        # Match the SAME number shape as the anchor lint (`\d+(?:\.\d+)?`,
+        # integers AND decimals). Anchoring only decimals left integer
+        # performance claims like "61 NDS" unanchored, which the lint then
+        # hard-blocked (Codex Round-8). Anchor every number that grounds in the
+        # MD; the lint only hard-fails number+metric-cue claims, so this closes
+        # the producer↔lint gap for honest integer metrics.
+        nums = re.findall(r"\d+(?:\.\d+)?", c["statement"])
         sentence = c["statement"]
         for n in nums:
             window = _find_in_md(md_text, n)

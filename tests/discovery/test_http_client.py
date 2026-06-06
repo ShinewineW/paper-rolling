@@ -33,8 +33,9 @@ class FakeHttp:
         self.responses = list(responses)
         self.urls = []
 
-    def __call__(self, url: str, timeout: float):
+    def __call__(self, url: str, timeout: float, headers=None):
         self.urls.append(url)
+        self.last_headers = headers
         resp = self.responses.pop(0)
         if isinstance(resp, int):
             raise FakeHTTPError(resp)
@@ -103,3 +104,20 @@ def test_5xx_raises_unavailable_no_retry():
     client = make_client(http, clock)
     with pytest.raises(HttpUnavailable):
         client.get_json("https://api.example.com/x")
+
+
+def test_get_json_forwards_per_request_headers():
+    # Regression (Codex Round-8): the shared production client MUST accept and
+    # forward per-request headers (e.g. the HF Papers Authorization bearer that
+    # hf_papers.py passes). Previously get_json had no `headers` param, so the
+    # real ThrottledClient raised TypeError on the HF discovery path.
+    clock = FakeClock()
+    http = FakeHttp([{"ok": True}])
+    client = make_client(http, clock)
+    out = client.get_json(
+        "https://huggingface.co/api/papers/search",
+        {"q": "topic"},
+        headers={"Authorization": "Bearer hf_xxx"},
+    )
+    assert out == {"ok": True}
+    assert http.last_headers == {"Authorization": "Bearer hf_xxx"}

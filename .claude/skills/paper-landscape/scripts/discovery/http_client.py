@@ -32,8 +32,11 @@ class _Clock:
     sleep = staticmethod(time.sleep)
 
 
-def _default_http_get(url: str, timeout: float) -> dict[str, Any]:
-    req = urllib.request.Request(url, headers={"User-Agent": "paper-rolling/0.1"})
+def _default_http_get(
+    url: str, timeout: float, headers: Mapping[str, str] | None = None
+) -> dict[str, Any]:
+    all_headers = {"User-Agent": "paper-rolling/0.1", **(headers or {})}
+    req = urllib.request.Request(url, headers=all_headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (host-pinned by caller)
         body = resp.read()
     return json.loads(body.decode("utf-8"))
@@ -55,7 +58,7 @@ class ThrottledClient:
 
     def __init__(
         self,
-        http_get: Callable[[str, float], dict[str, Any]] | None = None,
+        http_get: Callable[[str, float, Mapping[str, str] | None], dict[str, Any]] | None = None,
         clock: Any | None = None,
         http_error_cls: type[Exception] = urllib.error.HTTPError,
         min_interval: float = _ANONYMOUS_MIN_INTERVAL,
@@ -80,8 +83,17 @@ class ThrottledClient:
         if elapsed < self._min_interval:
             self._clock.sleep(self._min_interval - elapsed)
 
-    def get_json(self, url: str, query: Mapping[str, str] | None = None) -> dict[str, Any]:
+    def get_json(
+        self,
+        url: str,
+        query: Mapping[str, str] | None = None,
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         """GET url (optionally appending urlencoded query) and parse JSON.
+
+        `headers` are extra per-request headers (e.g. an Authorization bearer
+        for HF Papers) merged on top of the default User-Agent.
 
         Returns {} on 404. Raises HttpUnavailable on 5xx, network errors, or
         exhausted 429 retries.
@@ -98,7 +110,7 @@ class ThrottledClient:
 
         for attempt in range(_MAX_RETRIES + 1):
             try:
-                return self._http_get(full_url, self._timeout)
+                return self._http_get(full_url, self._timeout, headers)
             except self._http_error_cls as e:
                 code = getattr(e, "code", None)
                 if code == 404:
