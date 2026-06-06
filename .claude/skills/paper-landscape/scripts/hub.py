@@ -100,6 +100,80 @@ def _quarantine(workspace: Path, candidate: dict, result: SpokeResult) -> None:
     (failed_dir / f"{key}.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+def _is_truly_done(record: dict) -> bool:
+    """A 'done' ledger record is only trustworthy if both vault paths exist.
+
+    'non-done-but-claimed-done' (吸收-D3): status=='done' yet a vault path is
+    missing — the spoke lied/crashed mid-emit. Such records are re-fired.
+    """
+    return (
+        record.get("status") == "done"
+        and bool(record.get("person_vault_path"))
+        and bool(record.get("ai_package_path"))
+    )
+
+
+class Watchdog:
+    """Bounded re-fire on stall or false-done (吸收-D3).
+
+    NOT a daemon: it re-fires at most ``max_refires`` times total and only while
+    the tick is still short of N. False-done records (claimed done, missing vault
+    paths) are re-fired in place; ``stall_seconds`` is the wall-clock stall
+    threshold used by the real harness (0 in tests → re-fire immediately).
+    """
+
+    def __init__(self, *, stall_seconds: int = 1200, max_refires: int = 5) -> None:
+        self.stall_seconds = stall_seconds
+        self.max_refires = max_refires
+
+    def recover(
+        self,
+        *,
+        workspace: Path,
+        ledger: Ledger,
+        spoke: SpokeFn,
+        queue: list[dict],
+        n_target: int,
+        done_so_far: int,
+    ) -> int:
+        """Re-fire false-done papers; return number brought to true-done.
+
+        Bounded by ``max_refires`` total spoke re-fires AND by N (stops once the
+        tick reaches N). A persistently false-done paper consumes the re-fire
+        budget rather than looping forever.
+        """
+        by_key = {c["key"]: c for c in queue}
+        recovered = 0
+        refires = 0
+        done = done_so_far
+        while done < n_target and refires < self.max_refires:
+            # False-done = recorded 'done' but missing a vault path.
+            suspect = [
+                r["key"]
+                for r in ledger.entries()
+                if r.get("status") == "done" and not _is_truly_done(r)
+            ]
+            if not suspect:
+                break
+            key = suspect[0]
+            candidate = by_key.get(key)
+            if candidate is None:
+                break
+            refires += 1
+            result = spoke(candidate)
+            if result.status == "done" and result.person_vault_path and result.ai_package_path:
+                ledger.record(
+                    key,
+                    status="done",
+                    person_vault_path=result.person_vault_path,
+                    ai_package_path=result.ai_package_path,
+                )
+                recovered += 1
+                done += 1
+            # else: still false-done — re-checked next loop, bounded by max_refires.
+        return recovered
+
+
 def run_tick(
     *,
     workspace: Path,
@@ -109,12 +183,15 @@ def run_tick(
     discover: DiscoverFn,
     spoke: SpokeFn,
     max_concurrent: int = 5,
+    watchdog: Watchdog | None = None,
 ) -> HubResult:
     """Process one /loop tick: dispatch + skip + backfill until N done or pool out.
 
     Spokes run serial here (deterministic, testable); the real harness fans them
     out via the Agent/Task tool up to ``max_concurrent`` papers in parallel. N is
-    the count of SUCCESSFUL papers (中枢-D2), not attempts.
+    the count of SUCCESSFUL papers (中枢-D2), not attempts. A claimed-done result
+    with missing vault paths is recorded but NOT counted (吸收-D3) — the watchdog
+    re-fires it.
     """
     pool = discover(topic, n_target)
     skip = ledger.skip_set()
@@ -130,7 +207,7 @@ def run_tick(
         if done >= n_target:
             break
         result = spoke(candidate)
-        if result.status == "done":
+        if result.status == "done" and result.person_vault_path and result.ai_package_path:
             ledger.record(
                 candidate["key"],
                 status="done",
@@ -138,10 +215,29 @@ def run_tick(
                 ai_package_path=result.ai_package_path,
             )
             done += 1
+        elif result.status == "done":
+            # Claimed done but vault paths missing — record so the watchdog can
+            # detect & re-fire; does NOT count toward N (吸收-D3).
+            ledger.record(
+                candidate["key"],
+                status="done",
+                person_vault_path=result.person_vault_path,
+                ai_package_path=result.ai_package_path,
+            )
         else:
             ledger.record(candidate["key"], status="failed", failure_class=result.failure_class)
             _quarantine(workspace, candidate, result)
             failed += 1
+
+    if watchdog is not None and done < n_target:
+        done += watchdog.recover(
+            workspace=workspace,
+            ledger=ledger,
+            spoke=spoke,
+            queue=queue,
+            n_target=n_target,
+            done_so_far=done,
+        )
 
     exhausted = done < n_target
     return HubResult(done_count=done, failed_count=failed, exhausted=exhausted)

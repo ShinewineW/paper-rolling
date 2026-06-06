@@ -134,3 +134,84 @@ def test_pool_exhausted_reports_exhausted(tmp_path: Path):
     assert res.done_count == 0
     assert res.exhausted is True
     assert len([r for r in ledger.records if r["status"] == "failed"]) == 2
+
+
+# tests/test_hub.py  (append)
+from scripts.hub import Watchdog  # noqa: E402
+
+
+def test_watchdog_refires_on_false_done(tmp_path: Path):
+    # A paper that the spoke claimed 'done' but left no vault paths (falsely
+    # claimed done) must be re-fired by the watchdog, bounded by N (吸收-D3).
+    ledger = FakeLedger()
+    pool = [_candidate(f"p{i}") for i in range(3)]
+
+    # First attempt for p1 returns done-but-empty (non-done-but-claimed-done);
+    # the watchdog's re-fire returns a proper done.
+    attempts: dict[str, int] = {}
+
+    def spoke(cand: dict) -> SpokeResult:
+        k = cand["key"]
+        attempts[k] = attempts.get(k, 0) + 1
+        if k == "p1" and attempts[k] == 1:
+            return SpokeResult(
+                status="done",
+                person_vault_path=None,
+                ai_package_path=None,
+                failure_class=None,
+                failure_reason=None,
+                source_url=cand["source_url"],
+                attempted_tier="tier1",
+            )
+        return _ok(cand)
+
+    wd = Watchdog(stall_seconds=0, max_refires=3)
+    res = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=3,
+        ledger=ledger,
+        discover=lambda topic, n_target: pool,
+        spoke=spoke,
+        max_concurrent=3,
+        watchdog=wd,
+    )
+    # p1 was re-fired once and then succeeded.
+    assert attempts["p1"] == 2
+    assert res.done_count == 3
+    assert res.exhausted is False
+
+
+def test_watchdog_is_bounded_not_a_daemon(tmp_path: Path):
+    # If re-fires keep yielding false-done, the watchdog stops after max_refires
+    # (bounded — never loops forever).
+    ledger = FakeLedger()
+    pool = [_candidate("p0")]
+    calls = {"n": 0}
+
+    def always_false_done(cand: dict) -> SpokeResult:
+        calls["n"] += 1
+        return SpokeResult(
+            status="done",
+            person_vault_path=None,
+            ai_package_path=None,
+            failure_class=None,
+            failure_reason=None,
+            source_url=cand["source_url"],
+            attempted_tier="tier1",
+        )
+
+    wd = Watchdog(stall_seconds=0, max_refires=2)
+    res = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=1,
+        ledger=ledger,
+        discover=lambda topic, n_target: pool,
+        spoke=always_false_done,
+        max_concurrent=1,
+        watchdog=wd,
+    )
+    # 1 initial dispatch + at most 2 re-fires = 3 spoke calls; then it gives up.
+    assert calls["n"] <= 3
+    assert res.exhausted is True
