@@ -33,7 +33,12 @@ from scripts.audit.types import (
 
 # Matches integers and decimals (incl. signed/percent contexts). Captures the
 # numeric token only; surrounding %/× are handled by the source text match.
-_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
+# The `(?<![A-Za-z0-9])` lookbehind excludes digits glued to an identifier
+# (claim/experiment IDs like C01, E02) so G2 verifies only real evidence/metric
+# numbers — NOT structural artifacts. Without it, "C01" yielded "01", which an
+# honest skeptic cannot find in the source MD, hard-blocking legitimate papers
+# (Codex Round-10).
+_NUMBER = re.compile(r"(?<![A-Za-z0-9])-?\d+(?:\.\d+)?")
 _CLAIM_HEADER = re.compile(r"^##\s+(C\d{2,}):\s*(.+?)\s*$", re.MULTILINE)
 _PROOF_LINE = re.compile(r"\*\*Proof\*\*:\s*(.+)$", re.MULTILINE)
 _EXP_ID = re.compile(r"E\d{2,}")

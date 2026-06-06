@@ -117,7 +117,13 @@ def _math_section(analysis: dict) -> str:
     )
 
 
-def _loss_section() -> str:
+def _loss_section(key: str) -> str:
+    # The paired ai_package shares the SAME vault key. From person_vault/{key}/
+    # report.md, the paired evidence dir is ../../ai_package/{key}/ara/evidence/
+    # (up to the repo root, then into ai_package). `key` is the real vault key,
+    # threaded from produce_outputs — never the old "REPLACE_KEY" placeholder
+    # (Codex Round-10: that placeholder + wrong depth broke the cross-link).
+    evidence_link = f"../../ai_package/{key}/ara/evidence/"
     return "\n".join(
         [
             "### Loss 亮点解释",
@@ -129,7 +135,7 @@ def _loss_section() -> str:
             "- **对比基线**:标准回归在多模态下天然取均值,修不了该方向;"
             "交叉熵则需离散化轨迹,损失精度。",
             "- **证据**:对比数据见 "
-            "[ai_package evidence](../ai_package/REPLACE_KEY/ara/evidence/tables/table1_nuscenes.md)"  # noqa: E501
+            f"[ai_package evidence]({evidence_link})"
             "(branch1 不复制精确数字,交由审计层双分支一致性门核对)。",
         ]
     )
@@ -170,6 +176,7 @@ def write_branch1(
     md_path: Path,
     analysis: dict,
     *,
+    key: str | None = None,
     _force_unanchored: bool = False,
 ) -> None:
     """Write the branch1 report; RAISE if any empirical claim is unanchored.
@@ -180,12 +187,16 @@ def write_branch1(
         ara_dir: The already-written branch2 ara/ directory.
         md_path: The frozen {ID}.md (anchor target).
         analysis: Analyzer-spoke bundle.
+        key: The shared vault key used to link to the paired ai_package
+            (produce_outputs passes the real key; when omitted, falls back to
+            the person_dir name).
         _force_unanchored: Test hook to inject an unanchored performance claim.
 
     Raises:
         AnchorGateError: If the composed report fails the three-layer lint.
     """
     person_dir.mkdir(parents=True, exist_ok=True)
+    key = key or person_dir.name
     md_text = md_path.read_text(encoding="utf-8")
 
     sections = [
@@ -200,7 +211,7 @@ def write_branch1(
         "",
         _math_section(analysis),
         "",
-        _loss_section(),
+        _loss_section(key),
         "",
         "## 趋势与定位",
         "该方法将扩散式规划推向实时区间,推动端到端规划向多模态保真演进。",

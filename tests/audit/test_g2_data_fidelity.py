@@ -34,6 +34,18 @@ def test_extract_numbers_pulls_decimals_and_ints() -> None:
     assert "28.4" in nums and "24.6" in nums and "3" in nums
 
 
+def test_extract_numbers_excludes_identifier_glued_digits() -> None:
+    # Codex Round-10 regression: claim/experiment IDs (C01, E02) must NOT be
+    # collected as evidence numbers — branch2 writes them into the evidence
+    # index, and an honest skeptic cannot find "01" in the source MD, so it would
+    # hard-block a legitimate paper. Only free-standing metric numbers count.
+    nums = extract_numbers("Claim C01 (proof E02) reports BLEU 28.4 over 3 runs.")
+    assert "01" not in nums
+    assert "02" not in nums
+    assert "28.4" in nums
+    assert "3" in nums
+
+
 def test_extract_claim_registry_reads_claims_md(tmp_path: Path) -> None:
     ara = _make_ai_package(tmp_path)
     registry = extract_claim_registry(ara)

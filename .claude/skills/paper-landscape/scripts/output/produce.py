@@ -122,8 +122,9 @@ def produce_outputs(
                 raise ProduceGateBlocked(verdict)
 
         # branch1 derives from branch2 and self-gates on the anchor lint;
-        # any unanchored empirical claim raises AnchorGateError here.
-        write_branch1(stage_person, candidate, stage_ai, md_path, analysis)
+        # any unanchored empirical claim raises AnchorGateError here. `key` is
+        # the shared vault key so branch1 links to the paired ai_package.
+        write_branch1(stage_person, candidate, stage_ai, md_path, analysis, key=key)
 
         # Both gates passed → promote atomically. Remove prior same-identity
         # entries first (OT-2), then move staging into place.

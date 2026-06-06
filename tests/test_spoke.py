@@ -334,6 +334,16 @@ def _all_found_skeptic(numbers, source_md, claim_context):
     return tuple(SkepticVote(number=n, found_in_source=True) for n in numbers)
 
 
+def _honest_skeptic(numbers, source_md, claim_context):
+    """Realistic seam: a number grounds iff it actually appears in the source MD.
+
+    This is what exposed Codex Round-10: when G2 over-collected identifier-glued
+    digits (e.g. "01" from claim id C01), this honest check could not find them
+    in the source and hard-blocked a legitimate paper.
+    """
+    return tuple(SkepticVote(number=n, found_in_source=(n in source_md)) for n in numbers)
+
+
 def _skeptic_missing(*fabricated: str):
     """Build a seam that reports `fabricated` numbers as NOT found, rest found.
 
@@ -446,6 +456,31 @@ def test_spoke_happy_path_produces_both_vaults(tmp_path, fake_http, fake_cli):
     assert (ai / "ara" / "PAPER.md").exists()
     # G3 always writes the rigor seal report.
     assert (ai / "ara" / "level2_report.json").exists()
+
+
+def test_spoke_honest_skeptic_passes_and_links_paired_ai_package(tmp_path, fake_http, fake_cli):
+    # Codex Round-10 regression (both findings): (1) an HONEST skeptic (a number
+    # grounds iff it appears in the source MD) must NOT hard-block legitimate
+    # output — G2 no longer over-collects identifier-glued digits like "01" from
+    # claim ids. (2) the branch1 report links to the paired ai_package by the
+    # REAL shared key, never the old "REPLACE_KEY" placeholder.
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    spoke = _make_spoke(
+        tmp_path,
+        fake_http,
+        fake_cli,
+        analysis_md=_SOURCE_MD,
+        skeptic_votes=_honest_skeptic,
+    )
+
+    result = spoke(dict(_CANDIDATE))
+
+    assert result.status == "done"  # NOT blocked by a spurious id-glued "01"
+    ai = Path(result.ai_package_path)
+    key = ai.name
+    report = (Path(result.person_vault_path) / "report.md").read_text(encoding="utf-8")
+    assert "REPLACE_KEY" not in report
+    assert f"../../ai_package/{key}/ara/evidence/" in report
 
 
 def test_spoke_tier1_synthesizes_content_list_and_passes(tmp_path, fake_http, fake_cli):
