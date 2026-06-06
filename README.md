@@ -194,6 +194,13 @@ ruff" is the validation gate.
    PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.output.anchor_lint <file>...
    ```
 
+6. **bibliography export CLI** (`scripts/bibliography.py`). Emits `references.bib`
+   (BibTeX) + `references.csl.json` (CSL-JSON) for the sealed corpus:
+
+   ```bash
+   PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.bibliography --topic-dir .
+   ```
+
 ## The injected seams
 
 The composition is CODE; the runtime injects the seams. Two infrastructure
