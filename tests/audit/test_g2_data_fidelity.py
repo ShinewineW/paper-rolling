@@ -141,6 +141,44 @@ def test_run_g2_fails_closed_on_partial_skeptic_coverage(tmp_path: Path) -> None
     assert any("28.4" in f.observation for f in verdict.hard_findings)
 
 
+def _bare_ara(root: Path, name: str, evidence_value: str) -> Path:
+    ara = root / "ai_package" / name / "ara"
+    (ara / "logic").mkdir(parents=True)
+    (ara / "evidence" / "tables").mkdir(parents=True)
+    (ara / "logic" / "claims.md").write_text("# Claims\n", encoding="utf-8")
+    (ara / "evidence" / "tables" / "main.md").write_text(
+        f"| M | S |\n|---|---|\n| Ours | {evidence_value} |\n", encoding="utf-8"
+    )
+    return ara
+
+
+def _honest(numbers, source_md, claim_context):
+    return tuple(SkepticVote(number=n, found_in_source=(n in source_md)) for n in numbers)
+
+
+def test_run_g2_classifies_fabrication_with_no_near_value(tmp_path: Path) -> None:
+    """ROADMAP C3: a missing number with NO near source value -> 'fabricated'."""
+    ara = _bare_ara(tmp_path, "fab", "0.99")
+    md = tmp_path / "fab.md"
+    md.write_text("We report 0.12 on the benchmark.\n", encoding="utf-8")
+    verdict = run_g2(ara.parent, md, skeptic_votes=_honest, n_skeptics=3)
+    assert verdict.blocked
+    assert "fabricated" in verdict.hard_findings[0].observation
+
+
+def test_run_g2_classifies_transcription_error_when_near_value_exists(tmp_path: Path) -> None:
+    """ROADMAP C3: a missing number with a NEAR source value -> 'transcription
+    error' that cites the near value (actionable: re-extract the right figure)."""
+    ara = _bare_ara(tmp_path, "typo", "0.62")  # mis-transcribed
+    md = tmp_path / "typo.md"
+    md.write_text("Our model reaches 0.61 NDS.\n", encoding="utf-8")  # the true value
+    verdict = run_g2(ara.parent, md, skeptic_votes=_honest, n_skeptics=3)
+    assert verdict.blocked
+    obs = verdict.hard_findings[0].observation
+    assert "transcription error" in obs
+    assert "0.61" in obs  # cites the near source value
+
+
 def test_run_g2_cross_model_catches_in_family_false_negative(tmp_path: Path) -> None:
     """ROADMAP C2: the cross-model overlay blocks a fabricated number that the
     in-family majority wrongly 'confirmed' (the conformity-bias failure mode)."""

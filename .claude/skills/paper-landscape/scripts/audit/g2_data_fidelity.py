@@ -116,6 +116,29 @@ def _cross_model_flags(cross_votes: tuple[SkepticVote, ...], number: str) -> boo
     return any(v.number == number and not v.found_in_source for v in cross_votes)
 
 
+def _nearest_source_number(number: str, source_md: str) -> str | None:
+    """A source-MD number 'near' `number` — within 10% relative, or a digit
+    rearrangement (transposition). Its presence means the right value IS in the
+    source, so the defect is a likely TRANSCRIPTION error rather than a
+    fabrication (ROADMAP C3 — classify what failed, for actionable findings)."""
+    try:
+        target = float(number)
+    except ValueError:
+        return None
+    want_digits = sorted(c for c in number if c.isdigit())
+    for tok in extract_numbers(source_md):
+        if tok == number:
+            continue
+        try:
+            val = float(tok)
+        except ValueError:
+            continue
+        rel = abs(val - target) / max(abs(target), 1e-9)
+        if rel <= 0.1 or sorted(c for c in tok if c.isdigit()) == want_digits:
+            return tok
+    return None
+
+
 def run_g2(
     ai_package_dir: Path,
     md_path: Path,
@@ -167,6 +190,10 @@ def run_g2(
                 if cross_bad and not in_family_bad
                 else "a skeptic majority"
             )
+            # C3 defect class: a near source value ⇒ transcription error (re-extract
+            # the right figure); none ⇒ fabrication/unverifiable (remove the value).
+            near = _nearest_source_number(number, source_md)
+            defect = "likely a transcription error" if near else "likely fabricated or unverifiable"
             findings.append(
                 Finding(
                     finding_id=f"G2F{idx:02d}",
@@ -174,8 +201,8 @@ def run_g2(
                     target=str(ara_dir.relative_to(ai_package_dir.parent)),
                     observation=(
                         f"evidence number {number!r} not confirmed present in the "
-                        f"source MD by {by} — likely fabricated, mis-transcribed, "
-                        f"or unverifiable"
+                        f"source MD by {by} — {defect}"
+                        + (f" (source has a near value {near!r})" if near else "")
                     ),
                     is_hard_block=True,
                     reasoning=(
@@ -184,9 +211,11 @@ def run_g2(
                         "chain and poisons the knowledge base."
                     ),
                     suggestion=(
-                        "Re-extract the number from the source MD; if it is "
-                        "genuinely absent, remove the claim/row before any "
-                        "branch is emitted."
+                        f"Re-extract from the source MD — it has the near value "
+                        f"{near!r}, likely the intended figure."
+                        if near
+                        else "Re-extract from the source MD; if genuinely absent, "
+                        "remove the fabricated value before any branch is emitted."
                     ),
                 )
             )
