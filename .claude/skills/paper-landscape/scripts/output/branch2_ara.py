@@ -86,19 +86,23 @@ def _paper_md(candidate: dict, analysis: dict) -> str:
 
 
 def _problem_md(p: dict) -> str:
+    # Observations -> O#, Gaps -> G# (own namespaces). The analyzer sometimes reuses
+    # C#/E# here, colliding with claim/experiment IDs across layers; renumber
+    # deterministically so cross-layer IDs never alias. (Obs/gap IDs aren't
+    # referenced outside problem.md, so renumbering is safe.)
     out = ["# Problem Specification", "", "## Observations", ""]
-    for o in p["observations"]:
+    for i, o in enumerate(p["observations"], 1):
         out += [
-            f"### {o['id']}: {o['statement'][:40]}",
+            f"### O{i}: {o['statement'][:40]}",
             f"- **Statement**: {o['statement']}",
             f"- **Evidence**: {o['evidence']}",
             f"- **Implication**: {o['implication']}",
             "",
         ]
     out += ["## Gaps", ""]
-    for g in p["gaps"]:
+    for i, g in enumerate(p["gaps"], 1):
         out += [
-            f"### {g['id']}: {g['statement'][:40]}",
+            f"### G{i}: {g['statement'][:40]}",
             f"- **Statement**: {g['statement']}",
             f"- **Caused by**: {g['caused_by']}",
             f"- **Existing attempts**: {g['attempts']}",

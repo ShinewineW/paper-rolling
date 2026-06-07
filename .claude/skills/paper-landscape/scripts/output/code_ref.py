@@ -31,6 +31,10 @@ class Innovation:
 def _locate(repo_dir: Path, needle: str) -> str | None:
     """Return the first `relpath:line` whose line contains `needle`, else None."""
     for path in sorted(repo_dir.rglob("*")):
+        # Skip VCS internals (.git/index etc.): binary blobs yield garbage
+        # "matches" for short needles, polluting the trace layer's credibility.
+        if ".git" in path.parts:
+            continue
         if not path.is_file() or path.stat().st_size > 2_000_000:
             continue
         try:
