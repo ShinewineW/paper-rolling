@@ -36,12 +36,12 @@ invariants are what make unattended `/loop` runs safe:
 
 - **Single writer (LS-1)**: the **hub** is the only writer. `Ledger.acquire()`
   takes a **non-blocking `flock`** on a persistent `_ledger/.lock`
-  (`paths.LEDGER_LOCK_FILENAME`); a second concurrent instance fails fast with
+  (`Ledger.lock_path`); a second concurrent instance fails fast with
   `LedgerLockError` instead of racing. The lock is held for the whole tick by
   the `run_campaign` driver — never inside `run_campaign_tick` (so the hub tests
   can call the tick directly with their own ledger).
 - **Atomic append (LS-2)**: `processed_ledger.yaml`
-  (`paths.LEDGER_FILENAME`, under `_ledger/`) is append-only; every write goes
+  (`Ledger.ledger_path`, under `_ledger/`) is append-only; every write goes
   through `_atomic_write` — a temp file in the same dir + `os.replace` (atomic
   POSIX rename), so a crash mid-write never corrupts the ledger.
 - **Spoke never writes the ledger**: a spoke returns the exact

@@ -6,11 +6,12 @@ Returned arxiv_id is fed back through OpenAlex before entering the authority
 set.
 
 # ===========================================================================
-# HF API TOKEN — user-forced hardcode, READ-ONLY scope (D-发现-4).
-# User granted an explicit exemption to security.md secrets MUST after being
-# warned twice that git sync pushes this into GitHub history. The token is a
-# fine-grained READ-ONLY credential; leak blast radius = public-metadata read.
-# Single source of truth; never logged, never duplicated. Replace at deploy.
+# HF API TOKEN (D-发现-4). The shipped source carries a PLACEHOLDER, not a live
+# token. Resolution: HF_TOKEN env var first (see .env.example), else the source
+# constant. While it is the placeholder, requests go out ANONYMOUSLY (no
+# Authorization header) — HF Papers search works anonymously at a lower rate.
+# Replace the placeholder with a fine-grained READ-ONLY token (or set HF_TOKEN)
+# to raise the rate; a real token committed here would land in git history.
 # ===========================================================================
 """
 
@@ -21,14 +22,12 @@ from collections.abc import Iterator
 from typing import Any
 
 # ===========================================================================
-# HF API TOKEN — user-forced hardcode, READ-ONLY scope (D-发现-4).
-# User granted an explicit exemption to security.md secrets MUST after being
-# warned twice that git sync pushes this into GitHub history. The token is a
-# fine-grained READ-ONLY credential; leak blast radius = public-metadata read.
-# Single source of truth; never logged, never duplicated. Replace at deploy, OR
-# set HF_TOKEN in the environment (read FIRST — see .env.example).
+# HF API TOKEN (D-发现-4) — see the module docstring. Default is a placeholder;
+# real token via HF_TOKEN env (first) or by replacing the constant below. While
+# it is the placeholder, no Authorization header is sent (anonymous access).
 # ===========================================================================
-HF_READONLY_TOKEN = "hf_REPLACE_WITH_READONLY_TOKEN"  # user-forced fallback, read-only scope
+_PLACEHOLDER_TOKEN = "hf_REPLACE_WITH_READONLY_TOKEN"
+HF_READONLY_TOKEN = _PLACEHOLDER_TOKEN  # replace with a real read-only token, or set HF_TOKEN
 
 # OpenAlex polite-pool email (non-secret, D-发现-2).
 OPENALEX_POLITE_EMAIL = "ahhssxlcwjz@163.com"
@@ -38,9 +37,19 @@ _BASE = "https://huggingface.co/api/papers/search"
 
 def _hf_token() -> str:
     """Resolve the HF token: the HF_TOKEN env var first (honoring .env.example),
-    the hardcoded read-only constant as the self-contained fallback. Codex R17:
-    the code now actually reads the env override the docs promised."""
+    else the source constant (a placeholder by default)."""
     return os.environ.get("HF_TOKEN") or HF_READONLY_TOKEN
+
+
+def _hf_headers() -> dict[str, str]:
+    """Authorization header ONLY when a REAL token is present. While the token is
+    the shipped placeholder, return {} so the request goes out anonymously — the
+    placeholder must not be sent as a bearer (it would 401 instead of falling
+    back to anonymous; Codex Round-23)."""
+    token = _hf_token()
+    if token and token != _PLACEHOLDER_TOKEN:
+        return {"Authorization": f"Bearer {token}"}
+    return {}
 
 
 class HFPapersSource:
@@ -51,8 +60,7 @@ class HFPapersSource:
 
     def search(self, topic: str, max_results: int = 50) -> Iterator[dict[str, Any]]:
         """Yield candidates for *topic* with code + heat enrichment."""
-        headers = {"Authorization": f"Bearer {_hf_token()}"}
-        results = self._client.get_json(_BASE, {"q": topic}, headers=headers)
+        results = self._client.get_json(_BASE, {"q": topic}, headers=_hf_headers())
         emitted = 0
         for item in results or []:
             if emitted >= max_results:

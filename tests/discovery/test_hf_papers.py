@@ -31,23 +31,25 @@ HF_RESULTS = [
 ]
 
 
-def test_token_constant_is_readonly_labeled():
-    # The token is a hard-coded read-only constant (D-发现-4). It must exist
-    # and be a non-empty string; the source file carries the user-forced
-    # read-only-scope label.
+def test_token_constant_present():
+    # The HF token constant exists and is a non-empty string (D-发现-4); by
+    # default it is the placeholder, replaced via HF_TOKEN env or in source.
     assert isinstance(HF_READONLY_TOKEN, str)
     assert HF_READONLY_TOKEN  # non-empty
 
 
-def test_search_uses_q_param_and_auth_header(monkeypatch):
-    monkeypatch.delenv("HF_TOKEN", raising=False)  # pin the hardcoded fallback path
+def test_search_is_anonymous_when_token_is_placeholder(monkeypatch):
+    # With no HF_TOKEN env and the shipped placeholder constant, the request goes
+    # out ANONYMOUSLY — no Authorization header (Codex Round-23). The placeholder
+    # must never be sent as a bearer (it would 401 instead of falling back).
+    monkeypatch.delenv("HF_TOKEN", raising=False)
     client = StubClient([HF_RESULTS])
     src = HFPapersSource(client)
     list(src.search("end-to-end driving", max_results=10))
     url, q, headers = client.calls[0]
     assert url.endswith("/api/papers/search")
     assert q["q"] == "end-to-end driving"
-    assert headers.get("Authorization") == f"Bearer {HF_READONLY_TOKEN}"
+    assert "Authorization" not in headers
 
 
 def test_search_prefers_env_token_over_hardcoded(monkeypatch):
@@ -74,9 +76,10 @@ def test_candidate_extracts_github_keywords_upvotes():
     assert cand["discovery_sources"] == ["hf_papers"]
 
 
-def test_source_constant_file_labels_token_readonly():
+def test_source_documents_placeholder_and_anonymous_fallback():
     import inspect
 
-    src_text = inspect.getsource(hf_papers)
-    assert "read-only" in src_text.lower()
-    assert "user-forced" in src_text.lower()
+    src_text = inspect.getsource(hf_papers).lower()
+    assert "placeholder" in src_text
+    assert "anonymous" in src_text
+    assert "read-only" in src_text  # the upgrade path is a fine-grained read-only token

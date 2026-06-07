@@ -159,7 +159,7 @@ def test_campaign_yaml_template_has_all_locked_fields():
 def test_env_example_documents_hf_token_and_hardcode_note():
     text = (ROOT / ".env.example").read_text(encoding="utf-8")
     assert "HF_TOKEN" in text
-    # Note that the shipped skill hardcodes a read-only token (D-发现-4).
+    # .env.example documents the placeholder + env-override / anonymous model (D-发现-4).
     assert "read-only" in text.lower()
 
 

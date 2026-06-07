@@ -54,7 +54,7 @@ scripts/          the engine code (packages below)
 
 | Module | Purpose |
 |--------|---------|
-| `paths.py` | On-disk layout source of truth: dir-name constants, path builders, `repo_root`, `STATUS_*`/`FAILURE_*` enums. (NOT the vault-keying authority — that is `output/naming.py`.) |
+| `paths.py` | Cross-module layout constants: the vault-branch set (`VAULT_BRANCHES` / `VAULT_BRANCH_PATH_FIELDS`), the `FAILURE_*` classes, and `repo_root`. (NOT the vault-keying authority — that is `output/naming.py`.) |
 | `campaign.py` | Campaign Hard Gate (中枢-D1): `CampaignConfig`, `write_campaign`, `gate_needed`, `load_campaign`. |
 | `hub.py` | Hub-spoke orchestration (single ledger writer): `run_tick`, `run_campaign_tick`, `Watchdog`, `GateRequired`. Runs LS-4 self-heal before the batch. |
 | `spoke.py` | `make_spoke(...)` — the per-paper gated pipeline (ingest → branch2 → G2 → branch1 → G3), serial within one paper. |
@@ -70,7 +70,7 @@ scripts/          the engine code (packages below)
 | `openalex.py` | OpenAlex source (uses the polite-pool `mailto`, D-发现-2). |
 | `s2.py` | Semantic Scholar source. |
 | `arxiv_src.py` | arXiv source (category-restricted). |
-| `hf_papers.py` | Hugging Face Papers source (uses the hardcoded READ-ONLY HF token, D-发现-4). |
+| `hf_papers.py` | Hugging Face Papers source (placeholder HF token; `HF_TOKEN` env or anonymous fallback, D-发现-4). |
 | `dblp.py` | DBLP venue-authority source (`venue_for_title`) — enrichment, feeds the S2 venue signal. |
 | `authority.py` | Multi-signal OR authority scorer (ADR-0001): S1 cite / S2 venue / S3 institution / S4 heat. |
 | `dedup.py` | Cross-source dedup + field merge (D-发现-7). |
@@ -233,9 +233,11 @@ model seams" documents the exact input/output shape of each:
   venv. CPU backend (`-b pipeline`); first run downloads multi-GB model weights.
 - **OpenAlex polite pool**: a non-secret `mailto` email (D-发现-2) lifts the rate
   limit. Configured via the OpenAlex source's `polite_email`.
-- **Hugging Face Papers**: a **hardcoded READ-ONLY HF token** in
-  `scripts/discovery/hf_papers.py` (`HF_READONLY_TOKEN`, D-发现-4). User-forced
-  hardcode with read-only scope; note it lands in git history.
+- **Hugging Face Papers**: the source ships a **placeholder** HF token
+  (`HF_READONLY_TOKEN` in `scripts/discovery/hf_papers.py`, D-发现-4). Set
+  `HF_TOKEN` (env, read first) or replace the placeholder with a fine-grained
+  READ-ONLY token to raise the rate; with the placeholder unchanged, HF requests
+  go out **anonymously** (no Authorization header).
 - **API sources**: OpenAlex, Semantic Scholar, arXiv, DBLP, HF Papers — all reached
   through the shared throttled HTTP client (polite pacing).
 
