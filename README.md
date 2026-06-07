@@ -141,6 +141,9 @@ scripts/          the engine code (packages below)
 uv sync --group dev      # set up the venv
 uv run pytest            # run the test suite (the executable spec)
 uv run ruff check .      # lint (repo-wide)
+# Environment preflight — verify pandoc + mineru + runtime deps before a campaign
+# (exit 1 + install hints if any is missing; the skill runs this FIRST as a gate):
+PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.preflight
 ```
 
 There is no `validate` target beyond the test suite + ruff; "green pytest + clean

@@ -27,9 +27,27 @@ The agent-facing knowledge lives in `references/` (load the doc you need),
 - `examples/worked-example.md` + `examples/sample-ara-bundle.json` — one paper end-to-end; the literal `resolve_analysis` output target.
 - `templates/{ara-paper,branch1-report,landscape}.md` — the output skeletons branch2 / branch1 / landscapes write.
 
+## Preflight — environment check (run FIRST) — MUST
+
+Before the campaign gate or ANY processing, verify the machine has every external
+prerequisite. A missing tool MUST be a loud STOP here — never a silent per-paper
+skip later:
+
+```bash
+PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.preflight
+```
+
+It checks the runtime deps + `pandoc` (Tier-1 ingest) + `mineru` (Tier-2 ingest)
+and **exits non-zero** if any is missing, naming the install command. **If it
+exits non-zero, STOP**: report exactly what is missing and how to install it; do
+**not** proceed to the Hard Gate or ingest until the user has installed it and the
+preflight is all-green. Gate every run on it — `… -m scripts.preflight && <run the
+tick>` — so a missing tool cannot silently degrade ingest. (The four LLM seams are
+agent-provided and the HF token ships in source, so they are not preflighted.)
+
 ## Entry: the campaign Hard Gate (HITL, once per campaign) — MUST
 
-The **first action** on a new campaign is a blocking **Hard Gate** (中枢-D1).
+The **first action after preflight passes** is a blocking **Hard Gate** (中枢-D1).
 You MUST get explicit human confirmation of **two** things, then lock them into
 `config/campaign.yaml`:
 
@@ -190,7 +208,8 @@ contract: `references/wiring-the-seams.md`; per-role: `sub-skills/<role>/SKILL.m
 
 ## Invoke the engine (quickstart)
 
-The infra plumbing ships; the runtime only constructs the LLM seams, then calls
+Run the **Preflight** gate first (above) and only proceed if it is all-green. The
+infra plumbing ships; the runtime only constructs the LLM seams, then calls
 `run_campaign(...)`. Run with `PYTHONPATH=.claude/skills/paper-landscape`:
 
 ```python
