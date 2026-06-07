@@ -89,6 +89,17 @@ scripts/          the engine code (packages below)
 | `tier2_mineru.py` | Tier-2: download PDF + MinerU CLI (CPU) → MD + `images/` + `content_list.json`. |
 | `contract.py` | MD-only contract: provenance record + content hashing + equation-block counting. |
 
+`scripts/llm/` — pluggable LLM provider layer + seam factory:
+
+| Module | Purpose |
+|--------|---------|
+| `providers.py` | `LLMProvider` protocol: `ClaudeCodeProvider` (claude -p) + `OpenAICompatibleProvider` (any OpenAI-compat API) + `FallbackProvider` (primary → mandatory claude-code fallback → EngineAbort). |
+| `config.py` | `LLMConfig` from `config/llm.yaml`: loads per-seam provider routing + execution modes (inline / grounded / agent_team). |
+| `seams.py` | `build_seams()` factory: constructs the 6 LLM seams (analyzer, skeptic, rigor, entailment, expand, writer) with provider routing + FallbackProvider wrapping. |
+| `analyzer.py` | `analyze_chunked(...)` — grounded analyzer (chunks large MD, parallel analyst calls, formula-fidelity discipline). |
+| `writer.py` | `write_human_sections(...)` + `curate_figures(...)` — human-chain LLM writer (vivid Chinese prose + selective figure curation: mandatory arch + top-N results). |
+| `jsonparse.py` | `extract_json(...)` — tolerant JSON extraction (handles code fences, LaTeX escapes, leading prose). |
+
 `scripts/ledger/` — single-writer processed-state + idempotency:
 
 | Module | Purpose |
@@ -103,7 +114,8 @@ scripts/          the engine code (packages below)
 |--------|---------|
 | `produce.py` | `produce_outputs(...)` — builds branch2 then branch1 in staging, runs gates, promotes both-or-neither. |
 | `branch2_ara.py` | branch2 ARA producer (runs first). |
-| `branch1_report.py` | branch1 illustrated Chinese report (derived from branch2). |
+| `branch1_llm.py` | branch1 LLM-written human chain (vivid Chinese sections + grounded assembly + figure curation + self-contained HTML). Wired via optional `write_report` seam. |
+| `branch1_report.py` | branch1 thin deterministic renderer (fallback when no `write_report` seam; from analysis → markdown template). |
 | `naming.py` | **The single live vault-key authority**: `vault_key`, `derive_name`, `identity_base`, `find_existing_entries`. |
 | `ara_schema.py` | ARA Seal Level 1 structural validator. |
 | `anchor_lint.py` | Three-layer citation anchor lint (HARD gate) + the anchor-lint CLI. |
@@ -133,7 +145,7 @@ scripts/          the engine code (packages below)
 | `landscapes/{topic}/` | cross-paper synthesis (`INDEX.md` + `report.md`) |
 | `_ledger/` | `processed_ledger.yaml` (single-writer) + `.lock` |
 | `_failed/` | per-paper failure records for manual follow-up |
-| `config/` | `campaign.yaml.example` (shipped template). The Hard Gate writes the live `campaign.yaml` (locked `topic` / `n_per_tick` / `is_ad_domain`) on first run; a fresh clone has no live config, so the gate fires. |
+| `config/` | `campaign.yaml` (locked topic / n_per_tick / force_include by Hard Gate); `llm.yaml` (per-seam provider routing + execution modes, optional); `audit.yaml` (audit knobs: skeptic_votes, max_gate_rounds, data_fidelity tolerance, optional). |
 
 ## Develop / run / test / lint
 
@@ -207,19 +219,18 @@ ruff" is the validation gate.
 
 ## The injected seams
 
-The composition is CODE; the runtime injects the seams. Two infrastructure
-adapters + a network client are supplied to `run_campaign(...)` — **`discover`**
-(the discovery callable, built over the query-expansion `llm` + the source
-clients), **`http`**, and **`run_cli`** — and the LLM-backed analysis/audit
-callables below. Note there are **five** LLM-backed seams in total: the
-query-expansion `llm` (inside `discover`) plus the four here. Each of the four
+The composition is CODE; the runtime injects the seams. Three infrastructure
+adapters are supplied to `run_campaign(...)` — **`discover`** (the discovery
+callable, built over the query-expansion `llm` + the source clients), **`http`**,
+and **`run_cli`** — plus the **six LLM-backed seams** (all routed via
+`config/llm.yaml` from `scripts/llm.seams.build_seams()`). Each LLM seam
 **MUST** be an **independent Agent-tool invocation** (a fresh sub-agent per call)
 so audit votes stay uncorrelated with the generator. `SKILL.md` → "Wiring the
 model seams" documents the exact input/output shape of each:
 
-- **`resolve_analysis(md_path, candidate) -> dict`** — the analyzer sub-agent that
-  reads the frozen `{ID}.md` and returns the ARA bundle (incl. `headline_metric` /
-  `headline_value` / `params_million` the landscape table needs).
+- **`resolve_analysis(md_path, candidate) -> dict`** — the analyzer sub-agent (in
+  grounded mode, reads frozen `{ID}.md` itself) that returns the ARA bundle (incl.
+  `headline_metric` / `headline_value` / `params_million` landscape table needs).
 - **`skeptic_votes(numbers, source_md, claim_context) -> tuple[SkepticVote, ...]`** —
   the G2 ground-truth-isolated skeptic (sees only the candidate numbers + source MD;
   never the evidence/answer key/rubric). Multi-vote majority hard-blocks fabrication.
@@ -227,6 +238,11 @@ model seams" documents the exact input/output shape of each:
   privately by the seam, never in any generator prompt).
 - **`entailment_judge(claim, experiment_text) -> tuple[bool, str]`** — the G3
   type-aware entailment check.
+- **`expand_llm(topic) -> list[str]`** — the discovery query expander (cheap seam,
+  converts a single topic into multiple search queries for multi-source discovery).
+- **`write_report(ara_bundle, figures) -> dict`** — the human-chain LLM writer
+  (optional; if provided, generates vivid Chinese prose + grounded assembly;
+  if omitted, branch1 falls back to thin deterministic renderer).
 
 ## Key dependencies / external services / env
 
