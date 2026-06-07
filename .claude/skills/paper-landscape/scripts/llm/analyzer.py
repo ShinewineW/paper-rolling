@@ -189,7 +189,9 @@ def _chunk_prompt_grounded(
         f"{md_path}\n\n"
         f"本块 JSON schema:\n{schema}\n\n{_IDS}\n\n{_RULES}\n"
         "务必先用 Read/Grep 实际查阅该文件;凡写入 evidence_tables / headline_value 的数字,"
-        "先用 Grep 在该文件中确认其逐字存在再写入。最终只回复该 JSON 对象。\n"
+        "先用 Grep 在该文件中确认其逐字存在再写入。\n"
+        "查阅完成后,**直接以 `{` 开头输出该 JSON 对象**——不要任何前言、思考过程、解释,"
+        "也不要 markdown 代码围栏。\n"
     )
 
 

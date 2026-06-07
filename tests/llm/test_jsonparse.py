@@ -39,8 +39,24 @@ def test_repair_only_doubles_bad_backslashes() -> None:
 
 
 def test_unparseable_raises() -> None:
-    with pytest.raises(ValueError, match="no JSON value found"):
+    with pytest.raises(ValueError, match="JSON parse failed"):
         extract_json("just prose, no json here")
+
+
+def test_extract_json_from_grounded_prose_preamble() -> None:
+    # Grounded claude -p narrates before the JSON; a fenced block anywhere + LaTeX
+    # must still parse (this stalled the task-3 run).
+    s = (
+        "Now I have all the information needed. Let me compile the JSON.\n\n"
+        '```json\n{"overview": "WFM $\\mathcal{M}$ predicts $x_{0:t}$", "n": 3}\n```'
+    )
+    out = extract_json(s)
+    assert out["n"] == 3
+    assert "\\mathcal" in out["overview"]  # LaTeX backslash preserved
+
+
+def test_extract_json_bare_object_after_prose() -> None:
+    assert extract_json('Let me compile.\n{"a": 1, "b": "x"}') == {"a": 1, "b": "x"}
 
 
 def test_repair_does_not_over_escape_valid_backslash_pairs():

@@ -53,27 +53,33 @@ def extract_json(text: str):
     """Parse a JSON value from model output, tolerating fences / prose / invalid
     LaTeX backslash escapes.
 
+    Robust to a GROUNDED claude -p that narrates before the JSON ("Now I have all
+    the info. Let me compile.\n\n```json\n{...}```") — a fenced block ANYWHERE and a
+    balanced brace span are both tried, each as-is and escape-repaired.
+
     Raises:
         ValueError: no parseable JSON even after escape repair.
     """
     t = text.strip()
+    candidates: list[str] = []
+    # 1. A fenced ```json ... ``` (or bare ``` ... ```) block ANYWHERE — handles
+    #    prose preamble/postamble around the JSON (grounded tool-use narration).
+    fence = re.search(r"```(?:json|JSON)?\s*\n?(.*?)```", t, re.S)
+    if fence:
+        candidates.append(fence.group(1).strip())
+    # 2. A leading fence stripped (back-compat).
     if t.startswith("```"):
-        t = _FENCE_OPEN.sub("", t)
-        t = _FENCE_CLOSE.sub("", t).strip()
-    # Try as-is, then with LaTeX-backslash repair.
-    for candidate in (t, repair_json_escapes(t)):
-        try:
-            return json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-    # Fallback: first balanced-looking object/array span (also escape-repaired).
-    m = _JSON_SPAN.search(t)
-    if not m:
-        raise ValueError(f"no JSON value found in output: {text[:300]!r}")
-    span = m.group(1)
-    for candidate in (span, repair_json_escapes(span)):
-        try:
-            return json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
+        candidates.append(_FENCE_CLOSE.sub("", _FENCE_OPEN.sub("", t)).strip())
+    # 3. The raw text.
+    candidates.append(t)
+    # 4. The first balanced-looking object/array span.
+    span = _JSON_SPAN.search(t)
+    if span:
+        candidates.append(span.group(1))
+    for cand in candidates:
+        for variant in (cand, repair_json_escapes(cand)):
+            try:
+                return json.loads(variant)
+            except json.JSONDecodeError:
+                continue
     raise ValueError(f"JSON parse failed even after escape repair: {text[:300]!r}")
