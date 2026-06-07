@@ -88,6 +88,7 @@ def make_spoke(
     g2_tolerant: bool = False,
     g2_max_unconfirmed: int = 0,
     g2_max_unconfirmed_ratio: float = 0.0,
+    write_report: Callable | None = None,
 ) -> SpokeFn:
     """Build the production SpokeFn that runs the full gated pipeline per paper.
 
@@ -155,6 +156,7 @@ def make_spoke(
                 root=workspace,
                 resolve_analysis=resolve_analysis,
                 g2_gate=_g2,
+                write_report=write_report,
                 cancel=cancel,
             )
 

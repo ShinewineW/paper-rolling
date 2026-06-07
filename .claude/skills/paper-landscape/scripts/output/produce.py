@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.output.ara_schema import validate_ara_tree
+from scripts.output.branch1_llm import write_branch1_llm
 from scripts.output.branch1_report import write_branch1
 from scripts.output.branch2_ara import write_branch2
 from scripts.output.naming import find_existing_entries, vault_key
@@ -92,6 +93,7 @@ def produce_outputs(
     *,
     resolve_analysis: Callable[[Path, Any], dict],
     g2_gate: Callable[[Path], Any] | None = None,
+    write_report: Callable[..., dict] | None = None,
     cancel: threading.Event | None = None,
 ) -> ProduceResult:
     """Produce branch2 + branch1 atomically into the two top-level vaults.
@@ -163,7 +165,13 @@ def produce_outputs(
         # branch1 derives from branch2 and self-gates on the anchor lint;
         # any unanchored empirical claim raises AnchorGateError here. `key` is
         # the shared vault key so branch1 links to the paired ai_package.
-        write_branch1(stage_person, candidate, stage_ai, md_path, analysis, key=key)
+        # With a `write_report` seam, the human report is LLM-written (vivid
+        # Chinese sections + grounded assembly); else the deterministic thin
+        # renderer. Both pass the SAME three-layer anchor hard-gate.
+        if write_report is not None:
+            write_branch1_llm(stage_person, candidate, stage_ai, md_path, write_report, key=key)
+        else:
+            write_branch1(stage_person, candidate, stage_ai, md_path, analysis, key=key)
 
         # B2 / Codex R17: last safe point before any real-vault write. If the
         # per-paper guard already abandoned this spoke (stall budget exceeded), a
