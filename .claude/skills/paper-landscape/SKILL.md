@@ -240,17 +240,23 @@ from scripts.adapters import build_http, build_run_cli, build_discover
 # setup gate. is_ad_domain defaults to True (AD whitelists) when not yet locked.
 campaign = load_campaign(Path("."))
 
-# resolve_analysis / skeptic_votes / rigor_scores / entailment_judge / expand_llm
-# are each an INDEPENDENT Agent-tool invocation — construct per
-# references/wiring-the-seams.md + sub-skills/<role>/SKILL.md.
+# The SIX LLM seams are provider-routed + claude-code-fallback-wrapped; build them
+# from config/llm.yaml via build_seams() (see references/wiring-the-seams.md). Each
+# is an independent provider call (ground-truth isolation preserved). write_report
+# is the human-chain writer — pass it so branch1 produces the RICH LLM report
+# (figures + sections); omit it and branch1 falls back to the thin renderer.
+from scripts.llm.seams import build_seams
+
+seams = build_seams()
 result = run_campaign(
     workspace=".",
-    resolve_analysis=resolve_analysis,
-    skeptic_votes=skeptic_votes,
-    rigor_scores=rigor_scores,
-    entailment_judge=entailment_judge,
+    resolve_analysis=seams["resolve_analysis"],
+    skeptic_votes=seams["skeptic_votes"],
+    rigor_scores=seams["rigor_scores"],
+    entailment_judge=seams["entailment_judge"],
+    write_report=seams["write_report"],  # DEFAULT: rich LLM human chain
     discover=build_discover(
-        llm=expand_llm,
+        llm=seams["expand_llm"],
         is_ad_domain=campaign.is_ad_domain if campaign else True,
         force_include=campaign.force_include if campaign else [],
     ),
@@ -261,7 +267,9 @@ result = run_campaign(
 
 `run_campaign` raises `GateRequired` until `config/campaign.yaml` is locked (the
 campaign Hard Gate above) — establish the campaign once, then a `/loop` tick just
-runs this. The four LLM seams + `expand_llm` are the only things the agent builds.
+runs this. `build_seams()` constructs all six provider-routed LLM seams (analysis,
+skeptic, rigor, entailment, expand, writer); the agent only loads the campaign and
+calls `run_campaign(...)`.
 
 ## Failure handling (中枢-D2)
 

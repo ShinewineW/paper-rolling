@@ -3,7 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from scripts.output.branch1_llm import write_branch1_llm
+from scripts.output.branch1_llm import (
+    _quote_mermaid_labels,
+    _strip_emoji,
+    write_branch1_llm,
+)
 from scripts.output.branch1_report import AnchorGateError
 
 
@@ -107,6 +111,27 @@ def test_write_branch1_llm_embeds_selected_figures(tmp_path: Path) -> None:
     html = (person / "report.html").read_text(encoding="utf-8")
     assert "data:image/jpeg;base64," in html
     assert "background:#ffffff" in html  # light theme
+    assert "mathjax" in html.lower()  # math engine loaded so $$..$$ renders
+
+
+def test_strip_emoji_removes_emoji_keeps_text_and_arrows() -> None:
+    assert _strip_emoji("## 🧠 算法目标与推导") == "## 算法目标与推导"
+    assert _strip_emoji("结果 ✅ 很好") == "结果 很好"
+    assert _strip_emoji("A → B 的流程") == "A → B 的流程"  # plain arrow (U+2192) kept
+    assert _strip_emoji("普通中文文本无表情") == "普通中文文本无表情"
+
+
+def test_quote_mermaid_labels_only_inside_blocks() -> None:
+    md = (
+        "前文 [一个链接](http://x)\n\n"
+        "```mermaid\nflowchart TB\n  a[叠加激活 和>1归一化] --> b[正常]\n```\n"
+        "后文 [另一个链接](http://y)\n"
+    )
+    out = _quote_mermaid_labels(md)
+    assert 'a["叠加激活 和>1归一化"]' in out  # special-char label quoted
+    assert 'b["正常"]' in out
+    assert "[一个链接](http://x)" in out  # prose markdown links untouched
+    assert "[另一个链接](http://y)" in out
 
 
 def test_write_branch1_llm_requires_architecture_figure(tmp_path: Path) -> None:

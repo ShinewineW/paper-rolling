@@ -31,6 +31,41 @@ from scripts.output.figures import Figure, copy_figures, is_architecture_caption
 _NUM = re.compile(r"\d+(?:\.\d+)?")
 _FENCE = re.compile(r"^```")
 
+# Project IRON RULE: NO emoji in ANY report. Strip them (and a trailing space)
+# deterministically in the assembler so style is uniform regardless of the writer
+# model. Targets the emoji/pictograph/dingbat blocks; leaves CJK, math, and plain
+# arrows (→ U+2192, used in prose/diagrams) untouched.
+_EMOJI = re.compile(
+    "[\U0001f1e6-\U0001f1ff\U0001f300-\U0001f5ff\U0001f600-\U0001f64f"
+    "\U0001f680-\U0001f6ff\U0001f700-\U0001f77f\U0001f780-\U0001f7ff"
+    "\U0001f800-\U0001f8ff\U0001f900-\U0001f9ff\U0001fa00-\U0001faff"
+    "\U00002600-\U000026ff\U00002700-\U000027bf\U00002b00-\U00002bff"
+    "\U00002300-\U000023ff\ufe0f\u200d]+[ \t]*"
+)
+# Mermaid 11 rejects unquoted node labels containing special chars (>, +, (), …).
+_MERMAID_LABEL = re.compile(r"\[([^\]\n\"]+)\]")
+
+
+def _strip_emoji(text: str) -> str:
+    """Remove every emoji/pictograph (+ trailing space) — the no-emoji iron rule."""
+    return _EMOJI.sub("", text)
+
+
+def _quote_mermaid_labels(report: str) -> str:
+    """Quote ``[label]`` node/subgraph labels inside ```mermaid blocks so labels
+    with special chars (>, +, parentheses, …) parse under strict mermaid 11."""
+    out: list[str] = []
+    in_mermaid = False
+    for line in report.splitlines():
+        if line.strip().startswith("```"):
+            in_mermaid = line.strip().startswith("```mermaid")
+            out.append(line)
+            continue
+        if in_mermaid:
+            line = _MERMAID_LABEL.sub(lambda m: f'["{m.group(1).strip()}"]', line)
+        out.append(line)
+    return "\n".join(out)
+
 
 def _fig_block(figures: list[Figure], zh: dict[str, str], *, heading: str = "") -> str:
     """Render a group of original figures INLINE: each image followed by an italic
@@ -132,8 +167,13 @@ def _html(title: str, markdown: str, img_dir: Path) -> str:
         "<meta name=viewport content='width=device-width,initial-scale=1'>"
         f"<title>{title} — 深度解读</title>"
         "<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'></script>"
+        "<script>window.MathJax={startup:{typeset:false},"
+        "tex:{inlineMath:[['$','$'],['\\\\(','\\\\)']],displayMath:[['$$','$$'],['\\\\[','\\\\]']]},"
+        "options:{skipHtmlTags:['script','noscript','style','textarea','pre','code']}};</script>"
+        "<script src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>"
         "<script type=module>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';"
-        "mermaid.initialize({startOnLoad:false,theme:'default'});window.__mermaid=mermaid;</script>"
+        "mermaid.initialize({startOnLoad:false,theme:'default',securityLevel:'loose'});"
+        "window.__mermaid=mermaid;</script>"
         "<style>body{background:#ffffff;color:#1f2328;font-family:-apple-system,'Segoe UI',sans-serif;"  # noqa: E501
         "line-height:1.8;max-width:860px;margin:0 auto;padding:3rem 1.5rem}"
         "h1{border-bottom:2px solid #d0d7de;padding-bottom:.3rem}"
@@ -149,11 +189,22 @@ def _html(title: str, markdown: str, img_dir: Path) -> str:
         "td,th{border:1px solid #d0d7de;padding:.4rem .6rem}th{background:#f6f8fa}"
         ".mermaid{background:#f6f8fa;border-radius:8px;padding:1rem;margin:1rem 0}</style></head>"
         "<body><div id=doc></div>"
-        f"<script>const md={md_js};document.getElementById('doc').innerHTML=marked.parse(md);"
-        "document.querySelectorAll('code.language-mermaid').forEach(c=>{"
-        "const d=document.createElement('div');d.className='mermaid';d.textContent=c.textContent;"
+        f"<script>const md={md_js};"
+        # Protect $$..$$ / $..$ from marked (which would mangle \\ and _ in LaTeX),
+        # render markdown, then restore the raw math for MathJax to typeset.
+        "const store=[];"
+        "let src=md.replace(/\\$\\$([\\s\\S]+?)\\$\\$/g,function(m){store.push(m);"
+        "return '@@M'+(store.length-1)+'@@';})"
+        ".replace(/\\$([^\\n$]+?)\\$/g,function(m){store.push(m);"
+        "return '@@M'+(store.length-1)+'@@';});"
+        "let html=marked.parse(src).replace(/@@M(\\d+)@@/g,function(_,i){return store[i];});"
+        "document.getElementById('doc').innerHTML=html;"
+        "document.querySelectorAll('code.language-mermaid').forEach(function(c){"
+        "var d=document.createElement('div');d.className='mermaid';d.textContent=c.textContent;"
         "c.closest('pre').replaceWith(d);});"
-        "window.addEventListener('load',()=>window.__mermaid&&window.__mermaid.run());</script>"
+        "window.addEventListener('load',function(){"
+        "if(window.__mermaid){window.__mermaid.run({suppressErrors:true});}"
+        "if(window.MathJax&&MathJax.typesetPromise){MathJax.typesetPromise();}});</script>"
         "</body></html>"
     )
 
@@ -236,7 +287,9 @@ def write_branch1_llm(
         parts.append("")
         parts.append(_fig_block(leftover, zh, heading="## 其余论文原图"))
 
-    report = _ground_report("\n".join(parts) + "\n", md_text)
+    assembled = _strip_emoji("\n".join(parts) + "\n")  # no-emoji iron rule
+    assembled = _quote_mermaid_labels(assembled)  # make LLM mermaid parse-safe
+    report = _ground_report(assembled, md_text)
     violations = lint_text(report)
     if violations:
         raise AnchorGateError(
