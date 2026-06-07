@@ -27,6 +27,7 @@
 - [`adr/0001-multi-signal-authority-no-citation-gate.md`](adr/0001-multi-signal-authority-no-citation-gate.md) — 多信号 OR 权威排序、不设引用硬门禁。
 - [`adr/0002-extend-on-rule-of-three.md`](adr/0002-extend-on-rule-of-three.md) — rule-of-three 扩展策略；抽象发现源 seam、推迟 tier/branch 框架。
 - [`adr/0003-skill-knowledge-layer-and-shipped-adapters.md`](adr/0003-skill-knowledge-layer-and-shipped-adapters.md) — 技能逻辑分层为知识层（`references/` + `sub-skills/`）+ 出厂确定性 infra 适配器；LLM seam 仍由 agent 注入（含 W1 终判）。
+- [`adr/0004-llm-seam-transport-claude-p-default.md`](adr/0004-llm-seam-transport-claude-p-default.md) — LLM seam = 同步注入 callable；默认传输为锁死的 `claude -p`（订阅鉴权），另留直连 API 适配器；纯会话内 Agent-tool 仅用于交互式 survey，不进强制管线（修订 ADR-0003 决策 #3）。
 
 ### reference/ — 参考来源 provenance
 - [`reference/index.md`](reference/index.md) — 上游仓库清单：3 个 provenance 研究仓库（被借鉴/vendored 的来源）+ 6 个 ≥20k★ 领域基准仓库（自动化读论文/科研，如 MinerU/docling/marker/markitdown/storm/gpt-researcher）。克隆体本地忽略，仅 `index.md` 入库。

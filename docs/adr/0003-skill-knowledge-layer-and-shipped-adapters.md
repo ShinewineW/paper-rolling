@@ -1,6 +1,10 @@
 # 3. The skill's logic is a knowledge layer (references/ + sub-skills/); ship deterministic infra adapters, keep LLM seams agent-provided
 
-- Status: Accepted — 2026-06-07
+- Status: Accepted — 2026-06-07. Decision #3 ("keep the LLM seams
+  agent-provided, never as code") is **narrowed by ADR-0004**: the seam is a
+  synchronous injected callable whose default transport is a locked-down
+  `claude -p` adapter (with a direct-API alternative), so the LLM seams now ship
+  as adapters too. The knowledge layer and the shipped infra adapters below stand.
 
 ## Context
 
