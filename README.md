@@ -114,6 +114,7 @@ scripts/          the engine code (packages below)
 | Module | Purpose |
 |--------|---------|
 | `types.py` | Shared audit vocabulary: `Finding`, `GateVerdict`, `Severity`, `ClaimRecord`, the seam Protocols. |
+| `ara_tree.py` | Canonical read layer over a paper's `ara/` tree (claim registry, dir lookup); shared by G2 + G3 (ADR-0002). |
 | `g2_data_fidelity.py` | G2 data-fidelity gate (number/claim fidelity, multi-vote skeptic, hard-block on fabrication). |
 | `g3_seal.py` | G3 seal: branch1↔MD anchors + equation fidelity + type-aware entailment + 6-dim rigor. |
 | `equation_fidelity.py` | Mechanical equation-block count check (no LLM). |

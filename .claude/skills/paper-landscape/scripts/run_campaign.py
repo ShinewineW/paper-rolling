@@ -162,7 +162,7 @@ branch1 -> G3 -> landscapes), with the adversarial guarantees (G2 number-
 fabrication hard-block + G3 6-dim seal) baked into code.
 
 The runtime agent (the /paper-landscape skill or the daily /loop tick) MUST call
-run_campaign(...) and supply EIGHT injected callables — it cannot be invoked
+run_campaign(...) and supply SEVEN injected callables — it cannot be invoked
 blindly from the shell:
 
   discover           — the discovery layer (topic, n) -> ranked candidate pool

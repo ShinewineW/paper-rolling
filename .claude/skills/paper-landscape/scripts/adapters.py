@@ -1,7 +1,7 @@
 # .claude/skills/paper-landscape/scripts/adapters.py
 """Default deterministic infra adapters — the "just works" wiring (READY).
 
-`run_campaign(...)` takes EIGHT injected callables. Four are LLM seams that MUST
+`run_campaign(...)` takes SEVEN injected callables. Four are LLM seams that MUST
 be independent Agent-tool invocations and therefore can only be supplied by the
 runtime agent (see ``references/wiring-the-seams.md``). The other THREE are pure
 deterministic I/O:
