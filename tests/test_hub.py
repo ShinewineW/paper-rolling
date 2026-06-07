@@ -155,6 +155,73 @@ def test_force_include_all_attempted_even_above_n(tmp_path: Path):
     assert res.done_count == 3
 
 
+def test_force_include_already_done_does_not_inflate_target(tmp_path: Path):
+    # f0 is forced but already in the skip-set (processed a prior tick). The hub
+    # must count only NOT-done forced when bumping n_target, so a done forced
+    # paper does not pull extra discovered backfill. With n_target=1 and one
+    # pending forced (f1), exactly one paper is attempted — f1, the un-skipped
+    # forced — and the discovered spares (d0/d1) are not touched.
+    ledger = FakeLedger(skip={"f0"})
+    pool = [
+        {**_candidate("f0"), "forced": True},
+        {**_candidate("f1"), "forced": True},
+        _candidate("d0"),
+        _candidate("d1"),
+    ]
+    attempted: list[str] = []
+
+    def spoke(cand: dict) -> SpokeResult:
+        attempted.append(cand["key"])
+        return _ok(cand)
+
+    res = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=1,
+        ledger=ledger,
+        discover=lambda topic, n_target: pool,
+        spoke=spoke,
+        max_concurrent=2,
+    )
+    assert attempted == ["f1"]  # f0 skipped (done), target not inflated past 1
+    assert res.done_count == 1
+
+
+def test_force_include_failure_backfills_from_discovery(tmp_path: Path):
+    # 中枢-D1/D2 interaction (pins the intended budget semantics): with n_target=1
+    # and 2 pending forced, the hub bumps the target to 2 (attempt all forced). f0
+    # FAILS ingest (forced ≠ gate-exempt) and is quarantined; the tick then
+    # backfills from the discovered spares to reach the bumped target of 2 — so a
+    # failed forced paper costs one discovered slot, it does not silently shrink N.
+    ledger = FakeLedger()
+    pool = [
+        {**_candidate("f0"), "forced": True},
+        {**_candidate("f1"), "forced": True},
+        _candidate("d0"),
+        _candidate("d1"),
+    ]
+    attempted: list[str] = []
+
+    def spoke(cand: dict) -> SpokeResult:
+        attempted.append(cand["key"])
+        return _fail(cand) if cand["key"] == "f0" else _ok(cand)
+
+    res = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=1,
+        ledger=ledger,
+        discover=lambda topic, n_target: pool,
+        spoke=spoke,
+        max_concurrent=2,
+    )
+    assert "f0" in attempted and "f1" in attempted  # both forced attempted
+    assert "d0" in attempted  # discovery backfilled the failed forced slot
+    assert "d1" not in attempted  # bumped target (2) met — no over-pull past it
+    assert {r["key"] for r in ledger.records if r["status"] == "failed"} == {"f0"}
+    assert res.done_count == 2  # f1 + d0
+
+
 def test_skip_set_papers_not_reprocessed(tmp_path: Path):
     # p0 already done in the ledger skip-set → never dispatched this tick.
     ledger = FakeLedger(skip={"p0"})

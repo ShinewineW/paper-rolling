@@ -550,6 +550,30 @@ def test_spoke_g2_block_aborts_before_any_vault(tmp_path, fake_http, fake_cli):
     assert any((tmp_path / "_failed").glob("*.md"))
 
 
+def test_spoke_forced_candidate_still_g2_blocked(tmp_path, fake_http, fake_cli):
+    # 中枢-D1 invariant: a force-included paper is mandatory to ATTEMPT, NOT exempt
+    # from the quality gates. A forced candidate carrying a fabricated number must
+    # be G2 hard-blocked exactly like a discovered one — the spoke never branches
+    # on `forced`, so it quarantines instead of polluting the vaults.
+    forced = {**_CANDIDATE, "forced": True, "discovery_sources": ["forced"]}
+    _tier2_http(fake_http, dict(forced))
+    spoke = _make_spoke(
+        tmp_path,
+        fake_http,
+        fake_cli,
+        analysis_md=_SOURCE_MD,
+        skeptic_votes=_skeptic_missing("0.61"),
+    )
+
+    result = spoke(dict(forced))
+
+    assert result.status == "failed"
+    assert result.failure_class == FAILURE_AUDIT_BLOCK
+    assert "G2" in result.failure_reason
+    assert result.person_vault_path is None
+    assert result.ai_package_path is None
+
+
 # --- G3 SEAL FAIL (post-promotion cleanup) ---------------------------------
 
 

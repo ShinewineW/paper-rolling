@@ -39,23 +39,31 @@ def _validate_n(n_per_tick: int) -> int:
     return n_per_tick
 
 
-# A force-included paper is identified by at least one of these — the engine
-# needs one to fetch + ingest it (arxiv_id, a direct PDF URL, or a DOI).
-_FORCE_ID_KEYS = ("arxiv_id", "oa_pdf_url", "doi")
+# A force-included paper needs (1) an INGESTIBLE source the engine can actually
+# fetch — an arXiv id (HTML/PDF) or a direct PDF URL; a bare DOI is NOT ingestible
+# (there is no DOI->PDF resolver) — AND (2) a distinct IDENTITY so two entries
+# never collide into one corpus dir / ledger key (中枢-D1; a doi still helps dedup
+# but cannot stand alone, and an oa_pdf_url-only entry must add a title).
+_INGESTIBLE_KEYS = ("arxiv_id", "oa_pdf_url")
+_IDENTITY_KEYS = ("arxiv_id", "doi", "title")
 
 
 def _validate_force_include(entries: list) -> list:
-    """Each force-include entry must be a dict carrying at least one identifier
-    the engine can ingest by (中枢-D1: confirmed at the Hard Gate)."""
+    """Validate each force-include entry (中枢-D1: confirmed at the Hard Gate)."""
     if not isinstance(entries, list):
         raise GateError(f"force_include must be a list, got {type(entries).__name__}")
     for i, e in enumerate(entries):
         if not isinstance(e, dict):
             raise GateError(f"force_include[{i}] must be a dict, got {type(e).__name__}")
-        if not any(e.get(k) for k in _FORCE_ID_KEYS):
+        if not any(e.get(k) for k in _INGESTIBLE_KEYS):
             raise GateError(
-                f"force_include[{i}] needs at least one identifier "
-                f"({'/'.join(_FORCE_ID_KEYS)}) so the engine can ingest it"
+                f"force_include[{i}] needs an ingestible source — arxiv_id or "
+                f"oa_pdf_url (a bare DOI cannot be fetched)"
+            )
+        if not any(e.get(k) for k in _IDENTITY_KEYS):
+            raise GateError(
+                f"force_include[{i}] needs a distinct identity — arxiv_id, doi, or "
+                f"title (an oa_pdf_url-only entry must add a title to avoid collisions)"
             )
     return entries
 

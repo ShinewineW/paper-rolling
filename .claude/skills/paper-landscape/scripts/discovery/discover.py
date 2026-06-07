@@ -149,13 +149,21 @@ def discover(
         return scored[:cap]
     # Force-include (中枢-D1): mandatory papers sit at the FRONT of the pool
     # (processed first) and BYPASS the authority filter — force-include is
-    # mandatory, not signal-authoritative. Dedup any that discovery also found so
-    # they are not doubled. They still go through ingest + G2/G3 downstream.
-    forced_ids: set[tuple[str, str]] = set()
-    for f in forced:
-        forced_ids |= _identity_tokens(f)
-    deduped = [c for c in scored if not (_identity_tokens(c) & forced_ids)]
-    return forced + deduped[:cap]
+    # mandatory, not signal-authoritative. They still go through ingest + G2/G3.
+    # If discovery ALSO found a forced paper, MERGE discovery's ingest-enabling
+    # metadata (oa_pdf_url / version / real title / venue) into the forced entry —
+    # then drop the discovered duplicate so the enriched forced version wins once.
+    kept: list[dict[str, Any]] = []
+    for c in scored:
+        c_tokens = _identity_tokens(c)
+        match = next((f for f in forced if _identity_tokens(f) & c_tokens), None)
+        if match is None:
+            kept.append(c)
+            continue
+        for k in ("oa_pdf_url", "arxiv_id", "arxiv_version", "doi", "title", "venue", "year"):
+            if not match.get(k) and c.get(k):
+                match[k] = c[k]
+    return forced + kept[:cap]
 
 
 def _project(cand: dict[str, Any]) -> dict[str, Any]:
@@ -180,6 +188,9 @@ def _identity_tokens(cand: dict[str, Any]) -> set[tuple[str, str]]:
     doi = cand.get("doi")
     if doi:
         toks.add(("doi", str(doi).strip().lower()))
+    url = cand.get("oa_pdf_url")
+    if url:
+        toks.add(("url", str(url).strip()))
     title = cand.get("title")
     if title:
         toks.add(("title", " ".join(str(title).lower().split())))
@@ -203,7 +214,10 @@ def _build_forced(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         cand["authority_signals"] = {"forced": True}
         cand["authority_score"] = 0.0
         if not cand.get("title"):
-            cand["title"] = cand.get("arxiv_id") or cand.get("doi") or "forced-paper"
+            # Validation requires an identity (arxiv_id / doi / title); fall back
+            # to a UNIQUE id (never a shared sentinel) so two title-less entries
+            # cannot collapse into one identity / corpus dir / ledger key.
+            cand["title"] = cand.get("arxiv_id") or cand.get("doi") or cand.get("oa_pdf_url")
         forced.append(cand)
     return forced
 

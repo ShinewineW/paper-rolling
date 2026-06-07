@@ -127,13 +127,27 @@ not a gate) is documented in `OpenAlexSource.search`.
 ## Force-include (中枢-D1): mandatory papers
 
 `campaign_config["force_include"]` is a list of papers the user requires regardless
-of discovery. `_build_forced` projects each (preserving `arxiv_id` / `oa_pdf_url` /
-`doi` / `title`, marking `forced=True` + `discovery_sources=["forced"]`) and
-`discover()` **prepends** them to the pool, **bypassing the authority any-signal
-filter** — force-include is mandatory, not signal-authoritative. They are deduped
-against discovery by `_identity_tokens` (version-stripped arXiv id / lowercased DOI
-/ normalized title), so a forced paper discovery also found appears once. The hub
-raises `n_target` to `max(N, forced_count)` so every forced paper is **attempted**
-this tick — but they still pass through ingest + G2 + G3 (mandatory ≠ gate-exempt);
-a forced paper with no ingestible source quarantines like any failed ingest. Wired
-via `build_discover(force_include=CampaignConfig.force_include)`.
+of discovery. Each entry is validated at the Hard Gate (`campaign._validate_force_include`)
+on **two axes** — it must carry (1) an *ingestible source* the engine can fetch
+(`arxiv_id` or `oa_pdf_url`; a bare `doi` is rejected — there is no DOI→PDF resolver)
+and (2) a *distinct identity* (`arxiv_id` / `doi` / `title`; an `oa_pdf_url`-only
+entry must add a `title` so two entries can't collapse into one corpus dir / ledger
+key). `_build_forced` projects each (marking `forced=True` +
+`discovery_sources=["forced"]`; a title-less entry falls back to a *unique* id —
+`arxiv_id` → `doi` → `oa_pdf_url` — never a shared sentinel) and `discover()`
+**prepends** them to the pool, **bypassing the authority any-signal filter** —
+force-include is mandatory, not signal-authoritative.
+
+They are deduped against discovery by `_identity_tokens` (version-stripped arXiv id
+/ lowercased DOI / `oa_pdf_url` / normalized title): a forced paper discovery also
+found appears once, and discovery's ingest-enabling metadata (`oa_pdf_url`,
+`arxiv_version`, `doi`, real `title`, `venue`, `year`) is **merged into** the forced
+entry (filling only fields the forced entry lacks) before the discovered duplicate
+is dropped — so the enriched forced version wins.
+
+The hub raises `n_target` to `max(N, forced_pending)` — where `forced_pending`
+counts only forced papers **not already in the ledger skip-set** — so every
+not-yet-done forced paper is **attempted** this tick without a done forced paper
+inflating the discovered backfill. Forced papers still pass through ingest + G2 + G3
+(mandatory ≠ gate-exempt); one whose ingest fails quarantines like any failed
+ingest. Wired via `build_discover(force_include=CampaignConfig.force_include)`.

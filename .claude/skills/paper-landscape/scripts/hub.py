@@ -281,16 +281,18 @@ def run_tick(
     re-fires it.
     """
     pool = discover(topic, n_target)
-    # Force-include (中枢-D1): every force-included paper must be ATTEMPTED this
-    # tick, so raise the target to cover them all even if there are more forced
-    # papers than the per-tick N. They sit at the front of the pool; ledger-done
-    # ones are skipped below like any other.
-    n_target = max(n_target, sum(1 for c in pool if c.get("forced")))
     skip = ledger.skip_set()
     for c in pool:
         c.setdefault(
             "key", _candidate_key(c)
         )  # Round 2 F7: hub derives + attaches key (discovery does not emit it)
+    # Force-include (中枢-D1): every NOT-already-done force-included paper must be
+    # ATTEMPTED this tick, so raise the target to cover them even if there are more
+    # forced papers than the per-tick N. They sit at the front of the pool. Count
+    # only un-skipped forced so already-done forced papers don't inflate the
+    # discovered backfill.
+    forced_pending = sum(1 for c in pool if c.get("forced") and c["key"] not in skip)
+    n_target = max(n_target, forced_pending)
     queue = [c for c in pool if c["key"] not in skip]
 
     stall_seconds = watchdog.stall_seconds if watchdog is not None else None

@@ -57,12 +57,17 @@ must-include papers), then lock them into `config/campaign.yaml`:
 2. **N per tick** — the explicit number of papers to *successfully* process per
    `/loop` tick (the cost/disk ceiling). No number → no go.
 3. **force_include** (optional) — papers the user says MUST be processed, not left
-   to autonomous discovery. Each entry is a dict with at least one identifier
-   (`arxiv_id` / `oa_pdf_url` / `doi`) + ideally a `title`. They are prepended to
-   the pool, **bypass the authority filter**, dedup against discovery, and are all
-   attempted this tick — but still go through ingest + G2 + G3 (mandatory ≠ exempt
-   from quality gates). A force-included paper with no ingestible source (no arXiv
-   HTML/PDF) will quarantine like any other failed ingest.
+   to autonomous discovery. Each entry is a dict that needs **two** things and the
+   gate rejects it (`GateError`) if either is missing: (a) an **ingestible source**
+   the engine can actually fetch — an `arxiv_id` (HTML/PDF) or a direct `oa_pdf_url`
+   (a bare `doi` is NOT ingestible — there is no DOI→PDF resolver), and (b) a
+   **distinct identity** — `arxiv_id`, `doi`, or `title` (a `oa_pdf_url`-only entry
+   must add a `title` so two entries can't collide into one corpus dir / ledger
+   key). They are prepended to the pool, **bypass the authority filter**, and are
+   all attempted this tick — but still go through ingest + G2 + G3 (mandatory ≠
+   exempt from quality gates). If discovery independently finds a forced paper, the
+   two are deduped to ONE entry and discovery's ingest metadata (PDF URL, venue,
+   year) is **merged into** the forced entry.
 
 ```bash
 # Establish the campaign (run once, human present). force_include is optional:
@@ -223,8 +228,17 @@ infra plumbing ships; the runtime only constructs the LLM seams, then calls
 `run_campaign(...)`. Run with `PYTHONPATH=.claude/skills/paper-landscape`:
 
 ```python
+from pathlib import Path
+from scripts.campaign import load_campaign
 from scripts.run_campaign import run_campaign
 from scripts.adapters import build_http, build_run_cli, build_discover
+
+# Load the LOCKED campaign so is_ad_domain + force_include come from
+# config/campaign.yaml — NEVER hardcode them here (that silently drops the
+# Hard-Gate decision). load_campaign returns None until the campaign is locked;
+# run_campaign then raises GateRequired, which the harness turns into the HITL
+# setup gate. is_ad_domain defaults to True (AD whitelists) when not yet locked.
+campaign = load_campaign(Path("."))
 
 # resolve_analysis / skeptic_votes / rigor_scores / entailment_judge / expand_llm
 # are each an INDEPENDENT Agent-tool invocation — construct per
@@ -235,7 +249,11 @@ result = run_campaign(
     skeptic_votes=skeptic_votes,
     rigor_scores=rigor_scores,
     entailment_judge=entailment_judge,
-    discover=build_discover(llm=expand_llm, is_ad_domain=True, force_include=[]),  # is_ad_domain + force_include from campaign.yaml
+    discover=build_discover(
+        llm=expand_llm,
+        is_ad_domain=campaign.is_ad_domain if campaign else True,
+        force_include=campaign.force_include if campaign else [],
+    ),
     http=build_http(),
     run_cli=build_run_cli(),
 )

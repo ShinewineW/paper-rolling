@@ -27,11 +27,17 @@ n_per_tick: 5
 is_ad_domain: true
 
 # Optional: papers that MUST be processed (中枢-D1), beyond autonomous discovery.
-# Each entry needs >=1 identifier (arxiv_id / oa_pdf_url / doi) + ideally a title.
-# They are prepended to the pool, bypass the authority filter, dedup vs discovery,
-# and are all attempted this tick — but still go through ingest + G2 + G3.
+# Each entry needs BOTH (the Hard Gate rejects it otherwise):
+#   1. an ingestible source the engine can fetch — arxiv_id OR oa_pdf_url
+#      (a bare doi is NOT ingestible: there is no DOI->PDF resolver), and
+#   2. a distinct identity — arxiv_id / doi / title (an oa_pdf_url-only entry must
+#      add a title so two entries can't collide into one corpus dir / ledger key).
+# They are prepended to the pool, bypass the authority filter, dedup vs discovery
+# (discovery's PDF URL / venue / year are merged into the forced entry), and are
+# all attempted this tick — but still go through ingest + G2 + G3.
 force_include: []
 #   - {arxiv_id: "2401.00001", title: "A must-include paper"}
+#   - {oa_pdf_url: "https://example.org/paper.pdf", title: "Direct-PDF paper"}
 
 # --- discovery policy ---
 # 中枢-D5a / 吸收-D6: strict = preprints excluded from the authoritative set,

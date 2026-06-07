@@ -82,6 +82,68 @@ def test_force_include_dedup_no_duplicate_arxiv():
     assert hits[0].get("forced") is True
 
 
+def test_force_include_dedup_by_doi():
+    # discovery surfaces the same paper keyed by DOI (no arXiv id) -> match on the
+    # doi identity token, so it still appears ONCE with the forced entry winning.
+    disc = {"doi": "10.1/abc", "title": "Disc", "venue": "ICML", "year": 2025}
+    cfg = _cfg(force_include=[{"arxiv_id": "2401.00001", "doi": "10.1/ABC", "title": "Forced"}])
+    pool = discover(cfg, _sources(openalex=[disc]), _llm)
+    assert len(pool) == 1
+    assert pool[0]["forced"] is True
+
+
+def test_force_include_dedup_by_oa_pdf_url():
+    # same direct-PDF URL on both sides -> deduped via the url identity token.
+    url = "https://example.org/paper.pdf"
+    disc = {"oa_pdf_url": url, "title": "Disc", "venue": "ICLR", "year": 2025}
+    cfg = _cfg(force_include=[{"oa_pdf_url": url, "title": "Forced"}])
+    pool = discover(cfg, _sources(openalex=[disc]), _llm)
+    assert len(pool) == 1
+    assert pool[0]["forced"] is True
+
+
+def test_force_include_dedup_by_title():
+    # discovery surfaces the same paper matched by normalized TITLE alone (no shared
+    # arXiv id / DOI / URL) -> still deduped to one entry, forced winning.
+    disc = {"arxiv_id": "2403.55555", "title": "Shared  Title", "venue": "CVPR", "year": 2025}
+    cfg = _cfg(force_include=[{"oa_pdf_url": "https://x/p.pdf", "title": "shared title"}])
+    pool = discover(cfg, _sources(openalex=[disc]), _llm)
+    assert len(pool) == 1
+    assert pool[0]["forced"] is True
+
+
+def test_force_include_enriched_by_discovery():
+    # STRUCTURAL fix: when discovery also finds a forced paper, its ingest-enabling
+    # metadata (oa_pdf_url / venue / year) is MERGED into the forced entry instead
+    # of being discarded — the forced entry keeps its identity but gains the PDF URL.
+    disc = {
+        "arxiv_id": "2401.00001",
+        "title": "Disc",
+        "venue": "NeurIPS",
+        "year": 2025,
+        "oa_pdf_url": "https://example.org/found.pdf",
+    }
+    cfg = _cfg(force_include=[{"arxiv_id": "2401.00001", "title": "Forced"}])
+    pool = discover(cfg, _sources(openalex=[disc]), _llm)
+    assert len(pool) == 1
+    f = pool[0]
+    assert f["forced"] is True
+    assert f["title"] == "Forced"  # forced identity wins
+    assert f["oa_pdf_url"] == "https://example.org/found.pdf"  # discovery merged in
+    assert f["venue"] == "NeurIPS"
+    assert f["year"] == 2025
+
+
+def test_distinct_forced_papers_do_not_collapse():
+    # Two title-less forced entries with DIFFERENT arXiv ids must stay TWO papers
+    # (the title fallback is a unique id, never a shared sentinel that would
+    # collapse them into one corpus dir / ledger key).
+    cfg = _cfg(force_include=[{"arxiv_id": "2401.00001"}, {"arxiv_id": "2402.00002"}])
+    pool = discover(cfg, _sources(), _llm)
+    assert len(pool) == 2
+    assert {c["title"] for c in pool} == {"2401.00001", "2402.00002"}
+
+
 def test_no_force_include_returns_plain_pool():
     pool = discover(_cfg(), _sources(), _llm)  # no force_include key at all
     assert pool == []
@@ -118,11 +180,38 @@ def test_campaign_force_include_defaults_empty():
     assert cfg.force_include == []
 
 
-def test_campaign_force_include_requires_an_identifier():
-    with pytest.raises(GateError):
-        CampaignConfig(
-            topic="world models for planning",
-            n_per_tick=5,
-            is_ad_domain=False,
-            force_include=[{"title": "no identifier here"}],
-        )
+def _force_cfg(force_include):
+    return CampaignConfig(
+        topic="world models for planning",
+        n_per_tick=5,
+        is_ad_domain=False,
+        force_include=force_include,
+    )
+
+
+def test_force_include_title_only_rejected_no_ingestible_source():
+    # A title alone gives identity but NO ingestible source (no arXiv id / PDF URL)
+    # — the engine cannot fetch it, so the Hard Gate rejects it rather than letting
+    # it silently quarantine every tick.
+    with pytest.raises(GateError, match="ingestible source"):
+        _force_cfg([{"title": "no fetchable source here"}])
+
+
+def test_force_include_doi_only_rejected_no_ingestible_source():
+    # A bare DOI is NOT ingestible (there is no DOI->PDF resolver in the pipeline),
+    # so a doi-only entry is rejected at the gate — not accepted then quarantined.
+    with pytest.raises(GateError, match="ingestible source"):
+        _force_cfg([{"doi": "10.1/abc"}])
+
+
+def test_force_include_url_only_rejected_no_identity():
+    # An oa_pdf_url is ingestible but carries no stable identity; without a title
+    # two url-only entries could collide into one corpus dir / ledger key, so a
+    # url-only entry must add a title.
+    with pytest.raises(GateError, match="distinct identity"):
+        _force_cfg([{"oa_pdf_url": "https://example.org/p.pdf"}])
+
+
+def test_force_include_url_with_title_accepted():
+    cfg = _force_cfg([{"oa_pdf_url": "https://example.org/p.pdf", "title": "T"}])
+    assert cfg.force_include == [{"oa_pdf_url": "https://example.org/p.pdf", "title": "T"}]
