@@ -289,11 +289,13 @@ def write_branch2(ara_dir: Path, candidate: Any, analysis: dict) -> None:
         _w(ara_dir / f"evidence/tables/{t['name']}.md", _evidence_table_md(t))
     _w(ara_dir / "evidence/README.md", _evidence_readme(analysis["evidence_tables"]))
 
-    # Shallow code analysis → pointer (clone deleted inside, 分析-D2).
+    # Shallow code analysis → pointer (clone deleted inside, 分析-D2). Use .get():
+    # discovered papers may carry no github_repo / arxiv_id key (closed-source or
+    # DOI-only) — None -> a "_not found_" code_ref, never a KeyError crash.
     build_code_ref(
-        github_repo=candidate["github_repo"],
+        github_repo=candidate.get("github_repo"),
         innovations=[Innovation(name=i["name"], grep=i["grep"]) for i in analysis["innovations"]],
         out_path=ara_dir / "src/code_ref.md",
         clone_root=Path("/tmp/paper-repos"),
-        idbase=candidate["arxiv_id"],
+        idbase=candidate.get("arxiv_id") or candidate.get("doi") or "repo",
     )
