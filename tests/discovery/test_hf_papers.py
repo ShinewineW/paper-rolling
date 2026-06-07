@@ -32,16 +32,15 @@ HF_RESULTS = [
 
 
 def test_token_constant_present():
-    # The HF token constant exists and is a non-empty string (D-发现-4); by
-    # default it is the placeholder, replaced via HF_TOKEN env or in source.
+    # The HF token constant exists and is a non-empty string (D-发现-4); it is a
+    # hardcoded read-only token (owner exemption), overridable via HF_TOKEN env.
     assert isinstance(HF_READONLY_TOKEN, str)
     assert HF_READONLY_TOKEN  # non-empty
 
 
-def test_search_is_anonymous_when_token_is_placeholder(monkeypatch):
-    # With no HF_TOKEN env and the shipped placeholder constant, the request goes
-    # out ANONYMOUSLY — no Authorization header (Codex Round-23). The placeholder
-    # must never be sent as a bearer (it would 401 instead of falling back).
+def test_search_sends_bearer_for_hardcoded_token(monkeypatch):
+    # No HF_TOKEN env -> the hardcoded read-only token (D-发现-4) is sent as the
+    # bearer, so HF Papers authenticates self-contained.
     monkeypatch.delenv("HF_TOKEN", raising=False)
     client = StubClient([HF_RESULTS])
     src = HFPapersSource(client)
@@ -49,6 +48,19 @@ def test_search_is_anonymous_when_token_is_placeholder(monkeypatch):
     url, q, headers = client.calls[0]
     assert url.endswith("/api/papers/search")
     assert q["q"] == "end-to-end driving"
+    assert headers.get("Authorization") == f"Bearer {HF_READONLY_TOKEN}"
+
+
+def test_search_is_anonymous_when_reset_to_placeholder(monkeypatch):
+    # Safety: if the constant is reset to the placeholder sentinel and no env token
+    # is set, the request goes out ANONYMOUSLY — the placeholder is never sent as a
+    # bearer (it would 401 instead of falling back to anonymous).
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    monkeypatch.setattr(hf_papers, "HF_READONLY_TOKEN", hf_papers._PLACEHOLDER_TOKEN)
+    client = StubClient([HF_RESULTS])
+    src = HFPapersSource(client)
+    list(src.search("q", max_results=10))
+    _url, _q, headers = client.calls[0]
     assert "Authorization" not in headers
 
 
@@ -76,10 +88,10 @@ def test_candidate_extracts_github_keywords_upvotes():
     assert cand["discovery_sources"] == ["hf_papers"]
 
 
-def test_source_documents_placeholder_and_anonymous_fallback():
+def test_source_documents_hardcode_exemption_and_anonymous_fallback():
     import inspect
 
     src_text = inspect.getsource(hf_papers).lower()
-    assert "placeholder" in src_text
-    assert "anonymous" in src_text
-    assert "read-only" in src_text  # the upgrade path is a fine-grained read-only token
+    assert "read-only" in src_text  # the hardcoded token's scope
+    assert "exemption" in src_text  # the owner-granted security.md exemption
+    assert "anonymous" in src_text  # the placeholder-sentinel fallback

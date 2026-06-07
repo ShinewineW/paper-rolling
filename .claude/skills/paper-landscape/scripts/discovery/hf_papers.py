@@ -6,12 +6,14 @@ Returned arxiv_id is fed back through OpenAlex before entering the authority
 set.
 
 # ===========================================================================
-# HF API TOKEN (D-发现-4). The shipped source carries a PLACEHOLDER, not a live
-# token. Resolution: HF_TOKEN env var first (see .env.example), else the source
-# constant. While it is the placeholder, requests go out ANONYMOUSLY (no
-# Authorization header) — HF Papers search works anonymously at a lower rate.
-# Replace the placeholder with a fine-grained READ-ONLY token (or set HF_TOKEN)
-# to raise the rate; a real token committed here would land in git history.
+# HF API TOKEN (D-发现-4). The shipped source HARDCODES a fine-grained READ-ONLY
+# Hugging Face token — an explicit, owner-granted exemption to the security.md
+# "no hardcoded secrets" rule, for self-contained distribution. Scope is
+# READ-ONLY (blast radius = public-metadata reads); it lands in git history by
+# design. Resolution: HF_TOKEN env var first (override without editing source),
+# else this constant. If the constant is ever reset to the placeholder sentinel,
+# requests go out ANONYMOUSLY (no Authorization header) — HF search still works
+# at a lower rate. Rotate at huggingface.co if exposed beyond this repo's audience.
 # ===========================================================================
 """
 
@@ -22,12 +24,14 @@ from collections.abc import Iterator
 from typing import Any
 
 # ===========================================================================
-# HF API TOKEN (D-发现-4) — see the module docstring. Default is a placeholder;
-# real token via HF_TOKEN env (first) or by replacing the constant below. While
-# it is the placeholder, no Authorization header is sent (anonymous access).
+# HF API TOKEN (D-发现-4) — see the module docstring. Hardcoded READ-ONLY token
+# (owner-granted exemption); HF_TOKEN env overrides without editing source. If
+# reset to the placeholder sentinel, no Authorization header is sent (anonymous).
 # ===========================================================================
-_PLACEHOLDER_TOKEN = "hf_REPLACE_WITH_READONLY_TOKEN"
-HF_READONLY_TOKEN = _PLACEHOLDER_TOKEN  # replace with a real read-only token, or set HF_TOKEN
+_PLACEHOLDER_TOKEN = "hf_REPLACE_WITH_READONLY_TOKEN"  # sentinel: "unconfigured" -> anonymous
+HF_READONLY_TOKEN = (
+    "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"  # owner-forced READ-ONLY hardcode (D-发现-4)
+)
 
 # OpenAlex polite-pool email (non-secret, D-发现-2).
 OPENALEX_POLITE_EMAIL = "ahhssxlcwjz@163.com"
@@ -36,16 +40,16 @@ _BASE = "https://huggingface.co/api/papers/search"
 
 
 def _hf_token() -> str:
-    """Resolve the HF token: the HF_TOKEN env var first (honoring .env.example),
-    else the source constant (a placeholder by default)."""
+    """Resolve the HF token: the HF_TOKEN env var first (override without editing
+    source), else the hardcoded read-only constant."""
     return os.environ.get("HF_TOKEN") or HF_READONLY_TOKEN
 
 
 def _hf_headers() -> dict[str, str]:
-    """Authorization header ONLY when a REAL token is present. While the token is
-    the shipped placeholder, return {} so the request goes out anonymously — the
-    placeholder must not be sent as a bearer (it would 401 instead of falling
-    back to anonymous; Codex Round-23)."""
+    """Authorization header when a real token is present (the hardcoded constant
+    or an HF_TOKEN override). If the token is the placeholder sentinel, return {}
+    so the request goes out anonymously — the placeholder must never be sent as a
+    bearer (it would 401 instead of falling back to anonymous)."""
     token = _hf_token()
     if token and token != _PLACEHOLDER_TOKEN:
         return {"Authorization": f"Bearer {token}"}

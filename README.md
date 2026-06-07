@@ -70,7 +70,7 @@ scripts/          the engine code (packages below)
 | `openalex.py` | OpenAlex source (uses the polite-pool `mailto`, D-发现-2). |
 | `s2.py` | Semantic Scholar source. |
 | `arxiv_src.py` | arXiv source (category-restricted). |
-| `hf_papers.py` | Hugging Face Papers source (placeholder HF token; `HF_TOKEN` env or anonymous fallback, D-发现-4). |
+| `hf_papers.py` | Hugging Face Papers source (hardcoded read-only HF token, owner exemption; `HF_TOKEN` env overrides, D-发现-4). |
 | `dblp.py` | DBLP venue-authority source (`venue_for_title`) — enrichment, feeds the S2 venue signal. |
 | `authority.py` | Multi-signal OR authority scorer (ADR-0001): S1 cite / S2 venue / S3 institution / S4 heat. |
 | `dedup.py` | Cross-source dedup + field merge (D-发现-7). |
@@ -233,11 +233,12 @@ model seams" documents the exact input/output shape of each:
   venv. CPU backend (`-b pipeline`); first run downloads multi-GB model weights.
 - **OpenAlex polite pool**: a non-secret `mailto` email (D-发现-2) lifts the rate
   limit. Configured via the OpenAlex source's `polite_email`.
-- **Hugging Face Papers**: the source ships a **placeholder** HF token
-  (`HF_READONLY_TOKEN` in `scripts/discovery/hf_papers.py`, D-发现-4). Set
-  `HF_TOKEN` (env, read first) or replace the placeholder with a fine-grained
-  READ-ONLY token to raise the rate; with the placeholder unchanged, HF requests
-  go out **anonymously** (no Authorization header).
+- **Hugging Face Papers**: the source **hardcodes a fine-grained READ-ONLY HF
+  token** (`HF_READONLY_TOKEN` in `scripts/discovery/hf_papers.py`, D-发现-4) — an
+  owner-granted exemption to the no-hardcoded-secrets rule, for self-contained
+  distribution; it lands in git history (read-only scope → public-metadata reads).
+  `HF_TOKEN` (env) overrides it without editing source; if the constant is reset
+  to the placeholder sentinel, HF requests fall back to **anonymous**.
 - **API sources**: OpenAlex, Semantic Scholar, arXiv, DBLP, HF Papers — all reached
   through the shared throttled HTTP client (polite pacing).
 
