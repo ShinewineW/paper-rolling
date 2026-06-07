@@ -62,6 +62,19 @@ FAILURE_AUDIT_BLOCK = "audit_block"  # G2/G3 hard block, N rounds unmet
 FAILURE_STALLED = "stalled"  # spoke exceeded the wall-clock budget or crashed (中枢-D2)
 
 
+class EngineAbort(RuntimeError):
+    """FATAL, tick-aborting: a seam's primary provider AND the bottom-line
+    claude-code fallback both failed (raised by scripts/llm FallbackProvider).
+
+    Defined here (a dependency-light, LLM-agnostic module) so the hub can
+    recognize it and ABORT the whole tick WITHOUT importing the LLM transport
+    layer. Unlike a per-paper failure (中枢-D2 isolation → quarantine + backfill),
+    this is a total-transport outage: continuing would silently degrade or emit
+    empty knowledge artifacts, so the engine must stop. The per-paper guard
+    RE-RAISES it instead of swallowing it.
+    """
+
+
 def repo_root() -> Path:
     """Return the paper-rolling repo root (used by the scaffold/campaign tests).
 

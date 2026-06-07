@@ -1,59 +1,70 @@
-# config/llm.yaml — per-seam LLM provider routing.
+# config/llm.yaml — per-seam LLM routing + execution mode.
 #
-# OPTIONAL: delete this file to route EVERY seam to the default `claude -p`.
-# Providers are defined here too, so adding a new vendor is a config block —
-# NOT a code change. The engine stays provider-agnostic.
+# OPTIONAL: delete this file to route EVERY seam to the bottom-line default `claude -p`.
+# The engine itself is provider-agnostic; ALL transport choices live here.
 
 # ----------------------------------------------------------------------------
-# providers: name -> spec. Two TYPES:
-#   claude_code       : headless `claude -p` (uses your Claude Code auth; --effort)
-#   openai_compatible : ANY OpenAI chat-completions API (base_url + models + key
-#                       env var). NOT vendor-bound — opencode below is just one
-#                       instance; copy the block for OpenAI / Gemini(-compat) /
-#                       DeepSeek-direct / Together / a local vLLM, etc.
+# providers: name -> spec. Two provider TYPES (NEITHER is bound to any vendor):
+#   claude_code       : headless `claude -p` (your Claude Code auth; supports
+#                       --effort and grounded Read/Grep). This is the bottom-line
+#                       DEFAULT + the mandatory fallback for every seam.
+#   openai_compatible : ANY OpenAI chat-completions API behind an API TOKEN —
+#                       described purely by {base_url, models, api_key_env}. This
+#                       is the generic "API-token provider"; the instances below
+#                       (opencode / deepseek-official / openrouter / …) are just
+#                       config, NOT code. Swap or add vendors freely; nothing in
+#                       the engine knows any vendor name.
+#
+# The api_key_env value names an env var read from .env (gitignored) — keys are
+# NEVER hard-coded. Each instance carries its own token env.
 # ----------------------------------------------------------------------------
 providers:
-  claude-code:
+  claude-code:                       # bottom-line default + fallback (must exist)
     type: claude_code
     strong_model: claude-sonnet-4-6
     fast_model: claude-haiku-4-5-20251001
 
-  opencode:
+  # --- API-token providers (any OpenAI-compatible endpoint) -------------------
+  opencode:                          # OpenCode "Zen/Go" gateway (currently active)
     type: openai_compatible
     base_url: https://opencode.ai/zen/go/v1
-    api_key_env: OPENCODE_API_KEY        # read from .env (gitignored), never hard-coded
+    api_key_env: OPENCODE_API_KEY
     strong_model: deepseek-v4-pro
     fast_model: deepseek-v4-flash
-    # send_reasoning_effort: false        # set true only if the backend accepts OpenAI reasoning_effort
+    # send_reasoning_effort: false   # set true only if the backend accepts OpenAI reasoning_effort
 
-  # Example — add another vendor with zero code changes (uncomment + set key):
-  # openai:
+  # Ready-to-use alternatives — uncomment + set the key env in .env to switch.
+  # NOT bound to opencode: same code path, different base_url + token.
+  # deepseek-official:               # DeepSeek's own API
   #   type: openai_compatible
-  #   base_url: https://api.openai.com/v1
-  #   api_key_env: OPENAI_API_KEY
-  #   strong_model: gpt-5
-  #   fast_model: gpt-5-mini
+  #   base_url: https://api.deepseek.com/v1
+  #   api_key_env: DEEPSEEK_API_KEY
+  #   strong_model: deepseek-reasoner
+  #   fast_model: deepseek-chat
+  # openrouter:                      # OpenRouter (multi-model gateway)
+  #   type: openai_compatible
+  #   base_url: https://openrouter.ai/api/v1
+  #   api_key_env: OPENROUTER_API_KEY
+  #   strong_model: deepseek/deepseek-chat
+  #   fast_model: deepseek/deepseek-chat
 
 # ----------------------------------------------------------------------------
-# seams: which provider runs each LLM seam. Unlisted seams -> claude-code.
-#   analyzer   : reads the frozen MD -> ARA fact bundle (heavy reasoning)
-#   skeptic    : G2 number-fidelity verifier
-#   rigor      : G3 6-dimension rigor reviewer
-#   entailment : G3 claim<->experiment entailment judge
-#   expand     : discovery query expansion
-#   writer     : human-chain report writer (vivid Chinese prose)
+# seams: which provider + execution mode runs each LLM seam.
+#   value = a provider name (default mode), or {provider, mode}.
+#   mode  = inline | grounded(claude-code reads files itself) | agent_team(opt-in).
+# EVERY seam is independently routable; every call falls back to claude-code, and
+# if that bottom line ALSO fails the engine aborts (EngineAbort) — no silent
+# degradation.
+#
+# FUTURE (cross-audit, not yet active): a seam value may become a LIST of
+# providers for high-variance-but-critical seams (analyzer / writer) — each holds
+# the task independently and the main process judges + cherry-picks. The single
+# value below is the v1 form; the routing schema is shaped to grow into a list.
 # ----------------------------------------------------------------------------
 seams:
-  # Only the analyzer stays on Claude: it is the heaviest call, the most
-  # quality-critical (shared fact source), AND it emits a huge LaTeX-laden JSON
-  # bundle that deepseek mis-escaped 3/3 (Invalid \escape) + the big single
-  # request is the most proxy-exposed. Everything else -> the cheap backend.
-  analyzer: claude-code
-  # Audit seams on deepseek = healthy CROSS-MODEL verification (verifier family !=
-  # generator family) AND cheap. Their JSON output is simple (no LaTeX); skeptic/
-  # rigor send the big MD/bundle, covered by the hardened transport retries.
-  skeptic: opencode
-  rigor: opencode
-  entailment: opencode        # tiny in/out — the safest cheap seam
-  expand: opencode            # discovery query expansion: small, cheap, low-risk -> moved off Claude
-  writer: opencode            # human chain — quality rivals Claude (blind 8.21 vs 8.42), much cheaper
+  analyzer: { provider: claude-code, mode: grounded }   # heaviest + most critical SSOT; grounded = claude -p reads MD itself, chunked-parallel
+  skeptic: opencode            # G2 number-fidelity — cross-model vs analyzer, cheap
+  rigor: opencode              # G3 6-dim rigor
+  entailment: opencode         # G3 entailment — tiny in/out
+  expand: opencode             # discovery query expansion — small, cheap
+  writer: opencode             # human chain — rivals Claude (blind 8.21 vs 8.42), cheaper

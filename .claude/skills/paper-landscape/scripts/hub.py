@@ -28,7 +28,7 @@ from typing import Protocol
 
 from scripts.campaign import gate_needed, load_campaign
 from scripts.landscapes import LandscapeResult, generate_landscapes
-from scripts.paths import FAILURE_STALLED, VAULT_BRANCH_PATH_FIELDS
+from scripts.paths import FAILURE_STALLED, VAULT_BRANCH_PATH_FIELDS, EngineAbort
 
 FAILED_REL = Path("_failed")
 
@@ -249,6 +249,11 @@ def _run_spoke_guarded(
         )
     if "error" in box:
         exc = box["error"]
+        if isinstance(exc, EngineAbort):
+            # Total LLM-transport outage (primary AND claude-code fallback failed):
+            # NOT a per-paper failure — re-raise to abort the whole tick. Never
+            # quarantine/continue on this, or we'd emit silently-degraded artifacts.
+            raise exc
         return SpokeResult(
             status="failed",
             person_vault_path=None,

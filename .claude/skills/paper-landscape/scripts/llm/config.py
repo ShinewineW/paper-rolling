@@ -32,7 +32,12 @@ from pathlib import Path
 
 import yaml
 
-from scripts.llm.providers import LLMProvider, build_provider, load_dotenv
+from scripts.llm.providers import (
+    FallbackProvider,
+    LLMProvider,
+    build_provider,
+    load_dotenv,
+)
 
 LLM_CONFIG_REL = Path("config") / "llm.yaml"
 
@@ -73,6 +78,16 @@ class LLMConfig:
     def mode_for(self, seam: str) -> str:
         """Return the execution mode for ``seam`` (inline | grounded | agent_team)."""
         return self.modes.get(seam, _DEFAULT_MODES.get(seam, "inline"))
+
+    def resolve(self, seam: str) -> FallbackProvider:
+        """The runtime provider for ``seam``: its routed provider wrapped with the
+        MANDATORY bottom-line fallback to the claude-code default. Seams call this
+        (not for_seam) so every call has the fail-fast fallback path; if both the
+        primary and the claude-code fallback fail, complete() raises EngineAbort.
+        """
+        primary = self.for_seam(seam)
+        fallback = self.providers[_DEFAULT_PROVIDER]
+        return FallbackProvider(primary=primary, fallback=fallback)
 
 
 def _default_config() -> LLMConfig:

@@ -7,6 +7,8 @@ callables); this is the runtime's transport kit. See providers.py / config.py.
 from scripts.llm.config import SEAMS, LLMConfig, load_llm_config
 from scripts.llm.providers import (
     ClaudeCodeProvider,
+    EngineAbort,
+    FallbackProvider,
     LLMProvider,
     OpenAICompatibleProvider,
     ProviderError,
@@ -17,6 +19,8 @@ from scripts.llm.providers import (
 __all__ = [
     "SEAMS",
     "ClaudeCodeProvider",
+    "EngineAbort",
+    "FallbackProvider",
     "LLMConfig",
     "LLMProvider",
     "OpenAICompatibleProvider",

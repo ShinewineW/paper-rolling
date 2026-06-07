@@ -36,6 +36,11 @@ from typing import Protocol, runtime_checkable
 
 import requests
 
+# EngineAbort lives in the LLM-agnostic core (scripts/paths.py) so the engine/hub
+# can recognize it WITHOUT importing this transport layer; re-exported here since
+# FallbackProvider raises it and seam code imports it from here.
+from scripts.paths import EngineAbort
+
 
 class ProviderError(RuntimeError):
     """A provider call failed after exhausting its retry budget."""
@@ -244,6 +249,64 @@ class OpenAICompatibleProvider:
                 continue
             return str(content)
         raise ProviderError(f"{self.name} failed after {attempt} attempt(s): {last}")
+
+
+# --------------------------------------------------------------------------- #
+# Fallback wrapper — the mandatory failure path                                 #
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class FallbackProvider:
+    """A seam's routed provider with a MANDATORY bottom-line fallback.
+
+    Order: try ``primary``; on ``ProviderError`` (retries already exhausted), fall
+    back to ``fallback`` (the engine default = claude-code ``-p``). If the fallback
+    ALSO fails — or the primary IS the fallback and it fails — raise
+    :class:`EngineAbort` to stop the engine. No silent degradation.
+
+    Single-provider-per-seam today; the periphery is intentionally shaped so a
+    future cross-audit can wrap several providers + a judge here instead.
+    """
+
+    primary: LLMProvider
+    fallback: LLMProvider
+
+    @property
+    def name(self) -> str:
+        if self.primary.name == self.fallback.name:
+            return self.primary.name
+        return f"{self.primary.name}->fallback:{self.fallback.name}"
+
+    def complete(
+        self,
+        prompt: str,
+        *,
+        tier: str = "strong",
+        effort: str = "high",
+        timeout: float = 900.0,
+        tools: tuple[str, ...] | None = None,
+    ) -> str:
+        try:
+            return self.primary.complete(
+                prompt, tier=tier, effort=effort, timeout=timeout, tools=tools
+            )
+        except ProviderError as primary_exc:
+            if self.fallback.name == self.primary.name:
+                # The bottom-line provider itself failed → no lower tier to try.
+                raise EngineAbort(
+                    f"bottom-line provider {self.primary.name!r} failed (no distinct "
+                    f"fallback): {primary_exc}"
+                ) from primary_exc
+            try:
+                return self.fallback.complete(
+                    prompt, tier=tier, effort=effort, timeout=timeout, tools=tools
+                )
+            except ProviderError as fb_exc:
+                raise EngineAbort(
+                    f"primary {self.primary.name!r} AND fallback {self.fallback.name!r} "
+                    f"both failed; aborting engine. primary={primary_exc}; fallback={fb_exc}"
+                ) from fb_exc
 
 
 # --------------------------------------------------------------------------- #
