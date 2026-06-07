@@ -130,6 +130,31 @@ def test_backfill_reaches_n_despite_failures(tmp_path: Path):
     assert res.exhausted is False
 
 
+def test_force_include_all_attempted_even_above_n(tmp_path: Path):
+    # 3 force-included papers but n_target=1 — the hub raises the target so EVERY
+    # forced paper is attempted this tick (中枢-D1), not silently capped at N.
+    ledger = FakeLedger()
+    pool = [{**_candidate(f"f{i}"), "forced": True} for i in range(3)]
+    attempted: list[str] = []
+
+    def spoke(cand: dict) -> SpokeResult:
+        attempted.append(cand["key"])
+        return _ok(cand)
+
+    res: HubResult = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=1,
+        ledger=ledger,
+        discover=lambda topic, n_target: pool,
+        spoke=spoke,
+        max_concurrent=3,
+    )
+
+    assert set(attempted) == {"f0", "f1", "f2"}
+    assert res.done_count == 3
+
+
 def test_skip_set_papers_not_reprocessed(tmp_path: Path):
     # p0 already done in the ledger skip-set → never dispatched this tick.
     ledger = FakeLedger(skip={"p0"})

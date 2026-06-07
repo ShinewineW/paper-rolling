@@ -123,3 +123,17 @@ cfg)` adapter owns its source's search params (date floor, page size), keeping
 See `docs/guides/EXTENDING.md`. The OpenAlex `/works` recipe (default.search,
 `cursor=*` deep pagination, `cited_by_count:>{min_cites-1}` as page-breadth-only,
 not a gate) is documented in `OpenAlexSource.search`.
+
+## Force-include (中枢-D1): mandatory papers
+
+`campaign_config["force_include"]` is a list of papers the user requires regardless
+of discovery. `_build_forced` projects each (preserving `arxiv_id` / `oa_pdf_url` /
+`doi` / `title`, marking `forced=True` + `discovery_sources=["forced"]`) and
+`discover()` **prepends** them to the pool, **bypassing the authority any-signal
+filter** — force-include is mandatory, not signal-authoritative. They are deduped
+against discovery by `_identity_tokens` (version-stripped arXiv id / lowercased DOI
+/ normalized title), so a forced paper discovery also found appears once. The hub
+raises `n_target` to `max(N, forced_count)` so every forced paper is **attempted**
+this tick — but they still pass through ingest + G2 + G3 (mandatory ≠ gate-exempt);
+a forced paper with no ingestible source quarantines like any failed ingest. Wired
+via `build_discover(force_include=CampaignConfig.force_include)`.

@@ -106,6 +106,7 @@ def build_discover(
     polite_email: str | None = None,
     from_year: int | None = None,
     overfetch_factor: int = 3,
+    force_include: list[dict[str, Any]] | None = None,
 ) -> Callable[[str, int], list[dict[str, Any]]]:
     """Return a ``discover(topic, n) -> list[dict]`` seam wiring all five sources.
 
@@ -121,6 +122,9 @@ def build_discover(
         polite_email: optional OpenAlex polite-pool email (lifts the request rate).
         from_year: lower-bound publication year; defaults to current_year - 2.
         overfetch_factor: candidate over-pull multiple for failure backfill.
+        force_include: copy of ``CampaignConfig.force_include`` — mandatory papers
+            prepended to the pool (they bypass the authority filter but still go
+            through ingest + G2 + G3).
     """
     sources: dict[str, Any] = {
         "openalex": OpenAlexSource(ThrottledClient(polite=bool(polite_email)), polite_email),
@@ -141,6 +145,7 @@ def build_discover(
             "from_year": floor_year,
             "from_date": f"{floor_year}-01-01",
             "current_year": current_year,
+            "force_include": list(force_include or []),
         }
         return _discover(campaign_config, sources, llm)
 

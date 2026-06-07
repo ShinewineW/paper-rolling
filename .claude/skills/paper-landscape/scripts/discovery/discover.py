@@ -16,6 +16,7 @@ real sources over shared ThrottledClients in Chunk 5 (the SKILL entry).
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -142,7 +143,19 @@ def discover(
         scored.append(_project(cand))
 
     scored.sort(key=lambda c: c["authority_score"], reverse=True)
-    return scored[:cap]
+
+    forced = _build_forced(campaign_config.get("force_include") or [])
+    if not forced:
+        return scored[:cap]
+    # Force-include (中枢-D1): mandatory papers sit at the FRONT of the pool
+    # (processed first) and BYPASS the authority filter — force-include is
+    # mandatory, not signal-authoritative. Dedup any that discovery also found so
+    # they are not doubled. They still go through ingest + G2/G3 downstream.
+    forced_ids: set[tuple[str, str]] = set()
+    for f in forced:
+        forced_ids |= _identity_tokens(f)
+    deduped = [c for c in scored if not (_identity_tokens(c) & forced_ids)]
+    return forced + deduped[:cap]
 
 
 def _project(cand: dict[str, Any]) -> dict[str, Any]:
@@ -154,6 +167,45 @@ def _project(cand: dict[str, Any]) -> dict[str, Any]:
     out = {field: cand.get(field) for field in _INTERFACE_FIELDS}
     out["authors"] = out.get("authors") or []
     return out
+
+
+def _identity_tokens(cand: dict[str, Any]) -> set[tuple[str, str]]:
+    """Identity tokens for force-include dedup: version-stripped arXiv id,
+    lowercased DOI, whitespace-normalized lowercased title. A non-empty
+    intersection between two candidates means they are the same paper."""
+    toks: set[tuple[str, str]] = set()
+    aid = cand.get("arxiv_id")
+    if aid:
+        toks.add(("arxiv", re.sub(r"v\d+$", "", str(aid))))
+    doi = cand.get("doi")
+    if doi:
+        toks.add(("doi", str(doi).strip().lower()))
+    title = cand.get("title")
+    if title:
+        toks.add(("title", " ".join(str(title).lower().split())))
+    return toks
+
+
+def _build_forced(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Project force-included papers into pool candidates (中枢-D1).
+
+    Each is marked `forced` + `discovery_sources=["forced"]`, carries the
+    identifiers the user supplied (arxiv_id / oa_pdf_url / doi / title), and is
+    prepended to the pool. They skip the authority filter but NOT the downstream
+    quality gates (ingest + G2 + G3). `title` defaults to an identifier so the
+    naming / ingest path never KeyErrors on a title-less entry.
+    """
+    forced: list[dict[str, Any]] = []
+    for e in entries:
+        cand = _project(dict(e))
+        cand["discovery_sources"] = ["forced"]
+        cand["forced"] = True
+        cand["authority_signals"] = {"forced": True}
+        cand["authority_score"] = 0.0
+        if not cand.get("title"):
+            cand["title"] = cand.get("arxiv_id") or cand.get("doi") or "forced-paper"
+        forced.append(cand)
+    return forced
 
 
 def _run_openalex(source, queries, cfg) -> list[dict[str, Any]]:

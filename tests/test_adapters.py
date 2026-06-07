@@ -70,7 +70,13 @@ def test_build_discover_wires_five_sources_and_config(monkeypatch):
     def fake_llm(prompt):
         return ["q1", "q2"]
 
-    discover = build_discover(fake_llm, is_ad_domain=False, from_year=2025, overfetch_factor=2)
+    discover = build_discover(
+        fake_llm,
+        is_ad_domain=False,
+        from_year=2025,
+        overfetch_factor=2,
+        force_include=[{"arxiv_id": "2401.00001", "title": "Forced"}],
+    )
     out = discover("world models", 5)
 
     assert out == [{"title": "x"}]
@@ -82,6 +88,7 @@ def test_build_discover_wires_five_sources_and_config(monkeypatch):
     assert cfg["from_year"] == 2025
     assert cfg["from_date"] == "2025-01-01"
     assert cfg["overfetch_factor"] == 2
+    assert cfg["force_include"] == [{"arxiv_id": "2401.00001", "title": "Forced"}]
     assert seen["llm"] is fake_llm
 
 

@@ -48,20 +48,28 @@ agent-provided and the HF token ships in source, so they are not preflighted.)
 ## Entry: the campaign Hard Gate (HITL, once per campaign) — MUST
 
 The **first action after preflight passes** is a blocking **Hard Gate** (中枢-D1).
-You MUST get explicit human confirmation of **two** things, then lock them into
-`config/campaign.yaml`:
+You MUST get explicit human confirmation of **topic + N per tick** (plus any
+must-include papers), then lock them into `config/campaign.yaml`:
 
 1. **Topic** — precise, not vague. If the user says something broad ("自动驾驶"),
    propose a narrowed scope and get confirmation. A vague single-term topic is
    rejected (`GateError`).
 2. **N per tick** — the explicit number of papers to *successfully* process per
    `/loop` tick (the cost/disk ceiling). No number → no go.
+3. **force_include** (optional) — papers the user says MUST be processed, not left
+   to autonomous discovery. Each entry is a dict with at least one identifier
+   (`arxiv_id` / `oa_pdf_url` / `doi`) + ideally a `title`. They are prepended to
+   the pool, **bypass the authority filter**, dedup against discovery, and are all
+   attempted this tick — but still go through ingest + G2 + G3 (mandatory ≠ exempt
+   from quality gates). A force-included paper with no ingestible source (no arXiv
+   HTML/PDF) will quarantine like any other failed ingest.
 
 ```bash
-# Establish the campaign (run once, human present):
+# Establish the campaign (run once, human present). force_include is optional:
 PYTHONPATH=.claude/skills/paper-landscape uv run python -c "from scripts.campaign import CampaignConfig, write_campaign; \
 import pathlib; write_campaign(pathlib.Path('.'), \
-CampaignConfig(topic='end-to-end AD trajectory prediction', n_per_tick=5, is_ad_domain=True))"
+CampaignConfig(topic='end-to-end AD trajectory prediction', n_per_tick=5, is_ad_domain=True, \
+force_include=[{'arxiv_id': '2401.00001', 'title': 'A must-include paper'}]))"
 ```
 
 Until `config/campaign.yaml` exists, `run_campaign_tick` raises `GateRequired`
@@ -73,7 +81,9 @@ and processing is blocked. Changing the topic or N re-fires the gate; a plain
 > `CampaignConfig.is_ad_domain` into the discovery `config` dict. `score_authority`
 > reads it to pick the authority whitelists — general AI/ML venues+labs always,
 > plus the autonomous-driving/robotics extra set only when `is_ad_domain` is true.
-> Omit it and the scorer defaults to the full (general+AD) set.
+> Omit it and the scorer defaults to the full (general+AD) set. **Likewise copy
+> `CampaignConfig.force_include` into `build_discover(force_include=…)`** so the
+> locked must-include papers enter the pool (front, authority-bypassed, deduped).
 
 ## Daily usage: /loop (the long-running cadence)
 
@@ -225,7 +235,7 @@ result = run_campaign(
     skeptic_votes=skeptic_votes,
     rigor_scores=rigor_scores,
     entailment_judge=entailment_judge,
-    discover=build_discover(llm=expand_llm, is_ad_domain=True),  # is_ad_domain from campaign.yaml
+    discover=build_discover(llm=expand_llm, is_ad_domain=True, force_include=[]),  # is_ad_domain + force_include from campaign.yaml
     http=build_http(),
     run_cli=build_run_cli(),
 )

@@ -8,8 +8,8 @@
 # hand. Daily /loop ticks read the live file and run autonomously WITHOUT
 # re-gating; re-run the Hard Gate only to change topic or n_per_tick.
 #
-# The three fields `campaign.load_campaign()` actually reads are: topic,
-# n_per_tick, is_ad_domain. The remaining fields are discovery-policy overrides
+# The fields `campaign.load_campaign()` actually reads are: topic, n_per_tick,
+# is_ad_domain, force_include. The remaining fields are discovery-policy overrides
 # consumed by the discovery adapter / authority scorer (they have code defaults).
 
 # --- Hard-Gate-confirmed (人在场显式钉死) — the locked CampaignConfig ---
@@ -25,6 +25,13 @@ n_per_tick: 5
 # Whether this campaign is autonomous-driving / robotics focused (toggles the
 # AD-domain knowledge bases). The Hard Gate sets this when locking the campaign.
 is_ad_domain: true
+
+# Optional: papers that MUST be processed (中枢-D1), beyond autonomous discovery.
+# Each entry needs >=1 identifier (arxiv_id / oa_pdf_url / doi) + ideally a title.
+# They are prepended to the pool, bypass the authority filter, dedup vs discovery,
+# and are all attempted this tick — but still go through ingest + G2 + G3.
+force_include: []
+#   - {arxiv_id: "2401.00001", title: "A must-include paper"}
 
 # --- discovery policy ---
 # 中枢-D5a / 吸收-D6: strict = preprints excluded from the authoritative set,

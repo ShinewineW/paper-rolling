@@ -98,6 +98,7 @@ discover = build_discover(                  # wires OpenAlex / S2 / arXiv / DBLP
     llm=expand_llm,                         #   the ONE LLM-backed input (see below)
     is_ad_domain=campaign.is_ad_domain,
     polite_email=None,                      #   optional OpenAlex polite-pool email
+    force_include=campaign.force_include,   #   must-include papers (front, authority-bypassed)
 )
 ```
 

@@ -281,6 +281,11 @@ def run_tick(
     re-fires it.
     """
     pool = discover(topic, n_target)
+    # Force-include (中枢-D1): every force-included paper must be ATTEMPTED this
+    # tick, so raise the target to cover them all even if there are more forced
+    # papers than the per-tick N. They sit at the front of the pool; ledger-done
+    # ones are skipped below like any other.
+    n_target = max(n_target, sum(1 for c in pool if c.get("forced")))
     skip = ledger.skip_set()
     for c in pool:
         c.setdefault(

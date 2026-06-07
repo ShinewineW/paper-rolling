@@ -10,7 +10,7 @@ gate.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import yaml
@@ -39,18 +39,43 @@ def _validate_n(n_per_tick: int) -> int:
     return n_per_tick
 
 
+# A force-included paper is identified by at least one of these — the engine
+# needs one to fetch + ingest it (arxiv_id, a direct PDF URL, or a DOI).
+_FORCE_ID_KEYS = ("arxiv_id", "oa_pdf_url", "doi")
+
+
+def _validate_force_include(entries: list) -> list:
+    """Each force-include entry must be a dict carrying at least one identifier
+    the engine can ingest by (中枢-D1: confirmed at the Hard Gate)."""
+    if not isinstance(entries, list):
+        raise GateError(f"force_include must be a list, got {type(entries).__name__}")
+    for i, e in enumerate(entries):
+        if not isinstance(e, dict):
+            raise GateError(f"force_include[{i}] must be a dict, got {type(e).__name__}")
+        if not any(e.get(k) for k in _FORCE_ID_KEYS):
+            raise GateError(
+                f"force_include[{i}] needs at least one identifier "
+                f"({'/'.join(_FORCE_ID_KEYS)}) so the engine can ingest it"
+            )
+    return entries
+
+
 @dataclass(frozen=True)
 class CampaignConfig:
-    """The locked campaign decision (topic + per-tick N + AD-domain flag)."""
+    """The locked campaign decision: topic + per-tick N + AD-domain flag, plus an
+    optional list of force-included papers (must-process, beyond autonomous
+    discovery — 中枢-D1)."""
 
     topic: str
     n_per_tick: int
     is_ad_domain: bool
+    force_include: list[dict] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # Reads-only validation (frozen dataclass — no field assignment here).
         _validate_topic(self.topic)
         _validate_n(self.n_per_tick)
+        _validate_force_include(self.force_include)
 
 
 def load_campaign(workspace: Path) -> CampaignConfig | None:
@@ -63,6 +88,7 @@ def load_campaign(workspace: Path) -> CampaignConfig | None:
         topic=data["topic"],
         n_per_tick=int(data["n_per_tick"]),
         is_ad_domain=bool(data["is_ad_domain"]),
+        force_include=list(data.get("force_include") or []),
     )
 
 
