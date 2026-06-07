@@ -1,16 +1,20 @@
 # .claude/skills/paper-landscape/scripts/output/figures.py
 r"""Original-figure inventory for the human report (论文原图导览).
 
-The human report is a "paper guided tour", not just commentary: every ORIGINAL
-figure the paper shows MUST appear in it (强制要求 — as many as the paper has).
-The ingest layer (MinerU Tier-2 / pandoc Tier-1) already extracts the figures to
-``corpus/{id}/images/`` and references them in the frozen MD as
-``![](images/HASH.ext)`` with a following ``Figure N: ...`` caption line.
+The human report is a "paper guided tour", not just commentary. The selection is
+SELECTIVE, not all-figures: the core method / model-structure overview diagram is
+MANDATORY (强制,原模原样), plus a FEW representative result/effect figures — the
+rest (minor/table-screenshot figures) are skipped. The ingest layer (MinerU
+Tier-2 / pandoc Tier-1) extracts the figures to ``corpus/{id}/images/`` and
+references them in the frozen MD as ``![](images/HASH.ext)`` with a following
+``Figure N: ...`` caption line.
 
-This module extracts that ordered figure list (path + caption) and copies the
-referenced images into the report's vault dir so report.md / report.html resolve
-them. branch1_llm then embeds EVERY figure (deterministic paths — no LLM hash
-reproduction) with an LLM science-pop narration, and hard-gates on completeness.
+This module extracts that ordered figure list (path + caption), flags the
+architecture/method figure(s) via ``is_architecture_caption``, and copies the
+selected images into the report's vault dir so report.md / report.html resolve
+them. The writer (curate_figures) decides role + inclusion; branch1_llm embeds the
+selected figures (deterministic paths — no LLM hash reproduction) and hard-gates
+on the mandatory architecture figure being present.
 """
 
 from __future__ import annotations
@@ -22,6 +26,19 @@ from pathlib import Path
 
 _IMG_REF = re.compile(r"!\[[^\]]*\]\((images/[^)\s]+)\)")
 _TAG = re.compile(r"</?su[bp]>")  # MinerU wraps caption fragments in <sub>/<sup>
+# Caption cues for the MANDATORY core method / model-structure overview figure(s):
+# those must appear verbatim in the human report; result/effect figures are
+# selected, not all-included.
+_ARCH_CUE = re.compile(
+    r"(?i)(architecture|overview|framework|pipeline|model\s+structure|the\s+method|"
+    r"our\s+(model|method|approach|framework|pipeline)|架构|框架|流程|结构|总览|整体|方法概览)"
+)
+
+
+def is_architecture_caption(caption: str) -> bool:
+    """True if a figure caption signals the core method / model-structure diagram
+    (mandatory in the human report)."""
+    return bool(_ARCH_CUE.search(caption or ""))
 
 
 @dataclass(frozen=True)

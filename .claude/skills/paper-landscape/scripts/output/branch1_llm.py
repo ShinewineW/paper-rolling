@@ -25,7 +25,7 @@ from typing import Any
 
 from scripts.output.anchor_lint import _is_empirical_assertion, lint_text
 from scripts.output.branch1_report import AnchorGateError, _anchor, _find_in_md
-from scripts.output.figures import Figure, copy_figures
+from scripts.output.figures import Figure, copy_figures, is_architecture_caption
 
 _NUM = re.compile(r"\d+(?:\.\d+)?")
 _FENCE = re.compile(r"^```")
@@ -36,7 +36,7 @@ def _figure_tour(figures: list[Figure], zh: dict[str, str]) -> str:
     out = [
         "## 论文图解导览(原图)",
         "",
-        "> 下列为论文**原图**,逐图导览(以原图为准);本节确保原文图示在人审报告中完整在场。",
+        "> 下列为论文**原图**(核心方法/模型结构图 + 精选的代表性结果图),逐图导览,以原图为准。",
     ]
     for i, f in enumerate(figures, 1):
         cap = f.caption or f"Figure {i}"
@@ -161,13 +161,14 @@ def write_branch1_llm(
     sections = result.get("sections", result) if isinstance(result, dict) else result
     figures_meta = result.get("figures", []) if isinstance(result, dict) else []
 
-    # MANDATORY: every ORIGINAL paper figure must appear in the human report
-    # (paper-guided-tour). Copy the referenced images into the vault so report.md /
-    # report.html resolve them.
+    # SELECTIVE paper guided-tour: embed the CURATED original figures (mandatory
+    # core method/structure diagram + a few representative result figures), NOT all.
+    # Copy the referenced images into the vault so report.md / report.html resolve.
     person_dir.mkdir(parents=True, exist_ok=True)
-    figs = [Figure(ref=f["ref"], caption=f.get("caption", "")) for f in figures_meta]
+    selected = [f for f in figures_meta if f.get("include")]
+    figs = [Figure(ref=f["ref"], caption=f.get("caption", "")) for f in selected]
     copied = copy_figures(figs, md_path.parent, person_dir)
-    zh = {f["ref"]: f.get("zh", "") for f in figures_meta}
+    zh = {f["ref"]: f.get("zh", "") for f in selected}
 
     parts: list[str] = [
         f"# {title} — 深度解读",
@@ -193,10 +194,19 @@ def write_branch1_llm(
             "branch1 (LLM) failed three-layer citation gate (吸收-D1): "
             + "; ".join(v.message for v in violations[:5])
         )
-    # Completeness hard-gate: every copied original figure MUST be embedded.
+    # Every SELECTED figure must be embedded...
     missing = [f.ref for f in copied if f"({f.ref})" not in report]
     if missing:
-        raise AnchorGateError(f"branch1 (LLM) missing original figures: {missing}")
+        raise AnchorGateError(f"branch1 (LLM) missing selected figures: {missing}")
+    # ...and MANDATORY: the core method / model-structure figure must be present.
+    copied_refs = {f.ref for f in copied}
+    arch_in = any(f.get("role") == "architecture" and f["ref"] in copied_refs for f in selected)
+    paper_has_arch = any(is_architecture_caption(f.get("caption", "")) for f in figures_meta)
+    if paper_has_arch and not arch_in:
+        raise AnchorGateError(
+            "branch1 (LLM): the core method/model-structure figure is mandatory "
+            "but none was embedded"
+        )
 
     (person_dir / "report.md").write_text(report, encoding="utf-8")
     (person_dir / "report.html").write_text(_html(title, report), encoding="utf-8")

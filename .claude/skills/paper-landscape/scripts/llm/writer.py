@@ -199,25 +199,35 @@ def write_human_sections(
     return results
 
 
-def narrate_figures(
+def curate_figures(
     figures, provider: LLMProvider, *, title: str = "", timeout: float = 300.0
-) -> dict[str, str]:
-    """Chinese science-pop narration for each ORIGINAL figure (keyed by ref path).
+) -> dict[str, dict]:
+    """CURATE original figures for the human report (selective, not all).
 
-    `figures` is a list of objects with `.ref` and `.caption`. Returns {ref: 中文解说}
-    (1-3 句, 通俗, 无散落性能数字). On any failure returns {} — the caller falls
-    back to the figure's own caption so completeness still holds.
+    `figures` is a list of objects with `.ref` and `.caption`. The model classifies
+    each and decides inclusion:
+      - role: "architecture" (core method / model-structure overview — MANDATORY),
+        "result" (effect/quantitative figures — pick a FEW good ones), or "other".
+      - include: architecture figures MUST be true; 2-4 representative result
+        figures true; the rest (incl. tables/minor) false.
+      - zh: a 1-3 句 Chinese science-pop gloss (for included figures).
+    Returns {ref: {"role","include","zh"}}. On failure returns {} — the caller
+    applies a caption-heuristic fallback so the core structure figure is still in.
     """
     figs = list(figures)
     if not figs:
         return {}
     lines = "\n".join(f"{i}. {f.caption}" for i, f in enumerate(figs))
     prompt = (
-        f"论文《{title}》里有以下原图(序号 + 英文图注)。为每张图写一句到三句**中文**科普解说,"
-        "讲清这张图在展示什么、对理解论文有什么帮助;通俗生动,面向学习者;"
-        "专有名词/公式保留原样;不要写散落的精确性能数字。\n\n"
+        f"论文《{title}》里有以下原图(序号 + 英文图注)。请为人审报告**策展**这些图(不是全选):\n"
+        "- role:architecture(核心方法/模型结构总图)| result(效果/定量结果图)| other(其它)。\n"
+        "- include:**架构/核心方法/结构总图必须 include=true**;result 类只挑 2-4 张最有代表性的"
+        " include=true,其余(含次要图/纯表格截图)include=false。\n"
+        "- zh:对 include=true 的图写一句到三句**中文**科普解说"
+        "(通俗生动,专名/公式保留,无散落性能数字)。\n\n"
         f"{lines}\n\n"
-        '只回复一个 JSON 对象,key 为图的序号字符串,value 为中文解说,例如 {"0":"…","1":"…"}。'
+        '只回复一个 JSON 对象,key 为序号字符串,value 为 {"role":..,"include":true/false,"zh":".."},'
+        '例如 {"0":{"role":"architecture","include":true,"zh":"…"}}。'
     )
     try:
         out = extract_json(provider.complete(prompt, tier="fast", timeout=timeout))
@@ -225,9 +235,13 @@ def narrate_figures(
         return {}
     if not isinstance(out, dict):
         return {}
-    result: dict[str, str] = {}
+    result: dict[str, dict] = {}
     for i, f in enumerate(figs):
-        zh = out.get(str(i)) or out.get(i)
-        if isinstance(zh, str) and zh.strip():
-            result[f.ref] = zh.strip()
+        d = out.get(str(i)) or out.get(i)
+        if isinstance(d, dict):
+            result[f.ref] = {
+                "role": str(d.get("role", "other")),
+                "include": bool(d.get("include", False)),
+                "zh": str(d.get("zh", "")).strip(),
+            }
     return result

@@ -48,27 +48,41 @@ def test_write_branch1_llm_assembles_grounded_report(tmp_path: Path) -> None:
     assert "<!--anchor:" in report
 
 
-def test_write_branch1_llm_embeds_all_original_figures(tmp_path: Path) -> None:
-    """The paper-guided-tour requirement: every original figure must be embedded."""
+def test_write_branch1_llm_embeds_selected_figures(tmp_path: Path) -> None:
+    """Selective tour: mandatory architecture figure + a chosen result; skip the rest."""
     ara = _ara(tmp_path)
     md = tmp_path / "src.md"
     md.write_text("Method overview; BLEU of 28.4. See figures.\n", encoding="utf-8")
-    # two original images on disk next to the MD (as ingest produces)
     (md.parent / "images").mkdir()
-    (md.parent / "images" / "aaa.jpg").write_bytes(b"\xff\xd8\xff\xe0fake-jpeg")
-    (md.parent / "images" / "bbb.jpg").write_bytes(b"\xff\xd8\xff\xe0fake-jpeg")
+    for name in ("aaa.jpg", "bbb.jpg", "ccc.jpg"):
+        (md.parent / "images" / name).write_bytes(b"\xff\xd8\xff\xe0fake-jpeg")
     person = tmp_path / "person_vault" / "k"
 
     def fake_write_report(ara_dir, *, md_path=None, outdir=None):  # noqa: ARG001
         return {
             "sections": {"04_方法": "## 方法与架构\n本文方法概述。"},
             "figures": [
-                {
+                {  # mandatory core structure diagram
                     "ref": "images/aaa.jpg",
-                    "caption": "Figure 1: architecture",
+                    "caption": "Figure 1: architecture overview",
+                    "role": "architecture",
+                    "include": True,
                     "zh": "图1说明了整体架构。",
                 },
-                {"ref": "images/bbb.jpg", "caption": "Figure 2: results", "zh": "图2展示了结果。"},
+                {  # one selected representative result
+                    "ref": "images/bbb.jpg",
+                    "caption": "Figure 4: qualitative results",
+                    "role": "result",
+                    "include": True,
+                    "zh": "图4展示了代表性结果。",
+                },
+                {  # a minor result figure NOT selected
+                    "ref": "images/ccc.jpg",
+                    "caption": "Figure 9: extra ablation",
+                    "role": "result",
+                    "include": False,
+                    "zh": "",
+                },
             ],
         }
 
@@ -76,12 +90,40 @@ def test_write_branch1_llm_embeds_all_original_figures(tmp_path: Path) -> None:
 
     report = (person / "report.md").read_text(encoding="utf-8")
     assert "## 论文图解导览(原图)" in report
-    assert (
-        "![](images/aaa.jpg)" in report and "![](images/bbb.jpg)" in report
-    )  # ALL figures embedded
-    assert "图1说明了整体架构。" in report  # zh narration present
-    # images copied into the vault so report.md/html resolve them
+    assert "![](images/aaa.jpg)" in report  # mandatory architecture figure
+    assert "![](images/bbb.jpg)" in report  # selected result figure
+    assert "images/ccc.jpg" not in report  # NOT selected -> not embedded
+    assert "图1说明了整体架构。" in report
     assert (person / "images" / "aaa.jpg").exists() and (person / "images" / "bbb.jpg").exists()
+    assert not (person / "images" / "ccc.jpg").exists()  # not copied
+
+
+def test_write_branch1_llm_requires_architecture_figure(tmp_path: Path) -> None:
+    """If the paper has an architecture figure, it MUST be embedded (mandatory)."""
+    ara = _ara(tmp_path)
+    md = tmp_path / "src.md"
+    md.write_text("Method overview; BLEU of 28.4.\n", encoding="utf-8")
+    (md.parent / "images").mkdir()
+    (md.parent / "images" / "arch.jpg").write_bytes(b"\xff\xd8\xff\xe0fake-jpeg")
+    person = tmp_path / "person_vault" / "k"
+
+    def fake_write_report(ara_dir, *, md_path=None, outdir=None):  # noqa: ARG001
+        # An architecture-caption figure exists but the curator failed to include it.
+        return {
+            "sections": {"04_方法": "## 方法与架构\n概述。"},
+            "figures": [
+                {
+                    "ref": "images/arch.jpg",
+                    "caption": "Figure 1: model architecture",
+                    "role": "architecture",
+                    "include": False,
+                    "zh": "",
+                }
+            ],
+        }
+
+    with pytest.raises(AnchorGateError, match="core method/model-structure figure"):
+        write_branch1_llm(person, {"title": "P"}, ara, md, fake_write_report, key="k")
 
 
 def test_write_branch1_llm_blocks_unanchored_perf_claim(tmp_path: Path) -> None:

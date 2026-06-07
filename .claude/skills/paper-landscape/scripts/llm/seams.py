@@ -25,8 +25,8 @@ from scripts.llm.analyzer import analyze_chunked
 from scripts.llm.config import LLMConfig, load_llm_config
 from scripts.llm.jsonparse import extract_json as _extract_json
 from scripts.llm.providers import FallbackProvider
-from scripts.llm.writer import narrate_figures, write_human_sections
-from scripts.output.figures import extract_figures
+from scripts.llm.writer import curate_figures, write_human_sections
+from scripts.output.figures import extract_figures, is_architecture_caption
 
 # Per-seam provider routing (config/llm.yaml; default = claude -p). Loaded once.
 # Transport (claude -p / opencode / any OpenAI-compatible API) is chosen PER SEAM
@@ -345,9 +345,32 @@ def write_report(ara_dir: Path, *, md_path: Path | None = None, outdir: Path | N
     sections = write_human_sections(Path(ara_dir), provider, outdir=outdir, log=_log)
     figs = extract_figures(Path(md_path)) if md_path else []
     if figs:
-        _log(f"write_report: narrating {len(figs)} original figures")
-    narr = narrate_figures(figs, provider) if figs else {}
-    figures = [{"ref": f.ref, "caption": f.caption, "zh": narr.get(f.ref, "")} for f in figs]
+        _log(f"write_report: curating {len(figs)} original figures (selective)")
+    curated = curate_figures(figs, provider) if figs else {}
+    figures: list[dict] = []
+    for f in figs:
+        c = curated.get(f.ref, {})
+        arch = is_architecture_caption(f.caption)
+        role = c.get("role") or ("architecture" if arch else "other")
+        # fallback when the LLM didn't rule on this figure: include architecture figs.
+        include = bool(c["include"]) if "include" in c else arch
+        figures.append(
+            {
+                "ref": f.ref,
+                "caption": f.caption,
+                "role": role,
+                "include": include,
+                "zh": c.get("zh", ""),
+            }
+        )
+    # MANDATORY: the core method / model-structure figure(s) must be included.
+    if not any(x["include"] and x["role"] == "architecture" for x in figures):
+        forced = False
+        for x in figures:
+            if is_architecture_caption(x["caption"]):
+                x["include"], x["role"], forced = True, "architecture", True
+        if not forced and figures:  # no arch-like caption — papers lead with it
+            figures[0]["include"], figures[0]["role"] = True, "architecture"
     return {"sections": sections, "figures": figures}
 
 
