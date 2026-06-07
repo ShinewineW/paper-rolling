@@ -15,14 +15,17 @@ paper-rolling workspace layout (`corpus/`, `_ledger/`, `person_vault/`,
 
 ## Knowledge layer (read on demand)
 
-The agent-facing knowledge lives in `references/` (load the doc you need) and
-`sub-skills/` (one focused role per LLM seam — what a fresh sub-agent loads):
+The agent-facing knowledge lives in `references/` (load the doc you need),
+`sub-skills/` (one focused role per LLM seam), plus `examples/` + `templates/`:
 
 - `references/wiring-the-seams.md` — how to compose + **invoke** the engine (start here).
 - `references/ara-schema.md` — the ARA bundle `resolve_analysis` must return.
 - `references/discovery-and-authority.md` · `ingest-fidelity.md` · `naming-and-ledger.md` · `landscapes.md` — per-subsystem depth.
+- `references/branch1-quality.md` — quality bar + anchor discipline for the human report.
 - `references/glossary.md` — domain terms.
 - `sub-skills/{analyze-paper,g2-skeptic,g3-rigor-reviewer,entailment-judge}/` — the four independent LLM-seam roles.
+- `examples/worked-example.md` + `examples/sample-ara-bundle.json` — one paper end-to-end; the literal `resolve_analysis` output target.
+- `templates/{ara-paper,branch1-report,landscape}.md` — the output skeletons branch2 / branch1 / landscapes write.
 
 ## Entry: the campaign Hard Gate (HITL, once per campaign) — MUST
 

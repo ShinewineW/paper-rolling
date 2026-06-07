@@ -1,0 +1,105 @@
+{
+  "_comment": "ILLUSTRATIVE sample — a SYNTHETIC paper and INVENTED numbers, shown only to teach the exact shape resolve_analysis must return. Not a real paper; do not cite. Delete the _comment key in real output (the engine ignores it). See ../examples/worked-example.md for the end-to-end walkthrough and ../references/ara-schema.md for the field contract.",
+
+  "domain": "world models / model-based reinforcement learning",
+
+  "overview": "A latent world model is learned from interaction and used for imagination-based planning, decoupling representation learning from control so the policy can be optimized inside the model rather than on the environment.",
+
+  "problem": {
+    "observations": [
+      {"id": "O1", "statement": "Model-free control is sample-inefficient on long-horizon manipulation.", "evidence": "Reported environment-step counts in prior work are large.", "implication": "Real-robot training is impractical."}
+    ],
+    "gaps": [
+      {"id": "G1", "statement": "Prior latent models drift over long rollouts.", "why_fail": "One-step reconstruction loss does not penalize compounding error.", "caused_by": "O1", "attempts": ["pixel reconstruction", "contrastive latents"]}
+    ],
+    "insight": {
+      "statement": "Predicting value-equivalent quantities, not pixels, keeps long imagined rollouts useful for planning.",
+      "derived_from": "G1",
+      "enables": "Stable long-horizon imagination that the planner can trust."
+    },
+    "assumptions": ["The reward is observable during training.", "The latent dynamics are approximately Markov."]
+  },
+
+  "claims": [
+    {"id": "C1", "title": "Sample-efficient planning", "statement": "The latent world model attains an 87.3% task success rate, a 12.4-point improvement over the strongest model-free baseline.", "status": "supported", "tags": ["improvement"], "falsification": "Success rate is not above the baseline under matched interaction budget.", "proof": ["E1"], "evidence_basis": ["E1"], "interpretation": "Imagination-based planning closes most of the sample-efficiency gap."},
+    {"id": "C2", "title": "Rollout stability", "statement": "Value-equivalent prediction reduces compounding rollout error versus pixel reconstruction.", "status": "supported", "tags": ["causal"], "falsification": "Ablating value-equivalence does not increase rollout error.", "proof": ["E2"], "evidence_basis": ["E2"], "interpretation": "The value-equivalence term is the load-bearing piece for long rollouts."}
+  ],
+
+  "concepts": [
+    {"name": "latent dynamics model", "definition": "A learned transition function over a compact latent state.", "notation": "z_{t+1} = f(z_t, a_t)", "related": ["imagination rollout"], "interpretation": "A compressed simulator of the environment.", "boundary": "Holds only within the training distribution of dynamics."},
+    {"name": "imagination rollout", "definition": "A trajectory generated entirely inside the latent model.", "notation": "", "related": ["latent dynamics model"], "interpretation": "Planning without touching the real environment.", "boundary": "Quality degrades past the horizon the model was trained to."},
+    {"name": "value-equivalent prediction", "definition": "Training the model to preserve quantities relevant to value, not raw observations.", "notation": "", "related": ["latent dynamics model"], "interpretation": "Predict what matters for the decision, not the pixels.", "boundary": "Requires a reward signal at training time."}
+  ],
+
+  "experiments": [
+    {"id": "E1", "title": "Sample-efficiency comparison", "verifies": ["C1"], "setup": {"model": "Latent world model + imagination planner", "hardware": "1x A100", "dataset": "Six simulated manipulation tasks", "system": "Matched interaction budget vs a model-free baseline"}, "procedure": ["Train both methods under the same environment-step budget.", "Evaluate mean task success rate across the six tasks."], "metrics": ["success_rate"], "expected": "Higher success rate than the model-free baseline under a matched budget.", "baselines": ["model-free RL"], "dependencies": ["frozen reward signal"]},
+    {"id": "E2", "title": "Value-equivalence ablation", "verifies": ["C2"], "setup": {"model": "Latent world model with the value-equivalence loss removed", "hardware": "1x A100", "dataset": "Same six manipulation tasks", "system": "Ablation isolating the value-equivalence term"}, "procedure": ["Remove the value-equivalence loss term.", "Measure long-horizon rollout error and downstream success."], "metrics": ["rollout_error", "success_rate"], "expected": "Rollout error rises and downstream success drops relative to the full model.", "baselines": ["full model"], "dependencies": ["E1 training pipeline"]}
+  ],
+
+  "related_work": [
+    {"id": "R1", "cite": "Latent-dynamics planners (prior work)", "doi": "10.0000/illustrative-1", "type": "builds-on", "what_changed": "Adds a value-equivalent objective on top of latent-dynamics planning.", "why": "Reconstruction-based latents waste capacity on detail irrelevant to control.", "claims": ["C1"], "adopted": ["latent rollout planning"]},
+    {"id": "R2", "cite": "Value-equivalent model learning (prior work)", "doi": "10.0000/illustrative-2", "type": "extends", "what_changed": "Couples value-equivalence with long imagined rollouts rather than short ones.", "why": "Short rollouts under-use the model's predictive horizon.", "claims": ["C2"], "adopted": ["value-equivalence loss"]}
+  ],
+
+  "architecture": "Encoder -> Latent Dynamics -> Reward/Value Heads -> Imagination Planner -> Policy. The encoder maps observations to z; the dynamics roll z forward; the planner optimizes actions inside the model; the policy is distilled from planned actions.",
+
+  "algorithm": "Latent rollout objective (illustrative):\n$$ \\mathcal{L} = \\sum_{t} \\big\\| v_\\phi(z_t) - \\hat{v}_t \\big\\|^2 + \\lambda \\, \\mathrm{KL}\\!\\big(q(z_t\\mid o_t)\\,\\|\\,p(z_t\\mid z_{t-1},a_{t-1})\\big) $$",
+
+  "constraints": "# Constraints\n\n- Requires a reward signal during training.\n- Imagined rollouts degrade past the trained horizon.\n",
+
+  "heuristics": [
+    {"id": "H1", "desc": "Warm-start the planner from the policy's action.", "rationale": "The distilled policy is already a good action prior, so planning converges faster.", "sensitivity": "Low — affects planner iterations, not final quality.", "bounds": "Skip when the policy is untrained.", "code_ref": "src/execution/core.py:imagine", "source": "Section 4 (illustrative)"},
+    {"id": "H2", "desc": "Cap imagined horizon to the model's trained rollout length.", "rationale": "Beyond the trained horizon the latent dynamics leave their valid regime.", "sensitivity": "High — too long a horizon reintroduces compounding error.", "bounds": "Horizon <= 15 in this setup.", "code_ref": "src/execution/core.py:imagine", "source": "Section 4 (illustrative)"}
+  ],
+
+  "configs_training": [
+    {"name": "optimizer", "value": "Adam", "rationale": "Standard adaptive optimizer for latent-model training.", "range": "{Adam, AdamW}", "sensitivity": "Low", "source": "Appendix B (illustrative)"},
+    {"name": "lr", "value": "3e-4", "rationale": "Stable for the joint encoder/dynamics objective.", "range": "[1e-4, 1e-3]", "sensitivity": "Medium", "source": "Appendix B (illustrative)"},
+    {"name": "batch_size", "value": "50", "rationale": "Fits single-GPU memory at the chosen latent size.", "range": "[32, 128]", "sensitivity": "Low", "source": "Appendix B (illustrative)"},
+    {"name": "imagination_horizon", "value": "15", "rationale": "Longest horizon the dynamics stay reliable for.", "range": "[5, 50]", "sensitivity": "High", "source": "Section 4 (illustrative)"}
+  ],
+
+  "configs_model": [
+    {"name": "latent_dim", "value": "256", "rationale": "Enough capacity to encode task-relevant state without overfitting.", "range": "[128, 512]", "sensitivity": "Medium", "source": "Appendix B (illustrative)"},
+    {"name": "hidden_dim", "value": "512", "rationale": "Width of the dynamics/value MLPs.", "range": "[256, 1024]", "sensitivity": "Medium", "source": "Appendix B (illustrative)"},
+    {"name": "params_million", "value": "42.0", "rationale": "Total trainable parameters at the chosen widths.", "range": "—", "sensitivity": "—", "source": "Appendix B (illustrative)"}
+  ],
+
+  "environment": {
+    "python": "3.11",
+    "framework": "PyTorch 2.2",
+    "hardware": "Single A100 GPU",
+    "deps": ["torch", "gymnasium", "numpy"],
+    "seeds": "[0, 1, 2]"
+  },
+
+  "execution_stub": "import torch\n\n\ndef imagine(z0, policy, dynamics, horizon):\n    z, traj = z0, []\n    for _ in range(horizon):\n        a = policy(z)\n        z = dynamics(z, a)\n        traj.append((z, a))\n    return traj\n",
+
+  "innovations": [
+    {"name": "Value-equivalent latent objective for long rollouts.", "grep": "value_equivalent"},
+    {"name": "Planner warm-started from a distilled policy.", "grep": "warm_start"}
+  ],
+
+  "exploration_tree": [
+    {"decision": "latent training signal", "chosen": "value-equivalent prediction", "rejected": ["pixel reconstruction", "contrastive"], "rationale": "Reconstruction wastes capacity on irrelevant detail.", "outcome": "lower long-horizon drift", "support_level": "experiment"},
+    {"decision": "planning horizon", "chosen": "horizon 15", "rejected": ["horizon 50"], "rationale": "Beyond ~15 the model leaves its trained regime.", "outcome": "dead_end past 15", "support_level": "experiment"}
+  ],
+
+  "evidence_tables": [
+    {"name": "main_results", "headers": ["Task", "Ours", "Baseline"], "rows": [["Manipulation suite (mean)", "87.3", "74.9"]], "caption": "Mean success rate (%), matched interaction budget.", "source": "Table 1", "claims": ["C1"]}
+  ],
+
+  "math_intuition": "Like rehearsing a route in your head: you only need to remember the turns that change the outcome, not every shopfront along the way.",
+  "math_toy_example": "If two latent states lead to the same value, the model is free to merge them — it only must preserve what changes the decision.",
+  "loss_highlight": {
+    "direction": "The value term keeps long imagined rollouts decision-relevant.",
+    "mechanism": "The KL term ties the posterior to the learned prior so the latent stays predictable.",
+    "baseline": "Dropping the value term is what lets rollout error compound, unlike pixel reconstruction."
+  },
+
+  "trend": "Recent model-based methods move from reconstructing observations toward predicting decision-relevant quantities; this paper sits on that trajectory.",
+
+  "headline_metric": "success_rate",
+  "headline_value": 87.3,
+  "params_million": 42.0
+}

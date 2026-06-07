@@ -53,9 +53,10 @@ The headline keys are the hard contract; the rest of the bundle (`overview`,
 `problem`, `claims`, `concepts`, `experiments`, `related_work`, `architecture`,
 `algorithm`, `heuristics`, `configs_training`, `configs_model`, `environment`,
 `execution_stub`, `innovations`, `exploration_tree`, `evidence_tables`,
-`highlights`, …) follows the ARA schema. **Do not restate it here** — see
-[`../../references/ara-schema.md`](../../references/ara-schema.md) for the
-authoritative shape and field semantics.
+`loss_highlight`, `math_intuition`, `trend`, …) follows the ARA schema. **Do not
+restate it here** — see [`../../references/ara-schema.md`](../../references/ara-schema.md)
+for the authoritative shape, and [`../../examples/sample-ara-bundle.json`](../../examples/sample-ara-bundle.json)
+for a complete, copy-pasteable instance.
 
 ## Discipline
 
@@ -76,5 +77,8 @@ authoritative shape and field semantics.
 
 - [`../../SKILL.md`](../../SKILL.md) — engine overview, pipeline order, all four seams.
 - [`../../references/ara-schema.md`](../../references/ara-schema.md) — full ARA bundle shape.
+- [`../../examples/worked-example.md`](../../examples/worked-example.md) — your output
+  in the full pipeline; [`../../examples/sample-ara-bundle.json`](../../examples/sample-ara-bundle.json)
+  is the literal target dict.
 - Sibling audit seams back the gates that check this analyzer's output: G2
   skeptic, G3 rigor reviewer, G3 entailment judge.
