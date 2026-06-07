@@ -85,6 +85,9 @@ def make_spoke(
     cross_model_votes: SkepticVoteFn | None = None,
     cross_model_sample: float = 0.0,
     empirical_classifier: Callable | None = None,
+    g2_tolerant: bool = False,
+    g2_max_unconfirmed: int = 0,
+    g2_max_unconfirmed_ratio: float = 0.0,
 ) -> SpokeFn:
     """Build the production SpokeFn that runs the full gated pipeline per paper.
 
@@ -137,6 +140,9 @@ def make_spoke(
                 skeptic_votes=skeptic_votes,
                 n_skeptics=n_skeptics,
                 cross_model_votes=use_cross,
+                tolerant=g2_tolerant,
+                max_unconfirmed=g2_max_unconfirmed,
+                max_unconfirmed_ratio=g2_max_unconfirmed_ratio,
             )
 
         # 4. The analyzer seam is passed as a parameter (no module-global

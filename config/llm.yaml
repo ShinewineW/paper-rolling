@@ -1,0 +1,59 @@
+# config/llm.yaml — per-seam LLM provider routing.
+#
+# OPTIONAL: delete this file to route EVERY seam to the default `claude -p`.
+# Providers are defined here too, so adding a new vendor is a config block —
+# NOT a code change. The engine stays provider-agnostic.
+
+# ----------------------------------------------------------------------------
+# providers: name -> spec. Two TYPES:
+#   claude_code       : headless `claude -p` (uses your Claude Code auth; --effort)
+#   openai_compatible : ANY OpenAI chat-completions API (base_url + models + key
+#                       env var). NOT vendor-bound — opencode below is just one
+#                       instance; copy the block for OpenAI / Gemini(-compat) /
+#                       DeepSeek-direct / Together / a local vLLM, etc.
+# ----------------------------------------------------------------------------
+providers:
+  claude-code:
+    type: claude_code
+    strong_model: claude-sonnet-4-6
+    fast_model: claude-haiku-4-5-20251001
+
+  opencode:
+    type: openai_compatible
+    base_url: https://opencode.ai/zen/go/v1
+    api_key_env: OPENCODE_API_KEY        # read from .env (gitignored), never hard-coded
+    strong_model: deepseek-v4-pro
+    fast_model: deepseek-v4-flash
+    # send_reasoning_effort: false        # set true only if the backend accepts OpenAI reasoning_effort
+
+  # Example — add another vendor with zero code changes (uncomment + set key):
+  # openai:
+  #   type: openai_compatible
+  #   base_url: https://api.openai.com/v1
+  #   api_key_env: OPENAI_API_KEY
+  #   strong_model: gpt-5
+  #   fast_model: gpt-5-mini
+
+# ----------------------------------------------------------------------------
+# seams: which provider runs each LLM seam. Unlisted seams -> claude-code.
+#   analyzer   : reads the frozen MD -> ARA fact bundle (heavy reasoning)
+#   skeptic    : G2 number-fidelity verifier
+#   rigor      : G3 6-dimension rigor reviewer
+#   entailment : G3 claim<->experiment entailment judge
+#   expand     : discovery query expansion
+#   writer     : human-chain report writer (vivid Chinese prose)
+# ----------------------------------------------------------------------------
+seams:
+  # Only the analyzer stays on Claude: it is the heaviest call, the most
+  # quality-critical (shared fact source), AND it emits a huge LaTeX-laden JSON
+  # bundle that deepseek mis-escaped 3/3 (Invalid \escape) + the big single
+  # request is the most proxy-exposed. Everything else -> the cheap backend.
+  analyzer: claude-code
+  # Audit seams on deepseek = healthy CROSS-MODEL verification (verifier family !=
+  # generator family) AND cheap. Their JSON output is simple (no LaTeX); skeptic/
+  # rigor send the big MD/bundle, covered by the hardened transport retries.
+  skeptic: opencode
+  rigor: opencode
+  entailment: opencode        # tiny in/out — the safest cheap seam
+  expand: opencode            # discovery query expansion: small, cheap, low-risk -> moved off Claude
+  writer: opencode            # human chain — quality rivals Claude (blind 8.21 vs 8.42), much cheaper

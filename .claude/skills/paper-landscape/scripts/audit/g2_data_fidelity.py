@@ -146,6 +146,9 @@ def run_g2(
     skeptic_votes: SkepticVoteFn,
     n_skeptics: int = 3,
     cross_model_votes: SkepticVoteFn | None = None,
+    tolerant: bool = False,
+    max_unconfirmed: int = 0,
+    max_unconfirmed_ratio: float = 0.0,
 ) -> GateVerdict:
     """Run the G2 data-fidelity gate for one paper's ai_package.
 
@@ -159,6 +162,15 @@ def run_g2(
     cross-model verifier disagrees (votes it missing) — catching fabrications the
     same-family majority's conformity bias let through. It only strengthens the
     gate; it never clears a number the in-family vote blocked.
+
+    Tolerance (config/audit.yaml, operator-tunable): when `tolerant` is True and
+    the count of unconfirmed numbers stays within BOTH `max_unconfirmed` (an
+    absolute ceiling) and `max_unconfirmed_ratio` (a fraction of all checked
+    numbers), the findings are emitted as ADVISORY (not hard blocks) so a paper
+    is not quarantined over a few mis-transcriptions — they are flagged for the
+    pack instead. Beyond either limit the paper is treated as genuinely poisoned
+    and the findings hard-block as in strict mode. The verification itself is
+    unchanged; only the consequence of a small number of misses is softened.
     """
     ara_dir = find_ara_dir(ai_package_dir)
     source_md = md_path.read_text(encoding="utf-8")
@@ -180,43 +192,55 @@ def run_g2(
             )
         )
 
-    findings: list[Finding] = []
+    # First pass: identify every unconfirmed number (the verification proper).
+    bad: list[tuple[int, str, bool, bool]] = []  # (idx, number, in_family_bad, cross_bad)
     for idx, number in enumerate(candidate_numbers, start=1):
         in_family_bad = _insufficiently_confirmed(votes_per_round, number, n_skeptics)
         cross_bad = _cross_model_flags(cross_votes, number)
         if in_family_bad or cross_bad:
-            by = (
-                "the cross-model verifier"
-                if cross_bad and not in_family_bad
-                else "a skeptic majority"
+            bad.append((idx, number, in_family_bad, cross_bad))
+
+    # Decide the CONSEQUENCE: in tolerant mode, a small number of misses (within
+    # BOTH the absolute and ratio limits) is flagged but not blocked; otherwise
+    # every miss hard-blocks, exactly as in strict mode.
+    within_tolerance = (
+        tolerant
+        and len(bad) <= max_unconfirmed
+        and len(bad) <= max_unconfirmed_ratio * len(candidate_numbers)
+    )
+    hard_block = not within_tolerance
+
+    findings: list[Finding] = []
+    for idx, number, in_family_bad, cross_bad in bad:
+        by = "the cross-model verifier" if cross_bad and not in_family_bad else "a skeptic majority"
+        # C3 defect class: a near source value ⇒ transcription error (re-extract
+        # the right figure); none ⇒ fabrication/unverifiable (remove the value).
+        near = _nearest_source_number(number, source_md)
+        defect = "likely a transcription error" if near else "likely fabricated or unverifiable"
+        findings.append(
+            Finding(
+                finding_id=f"G2F{idx:02d}",
+                severity=Severity.CRITICAL if hard_block else Severity.MAJOR,
+                target=str(ara_dir.relative_to(ai_package_dir.parent)),
+                observation=(
+                    f"evidence number {number!r} not confirmed present in the "
+                    f"source MD by {by} — {defect}"
+                    + (f" (source has a near value {near!r})" if near else "")
+                    + ("" if hard_block else " [TOLERATED: flagged, paper kept]")
+                ),
+                is_hard_block=hard_block,
+                reasoning=(
+                    "A number that appears in the AI package evidence but "
+                    "not in the frozen source MD breaks the MD-only truth "
+                    "chain and poisons the knowledge base."
+                ),
+                suggestion=(
+                    f"Re-extract from the source MD — it has the near value "
+                    f"{near!r}, likely the intended figure."
+                    if near
+                    else "Re-extract from the source MD; if genuinely absent, "
+                    "remove the fabricated value before any branch is emitted."
+                ),
             )
-            # C3 defect class: a near source value ⇒ transcription error (re-extract
-            # the right figure); none ⇒ fabrication/unverifiable (remove the value).
-            near = _nearest_source_number(number, source_md)
-            defect = "likely a transcription error" if near else "likely fabricated or unverifiable"
-            findings.append(
-                Finding(
-                    finding_id=f"G2F{idx:02d}",
-                    severity=Severity.CRITICAL,
-                    target=str(ara_dir.relative_to(ai_package_dir.parent)),
-                    observation=(
-                        f"evidence number {number!r} not confirmed present in the "
-                        f"source MD by {by} — {defect}"
-                        + (f" (source has a near value {near!r})" if near else "")
-                    ),
-                    is_hard_block=True,
-                    reasoning=(
-                        "A number that appears in the AI package evidence but "
-                        "not in the frozen source MD breaks the MD-only truth "
-                        "chain and poisons the knowledge base."
-                    ),
-                    suggestion=(
-                        f"Re-extract from the source MD — it has the near value "
-                        f"{near!r}, likely the intended figure."
-                        if near
-                        else "Re-extract from the source MD; if genuinely absent, "
-                        "remove the fabricated value before any branch is emitted."
-                    ),
-                )
-            )
+        )
     return GateVerdict(gate="G2", findings=tuple(findings))

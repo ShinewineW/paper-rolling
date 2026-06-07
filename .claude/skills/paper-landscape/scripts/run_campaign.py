@@ -49,6 +49,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from scripts.audit.types import EntailmentJudgeFn, RigorScoreFn, SkepticVoteFn
+from scripts.audit_config import AuditConfig, load_audit_config
 from scripts.hub import DiscoverFn, TickResult, run_campaign_tick
 from scripts.ledger.store import Ledger
 from scripts.spoke import make_spoke
@@ -67,6 +68,7 @@ def run_campaign(
     cross_model_votes: SkepticVoteFn | None = None,
     cross_model_sample: float = 0.0,
     empirical_classifier: Callable | None = None,
+    audit_config: AuditConfig | None = None,
     requested_topic: str | None = None,
     requested_n: int | None = None,
 ) -> TickResult:
@@ -122,6 +124,9 @@ def run_campaign(
     """
     workspace = Path(workspace)
     ledger = Ledger(workspace)
+    # Operator-tunable audit knobs (config/audit.yaml; defaults if absent). These
+    # trade adversarial strictness against token cost / quarantine rate.
+    cfg = audit_config or load_audit_config(workspace)
     spoke = make_spoke(
         workspace=workspace,
         http=http,
@@ -134,6 +139,11 @@ def run_campaign(
         cross_model_votes=cross_model_votes,
         cross_model_sample=cross_model_sample,
         empirical_classifier=empirical_classifier,
+        n_skeptics=cfg.skeptic_votes,
+        max_gate_rounds=cfg.max_gate_rounds,
+        g2_tolerant=cfg.data_fidelity_tolerant,
+        g2_max_unconfirmed=cfg.data_fidelity_max_unconfirmed,
+        g2_max_unconfirmed_ratio=cfg.data_fidelity_max_unconfirmed_ratio,
     )
     # LS-1 single-writer lock: hold _ledger/.lock for the whole tick so a second
     # concurrent instance fails fast (LedgerLockError) instead of racing the

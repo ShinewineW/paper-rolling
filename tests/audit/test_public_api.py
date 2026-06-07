@@ -16,14 +16,20 @@ def test_run_g2_signature_is_stable_for_hub() -> None:
     sig = inspect.signature(g2_data_fidelity.run_g2)
     # Baseline + the cross-model overlay (B10 / ROADMAP C2 is now SHIPPED): the
     # optional `cross_model_votes` heterogeneous-family verifier strengthens the
-    # gate. It is keyword-only with a None default, so the hub's existing calls
-    # stay back-compatible.
+    # gate. Plus the operator-tunable tolerance knobs (config/audit.yaml): when
+    # `tolerant`, a few unconfirmed numbers within `max_unconfirmed` /
+    # `max_unconfirmed_ratio` are flagged instead of hard-blocking. All are
+    # keyword-only with back-compatible defaults (tolerant=False = strict), so the
+    # hub's existing calls are unchanged.
     assert list(sig.parameters) == [
         "ai_package_dir",
         "md_path",
         "skeptic_votes",
         "n_skeptics",
         "cross_model_votes",
+        "tolerant",
+        "max_unconfirmed",
+        "max_unconfirmed_ratio",
     ]
 
 

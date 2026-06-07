@@ -271,6 +271,86 @@ def test_run_g2_ignores_evidence_metadata_locators(tmp_path: Path) -> None:
     assert not verdict.blocked  # locators excluded; only the metric 28.4 (present) verified
 
 
+def _multi_ara(root: Path, name: str, values: list[str]) -> Path:
+    """An ara dir whose evidence table carries one DATA row per value."""
+    ara = root / "ai_package" / name / "ara"
+    (ara / "logic").mkdir(parents=True)
+    (ara / "evidence" / "tables").mkdir(parents=True)
+    (ara / "logic" / "claims.md").write_text("# Claims\n", encoding="utf-8")
+    rows = "".join(f"| r{i} | {v} |\n" for i, v in enumerate(values))
+    (ara / "evidence" / "tables" / "main.md").write_text(
+        f"| M | S |\n|---|---|\n{rows}", encoding="utf-8"
+    )
+    return ara
+
+
+def test_run_g2_tolerant_flags_a_few_misses_without_blocking(tmp_path: Path) -> None:
+    """Tolerant mode (config/audit.yaml): a small fraction of unconfirmed numbers
+    is FLAGGED (advisory finding) but does NOT block — the paper is kept."""
+    ara = _multi_ara(tmp_path, "tol", ["0.10", "0.20", "0.30", "0.40", "0.99"])
+    md = tmp_path / "tol.md"
+    md.write_text("We report 0.10, 0.20, 0.30 and 0.40.\n", encoding="utf-8")  # 0.99 absent
+    verdict = run_g2(
+        ara.parent,
+        md,
+        skeptic_votes=_honest,
+        n_skeptics=1,
+        tolerant=True,
+        max_unconfirmed=5,
+        max_unconfirmed_ratio=0.2,
+    )
+    assert verdict.blocked is False  # 1/5 miss within tolerance → kept
+    assert len(verdict.findings) == 1  # but the miss IS recorded
+    assert verdict.findings[0].is_hard_block is False
+    assert "0.99" in verdict.findings[0].observation
+    assert "TOLERATED" in verdict.findings[0].observation
+
+
+def test_run_g2_tolerant_blocks_when_absolute_limit_exceeded(tmp_path: Path) -> None:
+    """Too MANY misses = genuine poisoning → hard-block even in tolerant mode."""
+    ara = _multi_ara(tmp_path, "many", ["0.91", "0.92", "0.93"])
+    md = tmp_path / "many.md"
+    md.write_text("Nothing relevant here.\n", encoding="utf-8")  # all 3 absent
+    verdict = run_g2(
+        ara.parent,
+        md,
+        skeptic_votes=_honest,
+        n_skeptics=1,
+        tolerant=True,
+        max_unconfirmed=2,  # 3 misses > 2 → block
+        max_unconfirmed_ratio=1.0,
+    )
+    assert verdict.blocked is True
+    assert all(f.is_hard_block for f in verdict.hard_findings)
+
+
+def test_run_g2_tolerant_blocks_when_ratio_limit_exceeded(tmp_path: Path) -> None:
+    """Within the absolute count but over the ratio → still hard-block."""
+    ara = _multi_ara(tmp_path, "ratio", ["0.91", "0.92", "0.30", "0.40"])
+    md = tmp_path / "ratio.md"
+    md.write_text("We report 0.30 and 0.40.\n", encoding="utf-8")  # 2/4 = 0.5 absent
+    verdict = run_g2(
+        ara.parent,
+        md,
+        skeptic_votes=_honest,
+        n_skeptics=1,
+        tolerant=True,
+        max_unconfirmed=10,
+        max_unconfirmed_ratio=0.2,  # 0.5 > 0.2 → block
+    )
+    assert verdict.blocked is True
+
+
+def test_run_g2_strict_default_blocks_even_a_single_miss(tmp_path: Path) -> None:
+    """tolerant=False (the function default) preserves the original hard-block, so
+    the hub's existing strict behavior is unchanged unless opted out via config."""
+    ara = _multi_ara(tmp_path, "strict", ["0.10", "0.99"])
+    md = tmp_path / "strict.md"
+    md.write_text("We report 0.10.\n", encoding="utf-8")  # 0.99 absent
+    verdict = run_g2(ara.parent, md, skeptic_votes=_honest, n_skeptics=1)
+    assert verdict.blocked is True
+
+
 def test_run_g2_ignores_numeric_header_labels(tmp_path: Path) -> None:
     # Codex Round-12: a column HEADER can be a numeric metric label (Recall@10 /
     # mAP@0.5) — NOT an evidence value. Only DATA rows (after the |---| separator)

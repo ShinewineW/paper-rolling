@@ -62,6 +62,28 @@ class SpokeCancelled(Exception):
     """
 
 
+def _write_audit_flags(ara_dir: Path, verdict: Any) -> None:
+    """Record G2's tolerated (non-blocking) data-fidelity findings in the pack.
+
+    Written only in tolerant mode, when the gate kept the paper despite a few
+    unverified numbers (config/audit.yaml). Lands as `ara/AUDIT_FLAGS.md` so the
+    miss is visible alongside the knowledge pack instead of silently absorbed.
+    """
+    lines = [
+        "# Audit flags — tolerated data-fidelity findings",
+        "",
+        "These numbers were NOT confirmed in the source MD but fell within the "
+        "configured tolerance, so the paper was kept and flagged (not blocked). "
+        "Review before trusting them.",
+        "",
+    ]
+    for f in verdict.findings:
+        lines.append(f"- **[{f.severity.value}] {f.finding_id}** — {f.observation}")
+        if f.suggestion:
+            lines.append(f"  - _suggestion_: {f.suggestion}")
+    (ara_dir / "AUDIT_FLAGS.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def produce_outputs(
     md_path: Path,
     candidate: Any,
@@ -131,6 +153,12 @@ def produce_outputs(
             verdict = g2_gate(staging / "ai")  # staged ai ENTRY dir (parent of ara/)
             if verdict.blocked:
                 raise ProduceGateBlocked(verdict)
+            # Tolerant mode: G2 returned non-blocking (advisory) data-fidelity
+            # findings. The paper is kept, but the tolerated numbers are MARKED in
+            # the pack so the miss is visible downstream rather than silently
+            # absorbed (config/audit.yaml data_fidelity.mode: tolerant).
+            if verdict.findings:
+                _write_audit_flags(stage_ai, verdict)
 
         # branch1 derives from branch2 and self-gates on the anchor lint;
         # any unanchored empirical claim raises AnchorGateError here. `key` is

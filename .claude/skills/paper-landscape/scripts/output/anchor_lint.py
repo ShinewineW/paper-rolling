@@ -174,6 +174,14 @@ def lint_text(text: str) -> list[AnchorViolation]:
     for lineno, raw_line in enumerate(scan.splitlines(), 1):
         if _REF_MARKER.search(raw_line):
             continue
+        # A markdown table ROW is tabular data, not a prose performance claim:
+        # its cells are the paper's own reported figures, whose FIDELITY is gated
+        # by G2 (data-fidelity skeptic), not by this anchor lint. Policing table
+        # rows here false-positives on metric-name headers ("| ... | mAP↑ |", the
+        # `3` in `3D-Bbox`) and would block reports that faithfully render the
+        # gated evidence tables. Skip them (吸收-D1 targets prose assertions).
+        if raw_line.lstrip().startswith("|"):
+            continue
         prose = _COMMENT.sub("", raw_line)
         if _is_empirical_assertion(prose):
             violations.append(

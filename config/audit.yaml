@@ -1,0 +1,29 @@
+# config/audit.yaml — user-tunable audit knobs (trade strictness vs cost).
+#
+# OPTIONAL: delete this file (or any key) to fall back to the defaults shown.
+# This is operational tuning, separate from the locked campaign Hard Gate
+# (config/campaign.yaml). Edit freely; no Hard Gate re-fire.
+#
+# Lower = lighter & cheaper (fewer LLM calls, fewer papers quarantined).
+# Higher / mode:strict = the original maximal-strictness adversarial audit.
+
+# G2 number-fidelity skeptic passes per paper. ODD values give a clean majority
+# (1 = single pass; 3 = best-of-three). Each pass is one skeptic LLM call over
+# the full source text, so this is the biggest G2 cost lever.
+skeptic_votes: 1
+
+# How many times a blocked gate re-emits the offending branch before the paper
+# is quarantined. 1 = no retry (fail fast); 2 = one re-emit attempt.
+max_gate_rounds: 1
+
+data_fidelity:
+  # tolerant = a few unverified numbers are FLAGGED (written to the pack's
+  #            ara/AUDIT_FLAGS.md) but the paper is kept.
+  # strict   = ANY unverified number hard-blocks the whole paper (original).
+  mode: tolerant
+
+  # tolerant mode only: tolerate at most this many unverified numbers...
+  max_unconfirmed: 5
+  # ...AND at most this fraction of all checked numbers. Beyond either limit the
+  # paper is treated as genuinely poisoned and hard-blocked even in tolerant mode.
+  max_unconfirmed_ratio: 0.2
