@@ -15,19 +15,38 @@ from __future__ import annotations
 import json
 import re
 
-# A backslash NOT followed by a valid JSON escape char (\ " / b f n r t u).
-_BAD_ESCAPE = re.compile(r'\\(?![\\"/bfnrtu])')
+_VALID_ESCAPE = set('"\\/bfnrtu')  # chars that may follow a backslash in JSON
 _JSON_SPAN = re.compile(r"(\{.*\}|\[.*\])", re.S)
 _FENCE_OPEN = re.compile(r"^```[a-zA-Z]*\n?")
 _FENCE_CLOSE = re.compile(r"\n?```\s*$")
 
 
 def repair_json_escapes(s: str) -> str:
-    r"""Double any backslash that is not already a valid JSON escape.
+    r"""Double only LONE backslashes that aren't a valid JSON escape.
 
-    Turns ``\mathbf`` into ``\\mathbf`` so LaTeX-laden model output parses.
+    Pairwise scan: a valid escape pair (``\\``, ``\"``, ``\n``, ``\uXXXX`` …) is
+    kept intact — so ALREADY-escaped LaTeX like ``\\mathbf`` is NOT corrupted — and
+    a backslash followed by anything else (e.g. ``\mathbf``) is a stray LaTeX
+    backslash and gets doubled to ``\\mathbf``. (A regex doubling every "bad"
+    backslash mis-handled ``\\m`` -> ``\\\m`` and broke valid input.)
     """
-    return _BAD_ESCAPE.sub(r"\\\\", s)
+    out: list[str] = []
+    i, n = 0, len(s)
+    while i < n:
+        ch = s[i]
+        if ch == "\\":
+            nxt = s[i + 1] if i + 1 < n else ""
+            if nxt in _VALID_ESCAPE:  # valid escape pair — keep both, skip ahead
+                out.append(ch)
+                out.append(nxt)
+                i += 2
+                continue
+            out.append("\\\\")  # lone/stray backslash — escape it
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def extract_json(text: str):
