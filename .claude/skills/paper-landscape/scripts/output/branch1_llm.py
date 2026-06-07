@@ -25,9 +25,25 @@ from typing import Any
 
 from scripts.output.anchor_lint import _is_empirical_assertion, lint_text
 from scripts.output.branch1_report import AnchorGateError, _anchor, _find_in_md
+from scripts.output.figures import Figure, copy_figures
 
 _NUM = re.compile(r"\d+(?:\.\d+)?")
 _FENCE = re.compile(r"^```")
+
+
+def _figure_tour(figures: list[Figure], zh: dict[str, str]) -> str:
+    """论文图解导览 — embed EVERY original figure with its caption + 中文科普解说."""
+    out = [
+        "## 论文图解导览(原图)",
+        "",
+        "> 下列为论文**原图**,逐图导览(以原图为准);本节确保原文图示在人审报告中完整在场。",
+    ]
+    for i, f in enumerate(figures, 1):
+        cap = f.caption or f"Figure {i}"
+        out += ["", f"#### 图 {i} · {cap}", "", f"![]({f.ref})"]
+        if zh.get(f.ref):
+            out += ["", zh[f.ref]]
+    return "\n".join(out)
 
 
 def _claims_block(ara_dir: Path, md_text: str) -> str:
@@ -139,7 +155,19 @@ def write_branch1_llm(
     title = candidate["title"]
     key = key or person_dir.name
     md_text = md_path.read_text(encoding="utf-8")
-    sections = write_report(ara_dir)  # {section_id: markdown}
+
+    result = write_report(ara_dir, md_path=md_path)
+    # Tolerate the older flat {id: md} shape; the seam now returns sections+figures.
+    sections = result.get("sections", result) if isinstance(result, dict) else result
+    figures_meta = result.get("figures", []) if isinstance(result, dict) else []
+
+    # MANDATORY: every ORIGINAL paper figure must appear in the human report
+    # (paper-guided-tour). Copy the referenced images into the vault so report.md /
+    # report.html resolve them.
+    person_dir.mkdir(parents=True, exist_ok=True)
+    figs = [Figure(ref=f["ref"], caption=f.get("caption", "")) for f in figures_meta]
+    copied = copy_figures(figs, md_path.parent, person_dir)
+    zh = {f["ref"]: f.get("zh", "") for f in figures_meta}
 
     parts: list[str] = [
         f"# {title} — 深度解读",
@@ -154,6 +182,9 @@ def write_branch1_llm(
         if sid.startswith("06"):  # append the gated tables after 实验与对比
             parts.append("")
             parts.append(_evidence_tables(ara_dir))
+    if copied:  # the original-figure guided tour
+        parts.append("")
+        parts.append(_figure_tour(copied, zh))
 
     report = _ground_report("\n".join(parts) + "\n", md_text)
     violations = lint_text(report)
@@ -162,7 +193,10 @@ def write_branch1_llm(
             "branch1 (LLM) failed three-layer citation gate (吸收-D1): "
             + "; ".join(v.message for v in violations[:5])
         )
+    # Completeness hard-gate: every copied original figure MUST be embedded.
+    missing = [f.ref for f in copied if f"({f.ref})" not in report]
+    if missing:
+        raise AnchorGateError(f"branch1 (LLM) missing original figures: {missing}")
 
-    person_dir.mkdir(parents=True, exist_ok=True)
     (person_dir / "report.md").write_text(report, encoding="utf-8")
     (person_dir / "report.html").write_text(_html(title, report), encoding="utf-8")

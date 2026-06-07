@@ -22,6 +22,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from scripts.llm.jsonparse import extract_json
 from scripts.llm.providers import LLMProvider
 
 # Cap embedded ARA source per section so a prompt stays bounded.
@@ -196,3 +197,37 @@ def write_human_sections(
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         results = dict(ex.map(_one, SECTIONS))
     return results
+
+
+def narrate_figures(
+    figures, provider: LLMProvider, *, title: str = "", timeout: float = 300.0
+) -> dict[str, str]:
+    """Chinese science-pop narration for each ORIGINAL figure (keyed by ref path).
+
+    `figures` is a list of objects with `.ref` and `.caption`. Returns {ref: 中文解说}
+    (1-3 句, 通俗, 无散落性能数字). On any failure returns {} — the caller falls
+    back to the figure's own caption so completeness still holds.
+    """
+    figs = list(figures)
+    if not figs:
+        return {}
+    lines = "\n".join(f"{i}. {f.caption}" for i, f in enumerate(figs))
+    prompt = (
+        f"论文《{title}》里有以下原图(序号 + 英文图注)。为每张图写一句到三句**中文**科普解说,"
+        "讲清这张图在展示什么、对理解论文有什么帮助;通俗生动,面向学习者;"
+        "专有名词/公式保留原样;不要写散落的精确性能数字。\n\n"
+        f"{lines}\n\n"
+        '只回复一个 JSON 对象,key 为图的序号字符串,value 为中文解说,例如 {"0":"…","1":"…"}。'
+    )
+    try:
+        out = extract_json(provider.complete(prompt, tier="fast", timeout=timeout))
+    except (ValueError, RuntimeError):
+        return {}
+    if not isinstance(out, dict):
+        return {}
+    result: dict[str, str] = {}
+    for i, f in enumerate(figs):
+        zh = out.get(str(i)) or out.get(i)
+        if isinstance(zh, str) and zh.strip():
+            result[f.ref] = zh.strip()
+    return result

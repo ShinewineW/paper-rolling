@@ -25,7 +25,8 @@ from scripts.llm.analyzer import analyze_chunked
 from scripts.llm.config import LLMConfig, load_llm_config
 from scripts.llm.jsonparse import extract_json as _extract_json
 from scripts.llm.providers import FallbackProvider
-from scripts.llm.writer import write_human_sections
+from scripts.llm.writer import narrate_figures, write_human_sections
+from scripts.output.figures import extract_figures
 
 # Per-seam provider routing (config/llm.yaml; default = claude -p). Loaded once.
 # Transport (claude -p / opencode / any OpenAI-compatible API) is chosen PER SEAM
@@ -329,16 +330,25 @@ def expand_llm(prompt: str) -> list[str]:
 # --------------------------------------------------------------------------- #
 
 
-def write_report(ara_dir: Path, *, outdir: Path | None = None) -> dict[str, str]:
-    """Human-chain writer seam: gated ARA -> vivid Chinese report sections.
+def write_report(ara_dir: Path, *, md_path: Path | None = None, outdir: Path | None = None) -> dict:
+    """Human-chain writer seam: gated ARA (+ source MD) -> report material.
 
     Routed to the ``writer`` provider in config/llm.yaml (default claude -p;
-    typically a cheaper backend like deepseek). Returns {section_id: markdown};
-    the deterministic assembler stitches + grounds + lint-gates them.
+    typically a cheaper backend like deepseek). Returns:
+        {"sections": {section_id: markdown},
+         "figures":  [{"ref","caption","zh"}, ...]}  # ORIGINAL paper figures + 中文导览
+    branch1 stitches + grounds + lint-gates the sections and embeds EVERY figure
+    (the paper-guided-tour requirement). ``md_path`` enables the figure inventory.
     """
     provider = _provider_for("writer")
     _log(f"write_report: writer provider = {provider.name}")
-    return write_human_sections(Path(ara_dir), provider, outdir=outdir, log=_log)
+    sections = write_human_sections(Path(ara_dir), provider, outdir=outdir, log=_log)
+    figs = extract_figures(Path(md_path)) if md_path else []
+    if figs:
+        _log(f"write_report: narrating {len(figs)} original figures")
+    narr = narrate_figures(figs, provider) if figs else {}
+    figures = [{"ref": f.ref, "caption": f.caption, "zh": narr.get(f.ref, "")} for f in figs]
+    return {"sections": sections, "figures": figures}
 
 
 def build_seams() -> dict:
