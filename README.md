@@ -232,8 +232,12 @@ model seams" documents the exact input/output shape of each:
 
 - **`pandoc`** (Tier-1 ingest): `brew install pandoc` / GitHub release binary.
   Converts MathML → LaTeX `$$` in `--to gfm`.
-- **`mineru`** (Tier-2 ingest): `uv pip install -U "mineru[core]"` into the shared
-  venv. CPU backend (`-b pipeline`); first run downloads multi-GB model weights.
+- **`mineru`** (Tier-2 ingest): from the repo root (after `uv sync`),
+  `uv pip install -U "mineru[core]"` — it installs into **this project's `.venv`**
+  (uv's project-local env; there is no shared venv). CPU backend (`-b pipeline`).
+  First run downloads multi-GB model weights into the **standard model cache**
+  (`~/.cache/huggingface` by default, or `~/.cache/modelscope` via
+  `MINERU_MODEL_SOURCE=modelscope`) — a user-level cache, never the project tree.
 - **OpenAlex polite pool**: a non-secret `mailto` email (D-发现-2) lifts the rate
   limit. Configured via the OpenAlex source's `polite_email`.
 - **Hugging Face Papers**: the source **hardcodes a fine-grained READ-ONLY HF
