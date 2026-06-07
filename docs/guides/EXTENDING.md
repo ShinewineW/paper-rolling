@@ -8,7 +8,7 @@
 
 How to add capabilities **within the paper vertical**. Cross-vertical extension
 (news, other content domains) is deliberately out of scope until a real second
-vertical exists — see [ADR-0002](adr/0002-extend-on-rule-of-three.md).
+vertical exists — see [ADR-0002](../adr/0002-extend-on-rule-of-three.md).
 
 Two seams are already **abstracted** (adding is a drop-in); the rest are kept
 **concrete** on purpose (rule-of-three not yet met) and documented here so you

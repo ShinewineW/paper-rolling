@@ -82,8 +82,8 @@ Status keys: `planned` · `in-progress` · `done`.
   and was under-weighted. **Remedy shipped**: (1) the three deterministic infra adapters
   now ship as tested factories in `scripts/adapters.py`
   (`build_http`/`build_run_cli`/`build_discover`; +7 unit tests + a live-discovery
-  smoke), and (2) the agent-facing knowledge layer is built (`references/` ×7 +
-  `sub-skills/` ×4). Invoking `/paper-landscape` now only requires constructing the 4
+  smoke), and (2) the agent-facing knowledge layer is built (`references/` ×8 +
+  `sub-skills/` ×4 + `examples/` + `templates/`). Invoking `/paper-landscape` now only requires constructing the 4
   LLM seams; everything deterministic is wired. See `docs/adr/0003-skill-knowledge-layer-and-shipped-adapters.md`
   + `.claude/skills/paper-landscape/references/wiring-the-seams.md` + `attn_sink/oh-my-codex-review-log.md` (R21).
 

@@ -81,6 +81,6 @@ found in the source MD are hard-blocked as fabrication before promotion.
   bundle, `rigor_scores` over the 6 `DIMENSION_KEYS`, `entailment_judge`).
 - `../sub-skills/g2-skeptic/SKILL.md` — the skeptic gate over the numbers in this bundle.
 - `../sub-skills/g3-rigor-reviewer/SKILL.md` — `rigor_scores` reads this same bundle over the 6 `DIMENSION_KEYS`.
-- Engine composition + the 8 injected callables: `../SKILL.md`.
+- Engine composition + the injected seams: `../SKILL.md` and `wiring-the-seams.md`.
 
 LICENSE: CC-BY-NC 4.0 (research-only).

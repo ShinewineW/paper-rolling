@@ -36,7 +36,7 @@ callables (the agent's WebFetch/Bash are tools, not Python fn args).
 reference skill ships a standalone runner; the host agent orchestrates), so that
 overrule stands. But its *smell* was real and was under-weighted: with an empty
 `references/`/`sub-skills/` and no shipped infra adapters, the agent had only
-SKILL.md prose to wire eight callables and would re-improvise `http`/`discover`
+SKILL.md prose to wire every seam and would re-improvise `http`/`discover`
 plumbing every run. W1 correctly sensed incompleteness; it misattributed it to
 missing application code rather than a missing skill knowledge layer.
 

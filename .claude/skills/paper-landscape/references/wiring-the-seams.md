@@ -33,9 +33,11 @@ The wiring is CODE precisely so prose drift can't bypass the adversarial
 guarantees (G2 number-fabrication hard-block + G3 6-dim seal): every run goes
 through both gates regardless of which seams the agent supplies.
 
-## The 8 injected callables — two kinds
+## The injected callables — 7 to run_campaign, two kinds
 
-`run_campaign(...)` takes **eight** callables, of two distinct kinds.
+`run_campaign(...)` takes **seven** injected callables, of two distinct kinds (an
+eighth LLM seam — the query-expansion `llm` — is used to *build* the `discover`
+adapter before composition, not passed to `run_campaign`).
 
 ### (A) 4 LLM seams — agent-provided, each an INDEPENDENT Agent-tool invocation
 
