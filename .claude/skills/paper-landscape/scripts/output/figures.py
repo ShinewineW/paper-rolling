@@ -33,6 +33,7 @@ _ARCH_CUE = re.compile(
     r"(?i)(architecture|overview|framework|pipeline|model\s+structure|the\s+method|"
     r"our\s+(model|method|approach|framework|pipeline)|架构|框架|流程|结构|总览|整体|方法概览)"
 )
+_CAP_CUE = re.compile(r"(?i)^(figure|fig\.?|table|tab\.?|图|表)\s*\d")
 
 
 def is_architecture_caption(caption: str) -> bool:
@@ -52,8 +53,10 @@ class Figure:
 def extract_figures(md_path: Path) -> list[Figure]:
     """Ordered, de-duplicated original figures referenced in the frozen MD.
 
-    Caption = the first non-empty line after the image ref, tag-stripped (MinerU
-    puts ``Figure N: …`` there); empty if none.
+    Caption: scan the lines after the ref (tag-stripped), SKIPPING blanks and other
+    image refs (consecutive grid images carry no caption between them — the group
+    caption follows). Prefer a real ``Figure N: …`` caption line; else the first
+    text line; else empty.
     """
     lines = Path(md_path).read_text(encoding="utf-8").splitlines()
     figs: list[Figure] = []
@@ -66,12 +69,13 @@ def extract_figures(md_path: Path) -> list[Figure]:
         if ref in seen:
             continue
         seen.add(ref)
-        caption = ""
-        for nxt in lines[i + 1 : i + 4]:
+        window: list[str] = []
+        for nxt in lines[i + 1 : i + 9]:
             stripped = _TAG.sub("", nxt).strip()
-            if stripped:
-                caption = stripped
-                break
+            if not stripped or _IMG_REF.search(stripped):  # skip blanks + adjacent images
+                continue
+            window.append(stripped)
+        caption = next((w for w in window if _CAP_CUE.search(w)), window[0] if window else "")
         figs.append(Figure(ref=ref, caption=caption[:300]))
     return figs
 
