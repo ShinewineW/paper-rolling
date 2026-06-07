@@ -18,6 +18,7 @@ in tables / anchored conclusions), staying faithful + gate-passing.
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 from pathlib import Path
@@ -31,18 +32,16 @@ _NUM = re.compile(r"\d+(?:\.\d+)?")
 _FENCE = re.compile(r"^```")
 
 
-def _figure_tour(figures: list[Figure], zh: dict[str, str]) -> str:
-    """论文图解导览 — embed EVERY original figure with its caption + 中文科普解说."""
-    out = [
-        "## 论文图解导览(原图)",
-        "",
-        "> 下列为论文**原图**(核心方法/模型结构图 + 精选的代表性结果图),逐图导览,以原图为准。",
-    ]
-    for i, f in enumerate(figures, 1):
-        cap = f.caption or f"Figure {i}"
-        out += ["", f"#### 图 {i} · {cap}", "", f"![]({f.ref})"]
-        if zh.get(f.ref):
-            out += ["", zh[f.ref]]
+def _fig_block(figures: list[Figure], zh: dict[str, str], *, heading: str = "") -> str:
+    """Render a group of original figures INLINE: each image followed by an italic
+    Chinese caption (the science-pop gloss; falls back to the paper's own caption).
+    Used to weave figures into the relevant sections (intro / method / results)."""
+    out: list[str] = [heading] if heading else []
+    for f in figures:
+        out += ["", f"![]({f.ref})"]
+        cap = (zh.get(f.ref) or f.caption or "").strip()
+        if cap:
+            out += ["", f"*{cap}*"]
     return "\n".join(out)
 
 
@@ -107,23 +106,48 @@ def _ground_report(report: str, md_text: str) -> str:
     return "\n".join(out)
 
 
-def _html(title: str, markdown: str) -> str:
-    """Self-contained HTML: marked.js renders the MD, mermaid.js the diagrams."""
-    md_js = json.dumps(markdown)
+def _inline_images(markdown: str, img_dir: Path) -> str:
+    """Replace ``![alt](images/HASH.ext)`` with base64 data URIs so the HTML is
+    fully self-contained — original figures render anywhere (file://, moved, etc.),
+    not subject to a browser's local-subresource sandbox."""
+
+    def repl(m: re.Match) -> str:
+        p = img_dir / m.group(2)
+        if not p.is_file():
+            return m.group(0)
+        ext = p.suffix.lstrip(".").lower() or "jpeg"
+        ext = "jpeg" if ext == "jpg" else ext
+        b64 = base64.b64encode(p.read_bytes()).decode("ascii")
+        return f"![{m.group(1)}](data:image/{ext};base64,{b64})"
+
+    return re.sub(r"!\[([^\]]*)\]\((images/[^)\s]+)\)", repl, markdown)
+
+
+def _html(title: str, markdown: str, img_dir: Path) -> str:
+    """Self-contained light-theme HTML: marked.js renders the MD, mermaid the
+    diagrams; original figures are inlined as base64 (no external files)."""
+    md_js = json.dumps(_inline_images(markdown, img_dir))
     return (
         "<!doctype html><html lang=zh><head><meta charset=utf-8>"
         "<meta name=viewport content='width=device-width,initial-scale=1'>"
         f"<title>{title} — 深度解读</title>"
         "<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'></script>"
         "<script type=module>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';"
-        "mermaid.initialize({startOnLoad:false,theme:'dark'});window.__mermaid=mermaid;</script>"
-        "<style>body{background:#0d1117;color:#e6edf3;font-family:-apple-system,'Segoe UI',sans-serif;"  # noqa: E501
+        "mermaid.initialize({startOnLoad:false,theme:'default'});window.__mermaid=mermaid;</script>"
+        "<style>body{background:#ffffff;color:#1f2328;font-family:-apple-system,'Segoe UI',sans-serif;"  # noqa: E501
         "line-height:1.8;max-width:860px;margin:0 auto;padding:3rem 1.5rem}"
-        "h1{border-bottom:2px solid #30363d}h2{margin-top:2.5rem;color:#79c0ff}h3{color:#a5d6ff}"
-        "pre{background:#161b22;padding:1rem;border-radius:8px;overflow:auto}"
+        "h1{border-bottom:2px solid #d0d7de;padding-bottom:.3rem}"
+        "h2{margin-top:2.5rem;color:#0969da}h3{color:#0a3069}h4{color:#0a3069}"
+        "a{color:#0969da}pre{background:#f6f8fa;padding:1rem;border-radius:8px;overflow:auto}"
+        "code{background:#eff1f3;padding:.1rem .3rem;border-radius:4px}"
+        "pre code{background:none;padding:0}"
+        "blockquote{color:#57606a;border-left:.25rem solid #d0d7de;margin:1rem 0;padding:0 1rem}"
+        "img{max-width:100%;height:auto;border:1px solid #d0d7de;border-radius:6px;"
+        "margin:1rem 0;display:block}"
+        "figcaption,em{color:#57606a}"
         "table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9em}"
-        "td,th{border:1px solid #30363d;padding:.4rem .6rem}th{background:#161b22}"
-        ".mermaid{background:#161b22;border-radius:8px;padding:1rem;margin:1rem 0}</style></head>"
+        "td,th{border:1px solid #d0d7de;padding:.4rem .6rem}th{background:#f6f8fa}"
+        ".mermaid{background:#f6f8fa;border-radius:8px;padding:1rem;margin:1rem 0}</style></head>"
         "<body><div id=doc></div>"
         f"<script>const md={md_js};document.getElementById('doc').innerHTML=marked.parse(md);"
         "document.querySelectorAll('code.language-mermaid').forEach(c=>{"
@@ -170,6 +194,14 @@ def write_branch1_llm(
     copied = copy_figures(figs, md_path.parent, person_dir)
     zh = {f["ref"]: f.get("zh", "") for f in selected}
 
+    # Group figures by role (doc order preserved) for SECTION-AWARE placement:
+    # the overall架构图 sets the tone right after 导读; the structure sub-figures
+    # sit with 方法与架构; result figures form a showcase after 实验.
+    role_of = {f["ref"]: f.get("role", "other") for f in selected}
+    arch = [f for f in copied if role_of.get(f.ref) == "architecture"]
+    results = [f for f in copied if role_of.get(f.ref) != "architecture"]
+    primary_arch, rest_arch = arch[:1], arch[1:]
+
     parts: list[str] = [
         f"# {title} — 深度解读",
         "",
@@ -177,15 +209,32 @@ def write_branch1_llm(
         "",
         _claims_block(ara_dir, md_text),
     ]
+    emitted: set[str] = set()
+
+    def _place(group: list[Figure], heading: str) -> None:
+        if not group:
+            return
+        parts.append("")
+        parts.append(_fig_block(group, zh, heading=heading))
+        emitted.update(f.ref for f in group)
+
     for sid in sorted(sections):
         parts.append("")
         parts.append(str(sections[sid]).strip())
-        if sid.startswith("06"):  # append the gated tables after 实验与对比
+        if sid.startswith("01"):  # 初始定调:总体架构图紧跟导读
+            _place(primary_arch, "**论文总体架构(原图):**")
+        elif sid.startswith("04"):  # 方法论:模型结构与子图紧跟方法
+            _place(rest_arch, "**模型结构与关键子图(原图):**")
+        elif sid.startswith("06"):  # 实验:表格 + 效果示例
             parts.append("")
             parts.append(_evidence_tables(ara_dir))
-    if copied:  # the original-figure guided tour
+            _place(results, "**效果示例(论文原图):**")
+    # Backstop: any copied figure not yet placed (e.g. a section was missing) —
+    # keep completeness by appending it so the mandatory figures never vanish.
+    leftover = [f for f in copied if f.ref not in emitted]
+    if leftover:
         parts.append("")
-        parts.append(_figure_tour(copied, zh))
+        parts.append(_fig_block(leftover, zh, heading="## 其余论文原图"))
 
     report = _ground_report("\n".join(parts) + "\n", md_text)
     violations = lint_text(report)
@@ -209,4 +258,4 @@ def write_branch1_llm(
         )
 
     (person_dir / "report.md").write_text(report, encoding="utf-8")
-    (person_dir / "report.html").write_text(_html(title, report), encoding="utf-8")
+    (person_dir / "report.html").write_text(_html(title, report, person_dir), encoding="utf-8")

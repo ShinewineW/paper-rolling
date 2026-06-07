@@ -60,7 +60,11 @@ def test_write_branch1_llm_embeds_selected_figures(tmp_path: Path) -> None:
 
     def fake_write_report(ara_dir, *, md_path=None, outdir=None):  # noqa: ARG001
         return {
-            "sections": {"04_方法": "## 方法与架构\n本文方法概述。"},
+            "sections": {
+                "01_导读": "## 导读\n本文方法概述。",
+                "04_方法与架构": "## 方法与架构\n核心流程如下。",
+                "06_实验与对比": "## 实验与对比\n定性领先(详见下方实验表)。",
+            },
             "figures": [
                 {  # mandatory core structure diagram
                     "ref": "images/aaa.jpg",
@@ -89,13 +93,20 @@ def test_write_branch1_llm_embeds_selected_figures(tmp_path: Path) -> None:
     write_branch1_llm(person, {"title": "P"}, ara, md, fake_write_report, key="k")
 
     report = (person / "report.md").read_text(encoding="utf-8")
-    assert "## 论文图解导览(原图)" in report
     assert "![](images/aaa.jpg)" in report  # mandatory architecture figure
     assert "![](images/bbb.jpg)" in report  # selected result figure
     assert "images/ccc.jpg" not in report  # NOT selected -> not embedded
-    assert "图1说明了整体架构。" in report
+    assert "图1说明了整体架构。" in report  # zh caption under the figure
+    # section-aware placement: architecture by the intro, results after experiments
+    assert "论文总体架构" in report and "效果示例" in report
+    assert report.index("论文总体架构") < report.index("效果示例")  # intro before results
     assert (person / "images" / "aaa.jpg").exists() and (person / "images" / "bbb.jpg").exists()
     assert not (person / "images" / "ccc.jpg").exists()  # not copied
+
+    # HTML is self-contained: original figures inlined as base64 (no broken links)
+    html = (person / "report.html").read_text(encoding="utf-8")
+    assert "data:image/jpeg;base64," in html
+    assert "background:#ffffff" in html  # light theme
 
 
 def test_write_branch1_llm_requires_architecture_figure(tmp_path: Path) -> None:
