@@ -1,0 +1,1 @@
+论文未给出显式训练损失公式。训练期：冻结基础模型权重，仅优化各控制分支（每分支 3 个 transformer 块 + 零初始化线性层），继承 Cosmos-Predict1 的扩散去噪训练范式；各控制分支单独训练，互不干扰。推理期（非训练目标）：条件去噪器由基础去噪器 $$\mathbf{n} = D(\mathbf{x}_{\sigma}, \sigma)$$（公式1）扩展为 $$\mathbf{n} = D(\mathbf{x}_{\sigma}, \sigma, \mathbf{c})$$（公式2）；各控制分支激活通过时空控制图做元素积 $\mathbf{w}_i \cdot \mathbf{h}_i^j$ 加权后叠回主干，当各模态权重之和超过 1 时对权重归一化使其和为 1。

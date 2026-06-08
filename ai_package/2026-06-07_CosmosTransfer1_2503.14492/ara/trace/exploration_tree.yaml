@@ -1,0 +1,124 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何在大规模视频扩散世界模型中引入可组合的多模态空间控制？
+  description: 核心研究动机：单一模态（如仅深度或仅分割）无法同时满足结构保真与语义保留的需求；现有 ControlNet 架构为单模态设计，需要一种在架构与训练层面均可扩展的多模态融合方案。
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3
+  children:
+  - id: D1
+    type: decision
+    title: 控制分支训练策略：联合训练所有模态 vs 各模态分别独立训练后推理融合
+    choice: 各控制分支独立训练，仅在推理时通过时空控制图融合
+    alternatives:
+    - 联合同时训练所有控制分支（因内存瓶颈与配对数据稀缺被排除）
+    support_level: explicit
+    source_refs:
+    - Sec 3
+    children:
+    - id: DE1
+      type: dead_end
+      title: 联合训练所有控制分支：内存不可行 + 配对多模态数据稀缺
+      hypothesis: 同时优化多个控制分支可以在训练阶段捕获模态间的协同效应，从而获得更强的联合控制能力
+      failure_mode: 大规模视频数据联合训练时多个控制分支带来的显存开销超出工程可行边界；同时，某些模态（如带精确 HD 地图标注的驾驶视频）的配对多模态数据难以大量获取，若强制要求所有模态对齐则严重限制可用训练数据规模
+      lesson: 分治策略将内存压力降至单分支量级，并允许每个模态使用最适合该模态的独立数据集；推理时融合的灵活性（随意增减模态）是额外收益，不因联合训练缺失而损失
+      support_level: explicit
+      source_refs:
+      - Sec 3
+    - id: E1
+      type: experiment
+      title: TransferBench：单模态控制基线 vs 均匀权重多模态融合定量对比（Tab. 1）
+      result: 均匀权重多模态融合（Cosmos-Transfer1-7B Uniform Weights）在整体 Quality Score 上高于所有单模态基线，并在
+        Depth 对齐方面取得最优；单模态模型在各自专项指标上表现最强，但整体视觉质量分数明显低于多模态配置，验证了多模态融合的互补优势
+      support_level: explicit
+      source_refs:
+      - Sec 5.1
+      - Tab. 1
+  - id: D2
+    type: decision
+    title: 时空控制图（spatiotemporal control map）的生成方式选择
+    choice: 支持三种生成方式：手动设计、基于先验观测的启发式规则（如 SalientObject 算法）、神经网络预测；实验重点验证启发式方式
+    alternatives:
+    - 全局单一标量权重（已作为均匀基线实验）
+    - 仅使用手动常数权重
+    support_level: explicit
+    source_refs:
+    - Sec 3
+    - Sec 5.2
+    children:
+    - id: E2
+      type: experiment
+      title: SalientObject 算法：前景 vis/edge 权重消融与背景 depth 权重消融（Fig. 7）
+      result: 前景 vis 权重单调递增时前景 Blur SSIM 呈强正相关改善；背景 depth 权重单调递增时 Depth si-RMSE 呈强负相关下降；两组实验的
+        Pearson 相关系数均接近正负单位值，定量验证了时空控制图对各区域各指标的精细调控能力
+      support_level: explicit
+      source_refs:
+      - Sec 5.2
+      - Fig. 7
+    - id: E3
+      type: experiment
+      title: 前景/背景模态分配互换实验：vis+edge 与 depth+seg 前背景对调（Tab. 2）
+      result: 将 vis+edge 从前景移至背景后，背景 Blur SSIM 与 Edge F1 显著提升，前景对应指标随之下降；同时多样性 LPIPS
+        在前景与背景方向均发生显著反向变化，证明空间自适应权重能精确调控每个区域的生成自由度
+      support_level: explicit
+      source_refs:
+      - Sec 5.2
+      - Tab. 2
+- id: Q2
+  type: question
+  title: DiT 架构的 ControlNet 设计如何适配多模态视频控制？
+  description: 原始 ControlNet（Zhang et al., 2023）为 UNet 架构设计，Chen et al.（2024）将其扩展至
+    DiT；Cosmos-Transfer1 需在此基础上进一步决定条件块数量和线性层初始化策略。
+  support_level: explicit
+  source_refs:
+  - Sec 2
+  children:
+  - id: PIV1
+    type: pivot
+    title: 从 UNet-based ControlNet 到 DiT-based ControlNet 的架构迁移
+    from: 原始 ControlNet 依托 UNet 卷积编码器-解码器结构，通过跳连接传递条件信息
+    to: Cosmos-Transfer1 在 DiT 架构中构建控制分支：3 个 Transformer 条件块（权重从基模型对应块初始化），每个块的输出经零初始化线性层加至基模型对应块激活
+    trigger: Cosmos-Predict1 底层采用 DiT 架构（Peebles and Xie, 2023），卷积跳连接不适用，必须重新设计适配
+      Transformer 的条件注入机制
+    support_level: explicit
+    source_refs:
+    - Sec 2
+    - Fig. 1
+- id: Q3
+  type: question
+  title: Cosmos-Transfer1 能否有效缩小机器人仿真与真实场景之间的域差（Sim2Real）？
+  description: 机器人仿真视频（NVIDIA Omniverse / Isaac Lab 输出）与真实场景存在光照、纹理、背景等显著域差；需评估 Cosmos-Transfer1
+    在保留机器人动作完整性的同时提升视频真实感和多样性的效果。
+  support_level: explicit
+  source_refs:
+  - Sec 5.3
+  children:
+  - id: E4
+    type: experiment
+    title: 机器人 Sim2Real 定量评估：单模态基线 vs 两种时空控制图配置（Tab. 3，120 条视频）
+    result: 时空控制图多模态配置（Setting 2：Edge 前景 + Seg 背景）在整体 Quality Score 上优于所有单模态基线；两种多模态配置在
+      Quality Score、Diversity-LPIPS 和前景 FG Mask mIoU 的综合表现均位于排名前列，表明自适应时空权重在提升视觉质量的同时更好地保留了前景机器人形态
+    support_level: explicit
+    source_refs:
+    - Sec 5.3
+    - Tab. 3
+- id: Q4
+  type: question
+  title: 如何通过推理并行化策略实现 Cosmos-Transfer1-7B 的实时视频生成？
+  description: 单 GPU 推理生成一段视频远慢于实时速率；需设计面向 GB200 NVL72 系统特性（any-to-any NVLink、大 HBM）的并行化策略，在不引入额外归约开销的前提下线性扩展至多
+    GPU。
+  support_level: explicit
+  source_refs:
+  - Sec 6
+  children:
+  - id: E5
+    type: experiment
+    title: GB200 NVL72 上不同 GPU 数量的推理扩展性实验（Tab. 5）
+    result: 随 GPU 数量从 1 增至 64，扩散阶段计算时间呈近线性下降，整体加速比约达 40 倍；64 GPU 配置下端到端推理时长首次低于视频时长，实现实时生成吞吐率
+    support_level: explicit
+    source_refs:
+    - Sec 6
+    - Tab. 5
