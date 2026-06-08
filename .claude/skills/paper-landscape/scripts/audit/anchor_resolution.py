@@ -31,6 +31,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from scripts.audit.types import Finding, GateVerdict, Severity
+from scripts.output.anchor_lint import unanchored_empirical_lines
 
 _VALID_KINDS = frozenset({"quote", "page", "section", "paragraph", "none"})
 
@@ -39,39 +40,11 @@ _REF_ANCHOR = re.compile(
     r"<!--ref:[A-Za-z][A-Za-z0-9_:-]*(?:\s+[\w-]+){0,2}\s*-->"
     r"\s*<!--anchor:([a-z]+):([^>]*?)-->"
 )
-# Any anchor at all (to associate sentences with their anchors).
-_ANY_ANCHOR = re.compile(r"<!--anchor:[a-z]+:[^>]*?-->")
-# An empirical sentence cue: contains a number (the load-bearing surface for
-# the grounding requirement).
-_NUMBER = re.compile(r"\d+(?:\.\d+)?")
-# Sentence splitter that respects CJK and Latin terminators.
-_SENTENCE_SPLIT = re.compile(r"[。！？\n]|(?<=[.!?])\s+")
-# Fenced code blocks (mermaid diagrams, code stubs) — blanked before the
-# anchorless-number scan so diagram/code digits never count as empirical
-# assertions (mirrors branch1's own authoring gate, anchor_lint._strip_code_fences).
-_FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
-# Empirical PERFORMANCE cue (吸收-D1 contract, mirrored from anchor_lint): a
-# number alone (file paths, math exponents, the literal "branch2") is
-# illustrative and does NOT require an anchor; only a number co-occurring with a
-# metric/comparison cue (or a percent) is an empirical claim that MUST anchor.
-_PERCENT = re.compile(r"\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*个百分点")
-_METRIC_CUE = re.compile(
-    r"\b(NDS|mAP|AP|IoU|mIoU|BLEU|F1|AUC|ROUGE|PSNR|SSIM|FID|accuracy|acc|recall|"
-    r"precision|score|top-?\d|准确率|精度|召回|提升|超过|高于|达到|outperform\w*|"
-    r"improv\w*|reduc\w*|gain|百分点)\b",
-    re.IGNORECASE,
-)
 
-
-def _is_empirical_performance(sentence: str) -> bool:
-    """True iff `sentence` asserts an empirical performance number (must anchor).
-
-    Mirrors anchor_lint's authoring-side contract so the G3 auditor and the
-    branch1 author agree on which sentences require a three-layer anchor.
-    """
-    if _PERCENT.search(sentence):
-        return True
-    return bool(_NUMBER.search(sentence) and _METRIC_CUE.search(sentence))
+# "Which lines must be anchored" is decided by the SHARED detector in anchor_lint
+# (`unanchored_empirical_lines`), so the G3 auditor and the branch1 author agree
+# exactly — line-based, skips fences / ref-lines / table rows. (Previously G3 used
+# its own sentence-based scan that disagreed and rejected reports branch1 passed.)
 
 
 @dataclass(frozen=True)
@@ -124,7 +97,6 @@ def check_branch1_md_anchors(
     that MUST anchor. Defaults to the metric-cue heuristic; production may plug a
     trained NLI / factual-consistency model that generalizes beyond keyword cues.
     """
-    classify = is_empirical or _is_empirical_performance
     report = report_path.read_text(encoding="utf-8")
     md_text = md_path.read_text(encoding="utf-8")
     findings: list[Finding] = []
@@ -151,36 +123,31 @@ def check_branch1_md_anchors(
                 )
             )
 
-    # 2. Every empirical PERFORMANCE sentence must carry an anchor. Code fences
-    #    (mermaid diagrams) are blanked first, and bare numbers without a
-    #    metric/comparison cue (math exponents, file paths, the literal
-    #    "branch2") are illustrative — only performance assertions must anchor,
-    #    matching branch1's own authoring gate (吸收-D1).
-    scan = _FENCE.sub(lambda m: "\n" * m.group(0).count("\n"), report)
-    fault = 0
-    for sentence in _SENTENCE_SPLIT.split(scan):
-        s = sentence.strip()
-        if not s or not classify(s):
-            continue
-        if not _ANY_ANCHOR.search(s):
-            fault += 1
-            findings.append(
-                Finding(
-                    finding_id=f"NA{fault:02d}",
-                    severity=Severity.CRITICAL,
-                    target=str(report_path.name),
-                    observation=(
-                        f"empirical sentence carries a number but has no anchor "
-                        f"(吸收-D1 hard gate): {_normalize(s)[:80]!r}"
-                    ),
-                    is_hard_block=True,
-                    reasoning=(
-                        "An un-anchored empirical statement cannot be traced to "
-                        "the MD and is treated as ungrounded."
-                    ),
-                    suggestion=(
-                        "Add a <!--ref:slug--><!--anchor:quote:...--> pointing at the MD span."
-                    ),
-                )
+    # 2. Every empirical PERFORMANCE LINE must carry an anchor — via the SHARED
+    #    line-based detector (anchor_lint.unanchored_empirical_lines). Identical to
+    #    branch1's own authoring gate (skips fences / ref-lines / table rows), so a
+    #    report that passes branch1 is never rejected here on a divergent scan.
+    #    `is_empirical` (ROADMAP C4) still injects a custom classifier if provided.
+    for fault, (lineno, prose) in enumerate(
+        unanchored_empirical_lines(report, is_empirical=is_empirical), start=1
+    ):
+        findings.append(
+            Finding(
+                finding_id=f"NA{fault:02d}",
+                severity=Severity.CRITICAL,
+                target=str(report_path.name),
+                observation=(
+                    f"empirical line carries a number but has no anchor "
+                    f"(吸收-D1 hard gate) [L{lineno}]: {prose[:80]!r}"
+                ),
+                is_hard_block=True,
+                reasoning=(
+                    "An un-anchored empirical statement cannot be traced to "
+                    "the MD and is treated as ungrounded."
+                ),
+                suggestion=(
+                    "Add a <!--ref:slug--><!--anchor:quote:...--> pointing at the MD span."
+                ),
             )
+        )
     return GateVerdict(gate="G3-anchor", findings=tuple(findings))

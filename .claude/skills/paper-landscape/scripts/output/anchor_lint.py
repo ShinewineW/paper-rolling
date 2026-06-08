@@ -121,6 +121,33 @@ def _is_empirical_assertion(prose: str) -> bool:
     return any(w in _EMPIRICAL_VERBS for w in re.findall(r"[A-Za-z][A-Za-z-]*", lowered))
 
 
+def unanchored_empirical_lines(text: str, *, is_empirical=None) -> list[tuple[int, str]]:
+    """Lines that ARE empirical-performance assertions but carry NO ``<!--ref-->``.
+
+    THE single source of truth for "which lines must be anchored" — shared by the
+    branch1 authoring lint (`lint_text` below) AND the G3 anchor auditor
+    (`scripts/audit/anchor_resolution.check_branch1_md_anchors`), so a report that
+    passes branch1 can never be rejected by G3 on a *different* empirical scan
+    (the bug that blocked every dense paper: branch1 was line-based + skipped table
+    rows, G3 was sentence-based + didn't).
+
+    Line-based; skips code fences, ref-carrying lines, and markdown table rows
+    (table cells are the paper's own figures, gated by G2 — not prose claims).
+    Returns ``(1-based line, stripped prose)``. ``is_empirical`` optionally injects
+    a classifier (ROADMAP C4); defaults to the metric-cue heuristic.
+    """
+    classify = is_empirical or _is_empirical_assertion
+    scan = _strip_code_fences(text)
+    out: list[tuple[int, str]] = []
+    for lineno, raw_line in enumerate(scan.splitlines(), 1):
+        if _REF_MARKER.search(raw_line) or raw_line.lstrip().startswith("|"):
+            continue
+        prose = _COMMENT.sub("", raw_line)
+        if classify(prose):
+            out.append((lineno, prose.strip()))
+    return out
+
+
 def lint_text(text: str) -> list[AnchorViolation]:
     """Return all anchor-contract violations; empty list = PASS."""
     scan = _strip_code_fences(text)
@@ -168,28 +195,15 @@ def lint_text(text: str) -> list[AnchorViolation]:
             )
 
     # 4. paper-rolling addition — unanchored empirical PERFORMANCE assertions
-    #    hard-block. Line-based: a line carrying a <!--ref--> is anchored;
-    #    otherwise strip comment markers and test the prose for a performance
-    #    assertion (so encoded decimals / `-->` cannot shred or hide a ref).
-    for lineno, raw_line in enumerate(scan.splitlines(), 1):
-        if _REF_MARKER.search(raw_line):
-            continue
-        # A markdown table ROW is tabular data, not a prose performance claim:
-        # its cells are the paper's own reported figures, whose FIDELITY is gated
-        # by G2 (data-fidelity skeptic), not by this anchor lint. Policing table
-        # rows here false-positives on metric-name headers ("| ... | mAP↑ |", the
-        # `3` in `3D-Bbox`) and would block reports that faithfully render the
-        # gated evidence tables. Skip them (吸收-D1 targets prose assertions).
-        if raw_line.lstrip().startswith("|"):
-            continue
-        prose = _COMMENT.sub("", raw_line)
-        if _is_empirical_assertion(prose):
-            violations.append(
-                AnchorViolation(
-                    lineno,
-                    f"unanchored empirical assertion (no <!--ref--> marker): {prose.strip()[:60]!r}",  # noqa: E501
-                )
+    #    hard-block, via the SHARED line-based scan (skips fences / ref-lines /
+    #    table rows). Same function the G3 auditor uses, so branch1 and G3 agree.
+    for lineno, prose in unanchored_empirical_lines(text):
+        violations.append(
+            AnchorViolation(
+                lineno,
+                f"unanchored empirical assertion (no <!--ref--> marker): {prose[:60]!r}",
             )
+        )
 
     return violations
 

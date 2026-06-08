@@ -106,3 +106,28 @@ def test_anchor_check_accepts_injected_empirical_classifier(tmp_path):
     verdict = check_branch1_md_anchors(report, md, is_empirical=nli_stub)
     assert verdict.blocked is True
     assert any("no anchor" in f.observation for f in verdict.hard_findings)
+
+
+def test_g3_skips_table_rows_regression(tmp_path: Path) -> None:
+    """Regression: a markdown evidence-table row with a metric cue (F1, 0.889)
+    must NOT be flagged as an unanchored empirical sentence — branch1's lint skips
+    table rows (gated by G2), and G3 must agree. This blocked every dense paper."""
+    md = tmp_path / "src.md"
+    md.write_text("On BBC the F1 score is 0.889 in the paper.", encoding="utf-8")
+    report = tmp_path / "report.md"
+    report.write_text(
+        "## 实验\n\n| 数据集 | 指标 | 值 |\n|---|---|---|\n| BBC | F1 ↑ | 0.889 |\n",
+        encoding="utf-8",
+    )
+    verdict = check_branch1_md_anchors(report, md)
+    assert not verdict.findings  # table row not flagged (was the G3 false-positive)
+
+
+def test_g3_and_branch1_agree_on_unanchored_lines() -> None:
+    """G3 and branch1 use the SAME shared detector, so they flag the same lines."""
+    from scripts.output.anchor_lint import lint_text, unanchored_empirical_lines
+
+    text = "本节小结。\n模型在 mAP 上达到 0.99，大幅超过基线。\n"  # 2nd line empirical, no ref
+    g3 = {ln for ln, _ in unanchored_empirical_lines(text)}
+    b1 = {v.line for v in lint_text(text) if "unanchored empirical" in v.message}
+    assert g3 == b1 and g3  # agree + actually caught the empirical line
