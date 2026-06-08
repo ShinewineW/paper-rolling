@@ -59,12 +59,26 @@ def run_tier2(
         )
 
     mineru_dir = out_dir / mineru_out
-    md_path = mineru_dir / "paper.md"
-    content_list = mineru_dir / "content_list.json"
-    if not md_path.exists() or not content_list.exists():
-        raise Tier2Failed("mineru_incomplete: missing paper.md or content_list.json")
+    # MinerU's output layout is version-dependent: 2.0.x wrote `paper.md` /
+    # `content_list.json` directly under `-o`; 3.x nests under `{stem}/auto/` and
+    # names them `{stem}.md` / `{stem}_content_list.json` (+ a separate
+    # `{stem}_content_list_v2.json`). Locate the v1 content_list and its sibling
+    # markdown robustly so a MinerU upgrade can't silently break Tier-2 ingest.
+    content_candidates = [
+        c for c in sorted(mineru_dir.rglob("*content_list.json")) if "_v2" not in c.name
+    ]
+    content_list = content_candidates[0] if content_candidates else None
+    md_path = None
+    if content_list is not None:
+        sibling_mds = sorted(content_list.parent.glob("*.md"))
+        md_path = sibling_mds[0] if sibling_mds else None
+    if md_path is None:
+        md_all = sorted(mineru_dir.rglob("*.md"))
+        md_path = md_all[0] if md_all else None
+    if content_list is None or md_path is None or not md_path.exists():
+        raise Tier2Failed("mineru_incomplete: no .md / content_list.json under MinerU output")
 
-    images_dir = mineru_dir / "images"
+    images_dir = content_list.parent / "images"
     images = (
         sorted(p.name for p in images_dir.iterdir() if p.is_file()) if images_dir.is_dir() else []
     )
