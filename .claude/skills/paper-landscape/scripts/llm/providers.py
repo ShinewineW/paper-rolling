@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,6 +41,14 @@ import requests
 # can recognize it WITHOUT importing this transport layer; re-exported here since
 # FallbackProvider raises it and seam code imports it from here.
 from scripts.paths import EngineAbort
+
+# GLOBAL hard cap on concurrent `claude -p` subprocesses (account-level rate-limit
+# guard). The analyzer fans out 5 chunks/paper; without this, N concurrent papers
+# -> 5N concurrent `claude -p` saturated the API and stalled the whole run (see
+# HANDOFF.md). This semaphore bounds it process-wide regardless of orchestration.
+# Env-overridable but defaults to 5 (one paper's chunk fan-out).
+_CLAUDE_P_MAX = max(1, int(os.environ.get("CLAUDE_P_MAX_CONCURRENCY", "5")))
+_CLAUDE_P_SEM = threading.Semaphore(_CLAUDE_P_MAX)
 
 
 class ProviderError(RuntimeError):
@@ -123,14 +132,15 @@ class ClaudeCodeProvider:
                 _backoff_sleep(attempt)
             attempt += 1
             try:
-                proc = subprocess.run(  # noqa: S603 — fixed argv, prompt via stdin
-                    argv,
-                    input=prompt,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    check=False,
-                )
+                with _CLAUDE_P_SEM:  # global cap: <=5 concurrent `claude -p` (rate-limit guard)
+                    proc = subprocess.run(  # noqa: S603 — fixed argv, prompt via stdin
+                        argv,
+                        input=prompt,
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout,
+                        check=False,
+                    )
             except subprocess.TimeoutExpired:
                 timeouts += 1
                 last = ProviderError(f"claude -p timed out after {timeout:.0f}s")

@@ -208,3 +208,9 @@ def test_resolve_wraps_seam_with_claude_fallback(tmp_path: Path) -> None:
     assert isinstance(fb, P.FallbackProvider)
     assert fb.primary.name == "opencode"
     assert fb.fallback.name == "claude-code"  # always the bottom-line default
+
+
+def test_claude_p_global_concurrency_cap_defaults_to_5():
+    # Account-level rate-limit guard: claude -p is bounded process-wide to <=5.
+    assert P._CLAUDE_P_MAX == 5
+    assert P._CLAUDE_P_SEM._value <= P._CLAUDE_P_MAX
