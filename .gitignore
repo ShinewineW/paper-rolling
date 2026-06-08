@@ -46,3 +46,6 @@ __pycache__/
 
 # LS-1 runtime lock (persistent inode; flock state is the lock) — not a product
 _ledger/.lock
+
+# /loop scheduler lock (transient session state, not a product)
+.claude/scheduled_tasks.lock
