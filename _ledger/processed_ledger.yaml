@@ -120,3 +120,19 @@ processed:
   person_vault_path: null
   ai_package_path: null
   processed_at: '2026-06-07T21:23:36Z'
+- key: '2503.15558'
+  md_sha256: null
+  status: failed
+  failure_class: stalled
+  retry_after: null
+  person_vault_path: null
+  ai_package_path: null
+  processed_at: '2026-06-08T14:49:50Z'
+- key: '2503.15558'
+  md_sha256: null
+  status: done
+  failure_class: null
+  retry_after: null
+  person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_CosmosReason1_2503.15558
+  ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_CosmosReason1_2503.15558
+  processed_at: '2026-06-08T15:14:55Z'

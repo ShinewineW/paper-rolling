@@ -1,0 +1,1 @@
+视频输入 -> 视觉编码器(ViT,7B使用ViT-676M,56B使用InternViT-300M-V2.5) -> 投影器(下采样两层MLP,将视觉token对齐至文本嵌入空间) -> 仅解码器LLM骨干(Cosmos-Reason1-7B以Qwen2.5-VL为基础,使用密集Transformer;Cosmos-Reason1-56B以Nemotron-H为骨干,使用混合Mamba-MLP-Transformer) -> 长链式思维推理(<think>标签内) -> 自然语言答案(<answer>标签内)。训练分两阶段:Physical AI SFT(基于约400万条视频-文本对标注进行监督微调) -> Physical AI RL(基于GRPO算法以可验证规则化奖励进行强化学习后训练)。
