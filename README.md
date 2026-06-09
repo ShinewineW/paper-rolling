@@ -159,7 +159,7 @@ offline `arxiv_id → official repo` lookup (T2a), read with stdlib gzip at runt
 | `landscapes/{topic}/` | cross-paper synthesis (`INDEX.md` + `report.md`) |
 | `_ledger/` | `processed_ledger.yaml` (single-writer) + `.lock` |
 | `_failed/` | per-paper failure records for manual follow-up |
-| `config/` | `campaign.yaml` (locked topic / n_per_tick / force_include by Hard Gate); `llm.yaml` (per-seam provider routing + execution modes, optional); `audit.yaml` (audit knobs: skeptic_votes, max_gate_rounds, data_fidelity tolerance, optional). |
+| `config/` | `campaign.yaml` (locked topic / n_per_tick / force_include by Hard Gate); `llm.yaml` (per-seam provider routing + execution modes, **required** — every seam explicitly routed; no default provider, no silent `claude -p` fallback); `audit.yaml` (audit knobs: skeptic_votes, max_gate_rounds, data_fidelity tolerance, optional). |
 
 ## Develop / run / test / lint
 
