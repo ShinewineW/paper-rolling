@@ -10,6 +10,7 @@ unit tests with hand-built fakes.
 from __future__ import annotations
 
 import copy
+import json
 from pathlib import Path
 
 from conftest import write_mineru_output
@@ -546,8 +547,12 @@ def test_spoke_g2_block_aborts_before_any_vault(tmp_path, fake_http, fake_cli):
         (tmp_path / "person_vault").iterdir()
     )
     assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
-    # A _failed/ hand-off record exists.
-    assert any((tmp_path / "_failed").glob("*.md"))
+    # audit F: a self-contained scene (not a throwaway note) preserves the staged ai/.
+    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
+    assert scenes, "expected a _failed/<key>/scene.json"
+    m = json.loads(scenes[0].read_text(encoding="utf-8"))
+    assert m["failed_gate"] == "数字门"
+    assert (scenes[0].parent / "ai" / "ara").is_dir()
 
 
 def test_spoke_forced_candidate_still_g2_blocked(tmp_path, fake_http, fake_cli):
@@ -572,6 +577,41 @@ def test_spoke_forced_candidate_still_g2_blocked(tmp_path, fake_http, fake_cli):
     assert "G2" in result.failure_reason
     assert result.person_vault_path is None
     assert result.ai_package_path is None
+
+
+# --- STRUCTURAL GATE (Seal-1) ----------------------------------------------
+
+
+def test_spoke_structural_seal_failure_writes_scene(tmp_path, fake_http, fake_cli, monkeypatch):
+    """审计 R1 Finding 1:Seal-1 结构校验失败 → StructuralSealFailed 被 spoke 接住,写
+    failed_gate='结构门' 自包含现场(根在 branch2),不逃逸成泛化 stalled、不污染 vault。"""
+    import scripts.output.produce as prod
+
+    # Force Seal-1 to hard-fail AFTER write_branch2 staged a real ara/ (so the scene
+    # captures staged ai/), BEFORE G2 — exercises the structural-gate handler only.
+    monkeypatch.setattr(
+        prod,
+        "validate_ara_tree",
+        lambda _ara: ["N1: also_depends_on references unknown node 'D'"],
+    )
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    spoke = _make_spoke(tmp_path, fake_http, fake_cli, analysis_md=_SOURCE_MD)
+
+    result = spoke(dict(_CANDIDATE))  # must NOT raise StructuralSealFailed
+
+    assert result.status == "failed"
+    assert result.failure_class == FAILURE_AUDIT_BLOCK
+    assert result.person_vault_path is None and result.ai_package_path is None
+    # OT-5: nothing reached the vaults.
+    assert not (tmp_path / "ai_package").exists() or not any(
+        p for p in (tmp_path / "ai_package").iterdir() if p.name != ".gitkeep"
+    )
+    # Self-contained structural-gate scene with the staged ai/ara preserved.
+    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
+    assert scenes, "expected a _failed/<key>/scene.json"
+    m = json.loads(scenes[0].read_text(encoding="utf-8"))
+    assert m["failed_gate"] == "结构门"
+    assert (scenes[0].parent / "ai" / "ara").is_dir()
 
 
 # --- G3 SEAL FAIL (post-promotion cleanup) ---------------------------------
@@ -606,8 +646,13 @@ def test_spoke_g3_failure_removes_promoted_vault(tmp_path, fake_http, fake_cli):
     pv_root = tmp_path / "person_vault"
     assert not ai_root.exists() or not any(p for p in ai_root.iterdir() if p.name != ".gitkeep")
     assert not pv_root.exists() or not any(p for p in pv_root.iterdir() if p.name != ".gitkeep")
-    # Quarantine record written.
-    assert any((tmp_path / "_failed").glob("*.md"))
+    # audit F: the promoted products are preserved as a self-contained final-gate
+    # scene (moved out of the vault into _failed/<key>/), not just deleted.
+    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
+    assert scenes, "expected a _failed/<key>/scene.json"
+    m = json.loads(scenes[0].read_text(encoding="utf-8"))
+    assert m["failed_gate"] == "最终门"
+    assert (scenes[0].parent / "ai").is_dir() and (scenes[0].parent / "person").is_dir()
     # And the cross-paper landscape does NOT include the failed paper.
     land = generate_landscapes(tmp_path, topic="real-time planning")
     assert land.paper_count == 0
@@ -666,7 +711,12 @@ def test_spoke_unanchorable_claim_quarantines_not_crash(tmp_path, fake_http, fak
     assert not (tmp_path / "ai_package").exists() or not any(
         p for p in (tmp_path / "ai_package").iterdir() if p.name != ".gitkeep"
     )
-    assert any((tmp_path / "_failed").glob("*.md"))
+    # audit F: anchor failure preserves the staged scene (ai/ + partial person/).
+    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
+    assert scenes, "expected a _failed/<key>/scene.json"
+    m = json.loads(scenes[0].read_text(encoding="utf-8"))
+    assert m["failed_gate"] == "锚点门"
+    assert (scenes[0].parent / "ai").is_dir()
 
 
 # --- INGEST FAIL -----------------------------------------------------------

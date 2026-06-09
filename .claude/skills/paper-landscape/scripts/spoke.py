@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
@@ -33,10 +34,17 @@ from scripts.audit.g2_data_fidelity import run_g2
 from scripts.audit.g3_seal import run_g3
 from scripts.audit.gate_runner import run_with_budget
 from scripts.audit.types import EntailmentJudgeFn, RigorScoreFn, SkepticVoteFn
+from scripts.engine_version import current_commit
+from scripts.failure_scene import FAILED_REL, write_scene
 from scripts.hub import SpokeFn, SpokeResult, _candidate_key
 from scripts.ingest.ingest import IngestFailed, IngestResult, ingest, quarantine
 from scripts.output.branch1_report import AnchorGateError
-from scripts.output.produce import ProduceGateBlocked, ProduceResult, produce_outputs
+from scripts.output.produce import (
+    ProduceGateBlocked,
+    ProduceResult,
+    StructuralSealFailed,
+    produce_outputs,
+)
 from scripts.paths import FAILURE_AUDIT_BLOCK, FAILURE_CONVERT_ERROR
 
 
@@ -163,49 +171,69 @@ def make_spoke(
                 repo_resolver=repo_resolver,
             )
 
-        # 5. branch2 -> G2 -> branch1. A G2 hard block aborts before promotion.
+        # Scene helpers (audit F): a gate hard-block preserves the staged products
+        # as a self-contained _failed/<key>/ scene (carrying every input revival
+        # needs) instead of a throwaway note. ledger_key = the hub idempotency key
+        # so the batch revival can flip the original ledger row to done.
+        cand_key = _candidate_key(candidate)
+
+        def _pre_promote_scene(*, failed_gate, findings, staged_dir, reason) -> SpokeResult:
+            """A pre-promotion gate hard-failed: nothing reached the vault; preserve
+            the staged products (in `staged_dir`) as a scene and report failed."""
+            write_scene(
+                workspace=workspace,
+                key=cand_key,
+                ledger_key=cand_key,
+                failed_gate=failed_gate,
+                findings=findings,
+                engine_commit=current_commit(workspace),
+                candidate=candidate,
+                md_path=ing.md_path,
+                content_list_path=content_list_path,
+                analysis=None,
+                staged_dir=staged_dir,
+            )
+            return SpokeResult(
+                status="failed",
+                person_vault_path=None,
+                ai_package_path=None,
+                failure_class=FAILURE_AUDIT_BLOCK,
+                failure_reason=reason,
+                source_url=source_url,
+                attempted_tier=str(ing.tier),
+            )
+
+        # 5. branch2 -> Seal-1 -> G2 -> branch1. Any gate hard-block aborts before
+        #    promotion (OT-5) and is preserved as a self-contained scene.
         try:
             produced = _attempt()
+        except StructuralSealFailed as exc:
+            # Seal-1 structural validation failed → root in branch2; revival re-runs
+            # the whole branch2 chain. staged_dir holds the staged ai/ (no person/).
+            return _pre_promote_scene(
+                failed_gate="结构门",
+                findings=[{"target": "ara", "observation": e} for e in exc.errors],
+                staged_dir=exc.staged_dir,
+                reason="branch2 Seal-1 structural hard-fail: " + "; ".join(exc.errors[:3]),
+            )
         except ProduceGateBlocked as exc:
-            key = _candidate_key(candidate)
-            reason = "G2 data-fidelity hard-block: " + "; ".join(
-                f.observation for f in exc.verdict.hard_findings[:3]
-            )
-            failed_dir.mkdir(parents=True, exist_ok=True)
-            (failed_dir / f"{key}.md").write_text(
-                f"# Quarantined: {key}\n\n- **gate**: G2\n- **reason**: {reason}\n",
-                encoding="utf-8",
-            )
-            return SpokeResult(
-                status="failed",
-                person_vault_path=None,
-                ai_package_path=None,
-                failure_class=FAILURE_AUDIT_BLOCK,
-                failure_reason=reason,
-                source_url=source_url,
-                attempted_tier=str(ing.tier),
+            # G2 data-fidelity hard block: staged ai/ only (branch1 not yet built).
+            return _pre_promote_scene(
+                failed_gate="数字门",
+                findings=[f.as_dict() for f in exc.verdict.hard_findings],
+                staged_dir=exc.staged_dir,
+                reason="G2 data-fidelity hard-block: "
+                + "; ".join(f.observation for f in exc.verdict.hard_findings[:3]),
             )
         except AnchorGateError as exc:
-            # branch1's self-anchor lint hard-failed (an empirical claim could not
-            # be grounded in the MD). This happens in staging, BEFORE promotion, so
-            # nothing reached the vault (OT-5). Quarantine instead of letting the
-            # exception escape and crash the unattended /loop tick (中枢-D2 failure
-            # isolation): the hub then skips this paper and back-fills the next.
-            key = _candidate_key(candidate)
-            reason = f"branch1 three-layer anchor hard-gate: {exc}"
-            failed_dir.mkdir(parents=True, exist_ok=True)
-            (failed_dir / f"{key}.md").write_text(
-                f"# Quarantined: {key}\n\n- **gate**: branch1-anchor\n- **reason**: {reason}\n",
-                encoding="utf-8",
-            )
-            return SpokeResult(
-                status="failed",
-                person_vault_path=None,
-                ai_package_path=None,
-                failure_class=FAILURE_AUDIT_BLOCK,
-                failure_reason=reason,
-                source_url=source_url,
-                attempted_tier=str(ing.tier),
+            # branch1's three-layer anchor lint hard-failed (an empirical claim could
+            # not be grounded in the MD), in staging BEFORE promotion (OT-5). Preserve
+            # as a scene instead of crashing the unattended /loop tick (中枢-D2).
+            return _pre_promote_scene(
+                failed_gate="锚点门",
+                findings=[{"target": "report.md", "observation": str(exc)}],
+                staged_dir=getattr(exc, "staged_dir", None),
+                reason=f"branch1 three-layer anchor hard-gate: {exc}",
             )
 
         # 6. G3 seal (after both branches), bounded. On re-emit, rebuild branches.
@@ -218,6 +246,40 @@ def make_spoke(
                 rigor_scores=rigor_scores,
                 entailment_judge=entailment_judge,
                 empirical_classifier=empirical_classifier,
+            )
+
+        def _g3_to_scene(verdict) -> SpokeResult:
+            # The final gate runs AFTER promotion, so the products live in the vault.
+            # Move them into a _failed/-internal staging dir (NOT /tmp: a crash
+            # between the move and write_scene must leave them in the recoverable
+            # gitignored scratch subtree, audit R15), then preserve as a scene.
+            (workspace / FAILED_REL).mkdir(parents=True, exist_ok=True)
+            scene_staging = Path(
+                tempfile.mkdtemp(dir=str(workspace / FAILED_REL), prefix=".scene-")
+            )
+            shutil.move(str(produced.ai_path), str(scene_staging / "ai"))
+            shutil.move(str(produced.person_path), str(scene_staging / "person"))
+            write_scene(
+                workspace=workspace,
+                key=produced.key,
+                ledger_key=cand_key,
+                failed_gate="最终门",
+                findings=[f.as_dict() for f in verdict.hard_findings],
+                engine_commit=current_commit(workspace),
+                candidate=candidate,
+                md_path=ing.md_path,
+                content_list_path=content_list_path,
+                analysis=None,
+                staged_dir=scene_staging,
+            )
+            return SpokeResult(
+                status="failed",
+                person_vault_path=None,
+                ai_package_path=None,
+                failure_class=FAILURE_AUDIT_BLOCK,
+                failure_reason="G3 seal hard-block exhausted budget",
+                source_url=source_url,
+                attempted_tier=str(ing.tier),
             )
 
         outcome = run_with_budget(
@@ -234,24 +296,12 @@ def make_spoke(
             },
         )
         if outcome.escalated:
-            # G3 ran AFTER produce_outputs already promoted both vaults. The seal
-            # failed for the whole budget, so this paper is unprocessable
-            # (中枢-D2): REMOVE the promoted products so a failed-seal paper does
-            # NOT pollute ai_package/ or the cross-paper landscape (which scans
-            # ai_package/*/ara/PAPER.md). The _failed/{key}.md record was already
-            # written by run_with_budget. Idempotent: ignore_errors covers a prior
-            # re-emit having already swapped the dirs.
-            shutil.rmtree(produced.person_path, ignore_errors=True)
-            shutil.rmtree(produced.ai_path, ignore_errors=True)
-            return SpokeResult(
-                status="failed",
-                person_vault_path=None,
-                ai_package_path=None,
-                failure_class=FAILURE_AUDIT_BLOCK,
-                failure_reason="G3 seal hard-block exhausted budget",
-                source_url=source_url,
-                attempted_tier=str(ing.tier),
-            )
+            # G3 ran AFTER promotion; the seal failed for the whole budget. Preserve
+            # the promoted products as a self-contained final-gate scene (audit F) so
+            # revival can re-run the failed branch against the current engine —
+            # rather than just deleting them. (The duplicate run_with_budget
+            # _failed/<key>.md note is suppressed in Task 4.2.)
+            return _g3_to_scene(outcome.final_verdict)
 
         # 7. Success — return produce_outputs' EXACT paths (no re-derivation).
         return SpokeResult(
