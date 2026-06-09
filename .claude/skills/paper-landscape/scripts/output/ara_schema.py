@@ -99,7 +99,14 @@ def validate_exploration_tree(yaml_text: str) -> list[str]:
             errors.append(f"{nid}: support_level must be 'explicit' or 'inferred', got {sl!r}")
         elif sl == "explicit" and not node.get("source_refs"):
             errors.append(f"{nid}: explicit node must include source_refs")
-        for dep in node.get("also_depends_on", []) or []:
+        deps = node.get("also_depends_on", []) or []
+        if isinstance(deps, str):
+            errors.append(
+                f"{nid}: also_depends_on must be a list of node ids, got string {deps!r} "
+                f"(wrap a single id in a list, e.g. [{deps!r}])"
+            )
+            deps = []
+        for dep in deps:
             if dep not in ids:
                 errors.append(f"{nid}: also_depends_on references unknown node {dep!r}")
     return errors
