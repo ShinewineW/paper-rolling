@@ -23,6 +23,10 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Exclude accumulated dual-chain products — generated artifacts, not engine source:
+#   ai_package/   = AI chain (branch2 ARA packs; their ara/src/ sample code is generated)
+#   person_vault/ = human chain (branch1 reports)
+extend-exclude = ["ai_package", "person_vault"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
