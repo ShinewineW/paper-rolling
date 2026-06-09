@@ -82,6 +82,7 @@ def make_spoke(
     now=None,
     n_skeptics: int = 3,
     max_gate_rounds: int = 2,
+    g2_blind_retry_rounds: int = 1,
     cross_model_votes: SkepticVoteFn | None = None,
     cross_model_sample: float = 0.0,
     empirical_classifier: Callable | None = None,

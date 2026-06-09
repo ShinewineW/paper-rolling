@@ -143,6 +143,7 @@ def run_campaign(
         empirical_classifier=empirical_classifier,
         n_skeptics=cfg.skeptic_votes,
         max_gate_rounds=cfg.max_gate_rounds,
+        g2_blind_retry_rounds=cfg.g2_blind_retry_rounds,
         g2_tolerant=cfg.data_fidelity_tolerant,
         g2_max_unconfirmed=cfg.data_fidelity_max_unconfirmed,
         g2_max_unconfirmed_ratio=cfg.data_fidelity_max_unconfirmed_ratio,
