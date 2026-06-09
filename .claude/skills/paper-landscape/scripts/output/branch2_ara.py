@@ -21,7 +21,7 @@ the unified metric table without re-parsing evidence tables.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -279,12 +279,20 @@ def _evidence_readme(tables: list[dict], figures: Sequence[Any] = ()) -> str:
 
 
 def write_branch2(
-    ara_dir: Path, candidate: Any, analysis: dict, md_path: Path | None = None
+    ara_dir: Path,
+    candidate: Any,
+    analysis: dict,
+    md_path: Path | None = None,
+    *,
+    repo_resolver: Callable | None = None,
 ) -> None:
     """Write the full branch2 ARA tree under `ara_dir`.
 
     `md_path` (optional): the frozen {ID}.md — when given, its original figures are
     indexed (caption + source ref, no binary) into evidence/README.md (P1-a).
+    `repo_resolver` (optional): the code_ref candidate cascade; defaults to the pure
+    `resolve_repo_candidates` (T1+T2a). The driver injects a partial wired with T2b
+    (`hf_lookup`) / T4 (`web_search`) to extend coverage to post-PwC-freeze papers.
     """
     _w(ara_dir / "PAPER.md", _paper_md(candidate, analysis))
     _w(ara_dir / "logic/problem.md", _problem_md(analysis["problem"]))
@@ -315,7 +323,8 @@ def write_branch2(
     # candidates (T1 paper-text + T2a PwC-official + discovery), clone-verify in
     # order, write a three-state pointer — never the old None→"closed-source" lie.
     arxiv_id = candidate.get("arxiv_id")
-    candidates = resolve_repo_candidates(arxiv_id=arxiv_id, md_path=md_path, candidate=candidate)
+    resolver = repo_resolver or resolve_repo_candidates
+    candidates = resolver(arxiv_id=arxiv_id, md_path=md_path, candidate=candidate)
     build_code_ref(
         candidates=candidates,
         innovations=[Innovation(name=i["name"], grep=i["grep"]) for i in analysis["innovations"]],

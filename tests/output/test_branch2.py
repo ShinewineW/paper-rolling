@@ -70,3 +70,19 @@ def test_evidence_readme_indexes_figure_captions_when_md_given(tmp_path, candida
     assert "qualitative results on the test set" in readme
     assert "images/aaa.jpg" in readme  # source ref for provenance (no binary copied)
     assert not (ara / "evidence/figures").exists()  # caption-only: no binary dir
+
+
+def test_write_branch2_uses_injected_repo_resolver(tmp_path, candidate, analysis):
+    # Phase 2: the driver injects a repo_resolver (T2b/T4-wired). write_branch2 must
+    # call it instead of the default — proven by a recording fake that returns [].
+    seen = {}
+
+    def fake_resolver(*, arxiv_id, md_path, candidate):  # noqa: ARG001
+        seen["arxiv_id"] = arxiv_id
+        return []
+
+    ara = tmp_path / "ara"
+    write_branch2(ara, candidate, analysis, repo_resolver=fake_resolver)
+    assert seen["arxiv_id"] == candidate["arxiv_id"]  # injected resolver was called
+    body = (ara / "src/code_ref.md").read_text(encoding="utf-8")
+    assert "No public repository found" in body  # its [] result drove a not-found state

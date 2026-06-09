@@ -95,6 +95,7 @@ def produce_outputs(
     g2_gate: Callable[[Path], Any] | None = None,
     write_report: Callable[..., dict] | None = None,
     cancel: threading.Event | None = None,
+    repo_resolver: Callable | None = None,
 ) -> ProduceResult:
     """Produce branch2 + branch1 atomically into the two top-level vaults.
 
@@ -142,7 +143,7 @@ def produce_outputs(
     try:
         stage_ai = staging / "ai" / "ara"
         stage_person = staging / "person"
-        write_branch2(stage_ai, candidate, analysis, md_path=md_path)
+        write_branch2(stage_ai, candidate, analysis, md_path=md_path, repo_resolver=repo_resolver)
 
         ara_errors = validate_ara_tree(stage_ai)
         if ara_errors:

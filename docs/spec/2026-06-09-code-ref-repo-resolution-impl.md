@@ -79,24 +79,25 @@ def resolve_repo_candidates(
 - `produce.produce_outputs` 在调用点把驱动注入的 `http`/`web_search` 透传下来。
 
 ### 4.4 seam 接线
-- T2b 用既有基础设施适配器 `http`(`run_campaign` 已注入)。
-- **T4 `web_search` 为新增可选 seam**:驱动(Claude Code agent)用 WebSearch 工具实现并注入;缺省不注入 → T4 自动跳过(图省事/离线场景仍可跑 T1+T2a+T2b)。
+- **实现修订(与 §4.1/§4.3 草案的偏差)**:infra `http` 适配器是 `(url)->(status,bytes)`、**不支持 headers**,无法给 HF 加鉴权。故 T2b/T4 不走原始 `http`,改为**单一注入式 `repo_resolver` seam**(驱动用 `functools.partial(resolve_repo_candidates, hf_lookup=hf_official_repo, web_search=...)` 预绑),贯穿 `run_campaign → make_spoke → produce_outputs → write_branch2`(各加 `repo_resolver=None` 默认,回退纯 T1+T2a)。`hf_official_repo` 用 stdlib urllib + `hf_papers._hf_headers`(复用 `.env` HF token),`http_get` 可注入便于测试。
+- **T4 `web_search` 为新增可选 seam**:驱动(Claude Code agent)用 WebSearch 工具实现并注入,返回结果字符串列表;引擎用 `_GH` 从中抽 github repo URL。缺省不注入 → T4 自动跳过(单测/离线仍跑 T1+T2a)。
 
 ## 5. 分阶段实施(每步先 RED 再 GREEN)
 
-### Phase 1 — 确定性地基(无新 seam,无网络)
-- [ ] T1 grep MD 链接提取 + 单测(含 Tier-1 无图/无链接退化)
-- [ ] `build_pwc_table.py` 构建脚本 + 产出 `data/pwc_official_arxiv2repo.tsv.gz`(tracked)
-- [ ] T2a lazy dict 加载 + `pwc_lookup` + 单测
-- [ ] 验证闸门规则(clone+match)落到 `build_code_ref` + 单测(重实现被拒、官方被接受)
-- [ ] 三态渲染替换 `None→closed-source` + 单测(三态各一)
-- [ ] `resolve_repo_candidates` 串 T1+T2a + `branch2`/`produce` 接线 + 集成测试
-- [ ] 全量 `corpus/` 回扫脚本:对 26 篇打印解析结果(人工抽检准确率)
+### Phase 1 — 确定性地基(无新 seam,无网络)✅ 已落地(commit 86b984a)
+- [x] T1 grep MD 链接提取 + 单测(含尾随标点修正)
+- [x] `build_pwc_table.py` 构建脚本 + 产出 `data/pwc_official_arxiv2repo.tsv.gz`(179,953 条,tracked)
+- [x] T2a lazy dict 加载 + `pwc_lookup` + 单测
+- [x] 验证闸门规则(clone+match)落到 `build_code_ref` + 单测(重实现被拒、官方被接受)
+- [x] 三态渲染替换 `None→closed-source` + 单测(三态各一)
+- [x] `resolve_repo_candidates` 串 T1+T2a + `branch2`/`produce` 接线 + 集成测试
+- [x] 全量 `corpus/` 回扫脚本:26 篇 15 解析(离线 T1+T2a)
 
-### Phase 2 — 时效补充(注入式)
-- [ ] T2b HF-live(注入 http)+ 单测(mock http)
-- [ ] T4 `web_search` 可选 seam + 单测(mock seam;缺省跳过)
-- [ ] 端到端:对 PwC 冻结后论文(ORION/Dreamer4/2026 系列)验证 T2b/T4 兜底
+### Phase 2 — 时效补充(注入式)✅ 已落地(本次,待提交)
+- [x] T2b HF-live(`hf_official_repo`,注入 `http_get`)+ 单测(fake http) + 实网验证(DriveDreamer-Policy/Cosmos3)
+- [x] T4 `web_search` 可选 seam + 单测(fake seam;缺省跳过)
+- [x] `repo_resolver` seam 贯穿 4 层接线 + 接线单测
+- [x] 端到端实网:PwC 冻结后论文 T2b 命中 DriveDreamer-Policy(2604.01765)、Cosmos3(2606.02800);ORION/Dreamer4/COMBAT 仍交 T4/无码
 
 ## 6. 验收标准
 

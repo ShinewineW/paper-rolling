@@ -89,6 +89,7 @@ def make_spoke(
     g2_max_unconfirmed: int = 0,
     g2_max_unconfirmed_ratio: float = 0.0,
     write_report: Callable | None = None,
+    repo_resolver: Callable | None = None,
 ) -> SpokeFn:
     """Build the production SpokeFn that runs the full gated pipeline per paper.
 
@@ -158,6 +159,7 @@ def make_spoke(
                 g2_gate=_g2,
                 write_report=write_report,
                 cancel=cancel,
+                repo_resolver=repo_resolver,
             )
 
         # 5. branch2 -> G2 -> branch1. A G2 hard block aborts before promotion.

@@ -17,7 +17,10 @@ match) lives in build_code_ref — the two concerns are deliberately split.
 
 from __future__ import annotations
 
+import json
 import re
+import urllib.error
+import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +30,7 @@ from scripts.output.pwc_lookup import official_repo as _pwc_official_repo
 # github.com/<owner>/<repo> (also git@github.com:owner/repo). Captures owner/repo
 # and stops at the next '/', so .../tree/main and .../blob/... keep just owner/repo.
 _GH = re.compile(r"github\.com[/:]([A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+)")
+_ARXIV_VERSION = re.compile(r"v\d+$")
 
 # Author-declared closed-source cues. HIGH-PRECISION on purpose: the bug being
 # fixed is the OPPOSITE (labelling 'not found' as 'closed-source'), so closed is
@@ -94,14 +98,51 @@ def author_declares_closed(md_path: Path | None) -> bool:
     return bool(_CLOSED.search(Path(md_path).read_text(encoding="utf-8", errors="ignore")))
 
 
+def _default_http_get_json(url: str, headers: dict[str, str]) -> dict:
+    """Stdlib GET → parsed JSON dict (injectable for tests)."""
+    req = urllib.request.Request(url, headers=headers)  # noqa: S310 (https only, below)
+    with urllib.request.urlopen(req, timeout=20) as resp:  # noqa: S310
+        return json.load(resp)
+
+
+def hf_official_repo(
+    arxiv_id: str | None,
+    *,
+    http_get: Callable[[str, dict[str, str]], dict] = _default_http_get_json,
+) -> str | None:
+    """T2b — the repo HF Papers links for `arxiv_id` (live), or None.
+
+    Covers papers added after the PwC freeze. The link is HF-`auto`-added and may
+    be a reimplementation, so it enters the cascade as a "search" candidate (the
+    clone-verification gate confirms it). Network/parse failures degrade to None.
+    """
+    if not arxiv_id:
+        return None
+    from scripts.discovery.hf_papers import _hf_headers
+
+    key = _ARXIV_VERSION.sub("", arxiv_id.strip())
+    try:
+        data = http_get(f"https://huggingface.co/api/papers/{key}", _hf_headers())
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return None
+    repo = data.get("githubRepo") if isinstance(data, dict) else None
+    return repo or None
+
+
 def resolve_repo_candidates(
     arxiv_id: str | None,
     md_path: Path | None,
     candidate: dict,
     *,
     pwc_lookup: Callable[[str | None], str | None] = _pwc_official_repo,
+    hf_lookup: Callable[[str | None], str | None] | None = None,
+    web_search: Callable[[str], list[str]] | None = None,
 ) -> list[RepoCandidate]:
-    """Ordered, de-duplicated repo candidates (T1 → T2a → discovery)."""
+    """Ordered, de-duplicated repo candidates (T1 → T2a → discovery → T2b → T4).
+
+    T2b (`hf_lookup`) and T4 (`web_search`) are injected by the driver and OFF by
+    default — so the pure path (and every unit test) never touches the network.
+    """
     out: list[RepoCandidate] = []
     seen: set[str] = set()
 
@@ -119,4 +160,15 @@ def resolve_repo_candidates(
     add(pwc_lookup(arxiv_id), "pwc-official", "official")
     # A repo a discovery source already carried (e.g. HF Papers); verify.
     add(candidate.get("github_repo"), "discovery", "search")
+    # T2b — HF live (post-PwC-freeze papers); injected, verify.
+    if hf_lookup is not None:
+        add(hf_lookup(arxiv_id), "hf-live", "search")
+    # T4 — websearch long-tail; injected. The seam returns result strings; we
+    # extract github repo URLs from them (driver does the actual search).
+    if web_search is not None:
+        title = candidate.get("title") or ""
+        query = f"{title} {arxiv_id or ''} official code github".strip()
+        for result in web_search(query):
+            for m in _GH.finditer(result or ""):
+                add(m.group(0), "websearch", "search")
     return out
