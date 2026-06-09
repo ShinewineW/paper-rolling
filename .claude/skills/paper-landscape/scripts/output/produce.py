@@ -88,11 +88,16 @@ def _write_audit_flags(ara_dir: Path, verdict: Any) -> None:
     # numbers aren't buried only in AUDIT_FLAGS.md. Appended after branch2 wrote it.
     paper_md = ara_dir / "PAPER.md"
     if paper_md.exists() and verdict.findings:
-        ids = ", ".join(f.finding_id for f in verdict.findings)
+        # Surface the actual suspect numbers (carried in each finding's observation),
+        # not just the finding IDs — a reader must see WHICH number is unconfirmed
+        # in the body, not have to open AUDIT_FLAGS.md to learn it (Codex S2-R1).
+        bullets = "\n".join(f"> - **{f.finding_id}**:{f.observation}" for f in verdict.findings)
         banner = (
             f"\n> ⚠️ **数据保真存疑(容差内放行)**:本包有 {len(verdict.findings)} 处数字"
-            f"未被 G2 skeptic 多数确认({ids})——详见 "
-            "[AUDIT_FLAGS.md](AUDIT_FLAGS.md);引用相关数字前请先核对源文。\n"
+            "未被 G2 skeptic 多数确认,引用相关数字前请先核对源文——\n"
+            f"{bullets}\n"
+            ">\n"
+            "> 详见 [AUDIT_FLAGS.md](AUDIT_FLAGS.md)。\n"
         )
         paper_md.write_text(paper_md.read_text(encoding="utf-8") + banner, encoding="utf-8")
 

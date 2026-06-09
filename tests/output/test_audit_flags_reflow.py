@@ -31,4 +31,8 @@ def test_flags_reflow_into_paper_md(tmp_path: Path) -> None:
     paper = (ara / "PAPER.md").read_text(encoding="utf-8")
     assert "数据保真存疑" in paper  # banner present
     assert "G2F13" in paper  # the flagged id surfaced in the body
+    # 审计 §5-附1 (Codex S2-R1): the actual suspect number/observation must surface
+    # in PAPER.md itself, not only in AUDIT_FLAGS.md — the ID alone is not enough.
+    assert "'7'" in paper  # the unconfirmed number itself
+    assert "number '7' not confirmed in source MD" in paper  # the observation summary
     assert "AUDIT_FLAGS.md" in paper  # links to the detail
