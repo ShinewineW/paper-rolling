@@ -185,6 +185,10 @@ class OpenAICompatibleProvider:
     # Optional OpenAI-style reasoning-effort passthrough; off by default since not
     # every compatible backend accepts it.
     send_reasoning_effort: bool = False
+    # Bypass environment proxies (HTTP(S)_PROXY/ALL_PROXY) for this provider's host.
+    # Set for internal endpoints that must be reached DIRECT (e.g. a company API
+    # behind Clash with a DIRECT rule) while other providers keep using the proxy.
+    no_proxy: bool = False
 
     def _model(self, tier: str) -> str:
         return self.strong_model if tier == "strong" else self.fast_model
@@ -237,7 +241,14 @@ class OpenAICompatibleProvider:
                 time.sleep(min(cap, base * (2 ** (attempt - 1))))
             attempt += 1
             try:
-                resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+                if self.no_proxy:
+                    # Ignore env proxies so this host is reached DIRECT (then the OS
+                    # routing / Clash DIRECT rule takes it straight to the server).
+                    with requests.Session() as sess:
+                        sess.trust_env = False
+                        resp = sess.post(url, json=payload, headers=headers, timeout=timeout)
+                else:
+                    resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
             except requests.RequestException as exc:
                 last = ProviderError(f"{self.name} request error: {exc}")
                 conn_fail = True
@@ -359,6 +370,7 @@ def build_provider(name: str, spec: dict) -> LLMProvider:
             fast_model=spec["fast_model"],
             api_key_env=spec["api_key_env"],
             send_reasoning_effort=bool(spec.get("send_reasoning_effort", False)),
+            no_proxy=bool(spec.get("no_proxy", False)),
         )
     raise ProviderError(
         f"provider {name!r}: unknown type {ptype!r} (expected one of {_PROVIDER_TYPES})"

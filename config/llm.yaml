@@ -25,13 +25,21 @@ providers:
     fast_model: claude-haiku-4-5-20251001
 
   # --- API-token providers (any OpenAI-compatible endpoint) -------------------
-  opencode:                          # OpenCode "Zen/Go" gateway (currently active)
+  opencode:                          # OpenCode "Zen/Go" gateway
     type: openai_compatible
     base_url: https://opencode.ai/zen/go/v1
     api_key_env: OPENCODE_API_KEY
     strong_model: deepseek-v4-pro
     fast_model: deepseek-v4-flash
     # send_reasoning_effort: false   # set true only if the backend accepts OpenAI reasoning_effort
+
+  hellorobotaxi:                     # 公司内网 API-Hub (OpenAI 兼容) — Clash DIRECT 直连
+    type: openai_compatible
+    base_url: https://api-hub.hellorobotaxi.top/v1
+    api_key_env: HELLOROBOTAXI_API_KEY
+    strong_model: qwen3.7-max        # tier=strong 的 seam 用 (writer)
+    fast_model: qwen3.7-plus         # tier=fast 的 seam 用 (skeptic/entailment/expand)
+    no_proxy: true                   # 内网平台必须绕开 env 代理直连 (否则 TLS 被代理链掐断)
 
   # Ready-to-use alternatives — uncomment + set the key env in .env to switch.
   # NOT bound to opencode: same code path, different base_url + token.
@@ -63,8 +71,8 @@ providers:
 # ----------------------------------------------------------------------------
 seams:
   analyzer: { provider: claude-code, mode: grounded }   # heaviest + most critical SSOT; grounded = claude -p reads MD itself, chunked-parallel
-  skeptic: opencode            # G2 number-fidelity — cross-model vs analyzer, cheap
-  rigor: opencode              # G3 6-dim rigor
-  entailment: opencode         # G3 entailment — tiny in/out
-  expand: opencode             # discovery query expansion — small, cheap
-  writer: opencode             # human chain — rivals Claude (blind 8.21 vs 8.42), cheaper
+  skeptic: hellorobotaxi       # G2 number-fidelity (tier=fast → qwen3.7-plus)
+  rigor: hellorobotaxi         # G3 6-dim rigor (tier=strong → qwen3.7-max);analyzer 仍 claude-code,审计跨模型不破
+  entailment: hellorobotaxi    # G3 entailment — tiny in/out (tier=fast → qwen3.7-plus)
+  expand: hellorobotaxi        # discovery query expansion (tier=fast → qwen3.7-plus)
+  writer: hellorobotaxi        # human chain (tier=strong → qwen3.7-max)
