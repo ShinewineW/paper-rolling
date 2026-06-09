@@ -86,3 +86,14 @@ def test_write_branch2_uses_injected_repo_resolver(tmp_path, candidate, analysis
     assert seen["arxiv_id"] == candidate["arxiv_id"]  # injected resolver was called
     body = (ara / "src/code_ref.md").read_text(encoding="utf-8")
     assert "No public repository found" in body  # its [] result drove a not-found state
+
+
+def test_core_py_carries_reconstructed_disclaimer(tmp_path, candidate, analysis):
+    import ast
+
+    ara = tmp_path / "ara"
+    write_branch2(ara, candidate, analysis)
+    body = (ara / "src/execution/core.py").read_text(encoding="utf-8")
+    assert "RECONSTRUCTED STUB — NOT the official implementation" in body  # §5-附2
+    assert "code_ref.md" in body  # points to the authoritative code
+    ast.parse(body)  # disclaimer is comments → still valid Python (audit "0 bad py")

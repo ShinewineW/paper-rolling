@@ -34,6 +34,16 @@ from scripts.output.repo_resolve import author_declares_closed, resolve_repo_can
 SCHEMA_VERSION = "1.0"
 ARA_VERSION = "1.0"
 
+# 审计 §5-附2: core.py is a reconstruction inferred from the paper, NOT official
+# code — say so loudly in the file so downstream readers never cite it as the real
+# implementation. Plain `#` comments keep the file valid Python (AST-parseable).
+_STUB_HEADER = (
+    "# ⚠️ RECONSTRUCTED STUB — NOT the official implementation.\n"
+    "# A minimal runnable reconstruction inferred from the paper text, for ARA\n"
+    "# tracing only. For the authoritative code (repo + pinned SHA + file:line),\n"
+    "# see ../code_ref.md. Do not cite this as the paper's real implementation.\n\n"
+)
+
 
 def _w(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -307,7 +317,7 @@ def write_branch2(
     _w(ara_dir / "src/configs/training.md", _configs_md(analysis["configs_training"]))
     _w(ara_dir / "src/configs/model.md", _configs_md(analysis["configs_model"]))
     _w(ara_dir / "src/environment.md", _environment_md(analysis["environment"]))
-    _w(ara_dir / "src/execution/core.py", analysis["execution_stub"])
+    _w(ara_dir / "src/execution/core.py", _STUB_HEADER + analysis["execution_stub"])
 
     tree_yaml = "# Exploration Tree\n" + yaml.safe_dump(
         {"tree": analysis["exploration_tree"]}, allow_unicode=True, sort_keys=False

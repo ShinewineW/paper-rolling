@@ -84,6 +84,18 @@ def _write_audit_flags(ara_dir: Path, verdict: Any) -> None:
             lines.append(f"  - _suggestion_: {f.suggestion}")
     (ara_dir / "AUDIT_FLAGS.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+    # 审计 §5-附1: reflow a visible banner into PAPER.md so tolerated-but-unconfirmed
+    # numbers aren't buried only in AUDIT_FLAGS.md. Appended after branch2 wrote it.
+    paper_md = ara_dir / "PAPER.md"
+    if paper_md.exists() and verdict.findings:
+        ids = ", ".join(f.finding_id for f in verdict.findings)
+        banner = (
+            f"\n> ⚠️ **数据保真存疑(容差内放行)**:本包有 {len(verdict.findings)} 处数字"
+            f"未被 G2 skeptic 多数确认({ids})——详见 "
+            "[AUDIT_FLAGS.md](AUDIT_FLAGS.md);引用相关数字前请先核对源文。\n"
+        )
+        paper_md.write_text(paper_md.read_text(encoding="utf-8") + banner, encoding="utf-8")
+
 
 def produce_outputs(
     md_path: Path,
