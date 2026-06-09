@@ -1,64 +1,64 @@
 # Related Work
 
-## R1: Shao et al., 2024 (DeepSeekMath)
-- **DOI**: arXiv:2402.03300
-- **Type**: method
+## R1: DeepSeek-AI, 2025
+- **DOI**: 
+- **Type**: foundational
 - **Delta**:
-  - What changed: 采用GRPO作为RL优化算法，利用组内响应归一化计算优势函数，无需维护独立的Critic模型；公式为 $$A_i = \frac{R(o_i) - \text{mean}(\mathcal{G})}{\text{std}(\mathcal{G})}$$
-  - Why: GRPO无需Critic模型，计算简洁高效，适合Physical AI这类需要大规模视频多模态RL训练的场景
-- **Claims affected**: ['C2', 'C3']
-- **Adopted elements**: ['GRPO算法整体框架', '基于组内均值与标准差归一化的优势函数计算方式']
-
-## R2: DeepSeek-AI, 2025 (DeepSeek-R1)
-- **DOI**: arXiv:2501.12948
-- **Type**: dataset_and_method
-- **Delta**:
-  - What changed: 将DeepSeek-R1用作数据蒸馏工具，从视频文字描述中提取长链式推理轨迹以生成Physical AI SFT数据；同时借鉴其规则化可验证奖励的RL训练范式
-  - Why: DeepSeek-R1具备强大的文本推理能力，可将视觉信息压缩到文本后生成高质量推理轨迹，解决了大规模带思维链SFT数据稀缺的问题
+  - What changed: Cosmos-Reason1 将 DeepSeek-R1 的蒸馏方法迁移至物理 AI 领域：从 DeepSeek-R1 提取长链式思维推理轨迹用于 SFT 数据标注，并沿用其基于规则可验证奖励的 RL 训练范式
+  - Why: DeepSeek-R1 开源了面向数学和编程任务的高性能推理训练方法论，为构建 Physical AI 推理模型提供了直接的技术参照和数据蒸馏工具
 - **Claims affected**: ['C1', 'C2']
-- **Adopted elements**: ['DeepSeek-R1用于物理常识推理轨迹提取（Sec. 5.1.1）', 'DeepSeek-R1用于具身推理轨迹提取（Sec. 5.1.2）', '规则化可验证奖励的RL训练设计理念']
+- **Adopted elements**: ['DeepSeek-R1 推理轨迹蒸馏（用于物理常识和具身推理 SFT）', '基于规则可验证奖励的 RL 框架']
+
+## R2: Shao et al., 2024
+- **DOI**: 
+- **Type**: methodological
+- **Delta**:
+  - What changed: 直接采用 GRPO 算法作为 RL 优化方法，无需额外训练独立 critic 模型；优势函数由同组响应的奖励均值/标准差归一化得到
+  - Why: GRPO 以简洁性和计算效率见长（省去 critic 训练开销），适合大规模多模态 RL 训练场景
+- **Claims affected**: ['C2']
+- **Adopted elements**: ['GRPO 算法', '组内奖励归一化优势函数计算']
 
 ## R3: Bai et al., 2025 (Qwen2.5-VL)
-- **DOI**: arXiv:2502.13923
-- **Type**: pretrained_model
+- **DOI**: 
+- **Type**: backbone
 - **Delta**:
-  - What changed: 以Qwen2.5-VL作为Cosmos-Reason1-7B的预训练骨干，沿用其图像和视频处理流程（包括动态分辨率调整和视频帧采样策略）
-  - Why: Qwen2.5-VL提供了高质量视觉-语言预训练基础，可通过Physical AI专项SFT和RL进一步专门化为物理AI推理模型
-- **Claims affected**: ['C1', 'C5']
-- **Adopted elements**: ['Qwen2.5-VL作为7B模型骨干（预训练权重+架构）', 'Qwen2.5-VL的图像和视频处理流程']
-
-## R4: Waleffe et al., 2024; NVIDIA, 2025 (Nemotron-H)
-- **DOI**: arXiv:2406.07887; arXiv:2504.03624
-- **Type**: architecture_and_pretrained_model
-- **Delta**:
-  - What changed: 采用混合Mamba-MLP-Transformer架构（Nemotron-H）作为Cosmos-Reason1-56B的LLM骨干，结合InternViT-300M-V2.5视觉编码器构建56B多模态模型
-  - Why: 混合架构在线性时间复杂度长序列处理（Mamba部分）与全局长文本建模（Transformer层）之间取得平衡，适合视频输入的长上下文建模，同时降低推理计算开销
-- **Claims affected**: ['C1', 'C5']
-- **Adopted elements**: ['Mamba-MLP-Transformer混合架构设计用于56B模型LLM骨干', 'Nemotron-H预训练权重作为56B模型初始化', 'TP=8、PP=2并行策略用于56B模型训练']
-
-## R5: Liu et al., 2023 (LLaVA); Dai et al., 2024 (NVLM-D)
-- **DOI**: NeurIPS 2023; arXiv:2409.11402
-- **Type**: architecture
-- **Delta**:
-  - What changed: 采用Decoder-only多模态架构，将视觉编码器输出通过含PixelShuffle降采样的2层MLP投影器对齐到文本token空间，遵循LLaVA和NVLM-D的设计路线
-  - Why: NVLM研究表明Decoder-only架构在大学水平多学科知识和数学推理任务上优于Cross-attention架构，且对所有模态统一处理更简洁，利于推理能力的发展
+  - What changed: Cosmos-Reason1-7B 以 Qwen2.5-VL 为预训练起点，沿用其图像和视频处理方式，再经 Physical AI SFT 和 RL 两阶段后训练
+  - Why: Qwen2.5-VL 提供高质量的视觉-语言预训练基础，是 7B 规模模型的骨干选择
 - **Claims affected**: ['C1']
-- **Adopted elements**: ['Decoder-only多模态架构整体设计', '2层MLP投影器含PixelShuffle（2×2）降采样', 'NVLM-D的图像分块（tile）处理策略用于56B模型（动态分辨率1-12个448×448 tile）']
+- **Adopted elements**: ['Qwen2.5-VL 预训练权重', '图像/视频处理流程']
 
-## R6: Hu et al., 2024 (OpenRLHF); Sheng et al., 2024 (HybridFlow)
-- **DOI**: arXiv:2405.11143; arXiv:2409.19256
-- **Type**: baseline_system
+## R4: NVIDIA, 2025 (Nemotron-H); Waleffe et al., 2024
+- **DOI**: 
+- **Type**: backbone
 - **Delta**:
-  - What changed: 与这两个主流同位RL训练框架对比，指出其因同步开销导致资源利用率低，并提出全异步异构部署框架加以解决
-  - Why: 同位框架的策略训练与Rollout之间的同步等待是训练效率的主要瓶颈，异步框架通过两者分离实现约160%的效率提升
-- **Claims affected**: ['C3']
-- **Adopted elements**: []
+  - What changed: Cosmos-Reason1-56B 使用混合 Mamba-MLP-Transformer 预训练模型（Nemotron-H）作为 LLM 骨干，结合 InternViT-300M-V2.5 视觉编码器构成 56B 多模态架构
+  - Why: 混合 Mamba-MLP-Transformer 架构在处理长序列时具有线性时间复杂度，相比纯 Transformer 在视频多帧推理场景下效率更高；少量 Transformer 层保留了对长上下文细节的精确建模能力
+- **Claims affected**: ['C1', 'C6']
+- **Adopted elements**: ['Nemotron-H 混合 Mamba-MLP-Transformer 骨干权重', '混合架构设计（线性状态空间 + 少量自注意力层）']
 
-## R7: Chen et al., 2024 (InternVL2.5 / InternViT)
-- **DOI**: arXiv:2412.05271
-- **Type**: pretrained_model
+## R5: Liu et al., 2023 (LLaVA); Dai et al., 2024 (NVLM)
+- **DOI**: 
+- **Type**: architectural
 - **Delta**:
-  - What changed: 采用InternViT-300M-V2.5作为Cosmos-Reason1-56B的视觉编码器，处理448×448分辨率输入，每帧生成1024个视觉token后经PixelShuffle降采样至256个token
-  - Why: InternViT-300M-V2.5是高质量开源视觉编码器，适合高分辨率视频帧处理，与Nemotron-H骨干组合构建高效的56B多模态模型
+  - What changed: Cosmos-Reason1 采用 decoder-only 多模态架构（与 LLaVA、NVLM-D 类似），将视频帧通过视觉编码器和两层 MLP projector（含 PixelShuffle 下采样）映射至文本 token 嵌入空间后输入 LLM 骨干
+  - Why: Dai et al. (2024) 的对比实验表明，decoder-only 架构在视觉上下文中的多学科知识和数学推理任务上比交叉注意力架构推理能力更强
 - **Claims affected**: ['C1']
-- **Adopted elements**: ['InternViT-300M-V2.5视觉编码器（24层，模型维度1024）']
+- **Adopted elements**: ['decoder-only 多模态统一输入架构', '两层 MLP projector + PixelShuffle 下采样']
+
+## R6: Zawalski et al., 2024 (ECoT)
+- **DOI**: 
+- **Type**: related
+- **Delta**:
+  - What changed: Cosmos-Reason1 在具身推理 SFT 数据标注中，将 ECoT 提供的动作序列标注作为 BridgeData V2 captioning prompt 的补充信息；在 related work 中将 ECoT 视为具身链式思维框架的代表性工作
+  - Why: ECoT 展示了通过显式链式推理提升机器人决策能力的可行性，是具身 CoT 推理范式的直接先验
+- **Claims affected**: ['C1']
+- **Adopted elements**: ['ECoT 动作序列标注（用于辅助 BridgeData V2 视频标注）']
+
+## R7: Walke et al., 2023 (BridgeData V2); Sermanet et al., 2024 (RoboVQA); AgiBot, 2024; Wang et al., 2023 (HoloAssist)
+- **DOI**: 
+- **Type**: dataset
+- **Delta**:
+  - What changed: 将上述机器人操作和具身推理数据集重新处理为 Physical AI SFT 和 RL 所需的 MCQ 格式：通过 VLM captioning + DeepSeek-R1 推理轨迹提取 + 规则清洗流程生成训练样本
+  - Why: 这些数据集覆盖多样化的具身推理场景（机器人臂、人类、自动驾驶车辆等），是构建通用具身推理能力的基础数据来源
+- **Claims affected**: ['C1']
+- **Adopted elements**: ['BridgeData V2（60,096 轨迹，13 种技能，24 种环境）', 'RoboVQA（约 220K 片段，6 种问题类型）', 'AgiBot World（3,300 视频，36 项任务）', 'HoloAssist（166 小时以自我为中心的视频，1,758 段）']

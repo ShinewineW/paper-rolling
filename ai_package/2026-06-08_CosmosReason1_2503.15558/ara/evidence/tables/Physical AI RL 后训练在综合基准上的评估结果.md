@@ -1,6 +1,6 @@
-# Physical AI RL后训练前后物理常识与具身推理基准对比
+# Physical AI RL 后训练在综合基准上的评估结果
 - **Source**: Table 9
-- **Caption**: "Cosmos-Reason1-7B在Physical AI RL后训练前后的物理常识与具身推理基准准确率对比；括号内为RL相对SFT的综合提升幅度。"
+- **Caption**: "Physical AI RL 后训练效果对比（准确率 %）。RL 使 Cosmos-Reason1-7B 综合平均准确率从 60.7 提升至 65.7（提升 5.0 个百分点）；大多数子任务均有提升，RoboFail 任务改善有限。"
 
 | Models | Common Sense | BridgeData V2 | RoboVQA | Agibot | HoloAssist | AV | RoboFail | Avg. |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

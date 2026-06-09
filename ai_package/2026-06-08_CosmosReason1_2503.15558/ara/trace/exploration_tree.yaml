@@ -2,152 +2,92 @@
 tree:
 - id: Q1
   type: question
-  title: 如何为 Physical AI 系统建立可量化的推理能力评估框架？
-  description: Physical AI 系统需感知、理解并推理物理世界，但既有 LLM/VLM 评测体系（数学、代码）无法覆盖物理常识与具身推理能力。需从零定义本体（ontology）并构建对应基准测试。
-  support_level: explicit
-  source_refs:
-  - Sec 1
-  - Sec 2
+  title: 如何使多模态大模型具备物理世界推理与具身决策能力
+  support_level: inferred
+  description: Physical AI 系统需要感知、理解并在物理世界中执行复杂动作，当前通用 VLM 缺乏物理常识接地与具身决策能力，需要探索专项能力构建路径
   children:
+  - id: P1
+    type: pivot
+    title: 从「通用 VLM 零样本应用」转向「物理 AI 专项本体论指导的 SFT+RL 后训练」
+    support_level: inferred
+    from: 直接使用已有通用视觉语言模型零样本推理或依靠 chain-of-thought 提示处理物理 AI 任务
+    to: 定义物理常识（三大类 16 子类）与具身推理（二维本体论）的专项本体论，据此策展 SFT 数据与 RL 奖励，进行两阶段专项后训练
+    trigger: 通用 VLM 在物理常识与具身推理基准上显著弱于专项训练模型，直觉物理任务上接近随机猜测水平
   - id: D1
     type: decision
-    title: 建立双本体体系：物理常识三类 16 子类本体 + 具身推理四能力五类别二维本体
-    choice: 物理常识本体按 Space、Time、Fundamental Physics 三大类共 16 个细粒度子类组织；具身推理本体以「处理复杂感知输入、预测动作效果、遵守物理约束、从交互中学习」四种能力与「自然智能体、机械臂、人形机器人、自动驾驶车辆」等五类具身体构成二维网格
-    alternatives:
-    - 沿用已有视频问答数据集（如 MMMU）进行评测，不单独定义本体
-    - 仅针对单一具身类型（如机械臂）构建窄领域基准
+    title: 训练范式选择：仅 RL vs. 两阶段 SFT 先建基础再 RL 提升
     support_level: explicit
     source_refs:
-    - Sec 2.1
-    - Sec 2.2
-    - Tab. 1
-    - Tab. 2
-- id: Q2
-  type: question
-  title: 如何选择多模态 LLM 架构以统一处理视频与文本输入？
-  description: 需在 decoder-only 与 cross-attention-based 两种主流 MLLM 架构中做出选择，并决定是否引入高效的混合序列建模骨干应对长视频推理的计算挑战。
-  support_level: inferred
-  children:
+    - Sec 4
+    - Sec 7.1
+    - Sec 7.2
+    choice: 采用两阶段训练：先进行 Physical AI SFT 建立领域基础能力，再进行 Physical AI RL 后训练进一步提升推理精度
+    alternatives:
+    - 仅使用 RL 端到端后训练，跳过 SFT 阶段
+    - 仅使用 SFT，不加 RL 后训练
+    children:
+    - id: E1
+      type: experiment
+      title: Physical AI SFT 在物理常识与具身推理基准上的效果验证
+      support_level: explicit
+      source_refs:
+      - Sec 7.1
+      - Tab. 7
+      - Tab. 8
+      result: Physical AI SFT 相比基础 VLM 主干在物理常识基准和具身推理基准上均有显著提升，7B 和 56B 变体均大幅超越对应骨干模型
+      children:
+      - id: E2
+        type: experiment
+        title: Physical AI RL 后训练对物理常识与具身推理基准的进一步改进
+        support_level: explicit
+        source_refs:
+        - Sec 7.2
+        - Tab. 9
+        result: RL 后训练在大多数基准分项上继续提升性能；但 RoboFail（手工策划困难样本集）表现停滞，归因于代表性训练数据不足
+    - id: E3
+      type: experiment
+      title: 直觉物理任务（空间拼图、时间方向、物体恒存性）的 RL 训练效果实验
+      support_level: explicit
+      source_refs:
+      - Sec 7.2.3
+      - Tab. 10
+      result: SFT 后直觉物理整体大幅提升；RL 进一步改善空间拼图与物体恒存性，但时间方向（Arrow of Time）仍是挑战
   - id: D2
     type: decision
-    title: 7B 采用 decoder-only 密集 Transformer；56B 引入 Mamba-MLP-Transformer 混合骨干
-    choice: Cosmos-Reason1-7B 基于 Qwen2.5-VL 的 decoder-only 密集 Transformer，利用其统一处理所有模态的简洁性；Cosmos-Reason1-56B
-      使用 InternViT-300M-V2.5 + Nemotron-H 混合架构，以 Mamba 选择性状态空间模型在长序列上实现线性时间复杂度，同时保留少量
-      Transformer 层进行长上下文建模
-    alternatives:
-    - cross-attention-based 架构（如 Flamingo、Llama 3-V），图像 token 经 LLM 交叉注意力层处理
-    - 56B 也采用纯密集 Transformer 骨干（计算开销过高，尤其在长视频场景）
+    title: 56B 骨干架构选择：密集 Transformer vs. 混合 Mamba-MLP-Transformer
     support_level: explicit
     source_refs:
-    - Sec 3.1
     - Sec 3.2
-    - Tab. 3
-- id: Q3
-  type: question
-  title: 能否为 Physical AI 推理模型设计规则化可验证的 RL 奖励？
-  description: 与数学/代码问题不同，物理常识和具身推理的答案往往是开放式的，难以直接构建规则化可验证奖励信号，需要设计适配 Physical AI
-    领域的新机制。
-  support_level: explicit
-  source_refs:
-  - Sec 1
-  - Sec 4
-  children:
-  - id: D3
-    type: decision
-    title: 将所有 RL 训练样本转换为单选 MCQ，以字符串匹配实现规则化准确率奖励
-    choice: 把 SFT 推理数据源（去掉思维链）转换为单选 MCQ，利用字符串匹配在 <answer></answer> 标签内进行规则验证；直觉物理数据天然已为
-      MCQ 格式；额外设置格式奖励（正则匹配 <think>/<answer> 标签）；MCQ 选项在训练时动态随机打乱以鼓励泛化
+    choice: 为 Cosmos-Reason1-56B 选用混合 Mamba-MLP-Transformer 架构（Nemotron-H），以少量 Transformer
+      层补偿 Mamba 在长序列细节捕捉上的不足
     alternatives:
-    - 使用额外语言模型评判（LLM-as-judge）对开放式答案打分
-    - 仅用直觉物理自监督数据做 RL，放弃物理常识与具身推理部分
+    - 纯密集 Transformer（7B 所采用方案）
+    - 纯 Mamba 架构（无 Transformer 层）
+  - id: Q2
+    type: question
+    title: 如何为物理常识与具身推理任务设计规则可验证的 RL 奖励
     support_level: explicit
     source_refs:
     - Sec 5.2
     - Sec 7.2.1
-  - id: D4
-    type: decision
-    title: 选择 GRPO 作为 RL 算法以避免维护独立 critic 模型
-    choice: 采用 GRPO（Group Relative Policy Optimization）：优势函数通过对同一 prompt 生成的一组响应奖励进行组内均值-标准差归一化来估计，无需单独训练
-      critic/value 网络，简化训练流程并提升计算效率
-    alternatives:
-    - PPO（需要单独的 critic 模型，训练开销更高）
-    - REINFORCE（方差更大，收敛更不稳定）
+    description: 物理常识与具身推理任务的回答通常是自由格式开放式文本，不能直接使用精确字符串匹配；需要探索可扩展的可验证奖励设计方案
+    children:
+    - id: DE1
+      type: dead_end
+      title: 直接使用自由格式回答作为 RL 奖励信号
+      support_level: explicit
+      source_refs:
+      - Sec 5.2
+      hypothesis: 物理常识与具身推理任务的自由格式开放式回答可直接用于设计规则可验证的 RL 奖励
+      failure_mode: 自由格式回答难以进行精确规则验证，奖励分配复杂，不满足「可验证奖励」前提；无法像数学、编程任务那样精确定义正确答案
+      lesson: 需将样本转化为单一正确答案的多选题（MCQ），方可使用简单字符串匹配实现规则可验证奖励
+  - id: DE2
+    type: dead_end
+    title: 对直觉物理数据使用通用「压缩视觉为 caption 后送 R1 提取推理链」流程
     support_level: explicit
     source_refs:
-    - Sec 4.1
-- id: Q4
-  type: question
-  title: 如何解决协同部署式 RL 框架中资源利用率低与容错性差的问题？
-  description: 主流协同部署框架（colocated framework）中，policy training 与 actor rollout 需同步运行，导致空闲等待开销高；节点失败需要全流程重启，制约大规模训练效率与稳定性。
-  support_level: inferred
-  children:
-  - id: D5
-    type: decision
-    title: 设计全异步异构 RL 训练框架，支持节点失败快速重配置与动态扩缩容
-    choice: 将 policy training 与 actor rollout 异构部署（非协同部署），通过统一 dispatcher 调度和分发训练
-      prompt，实现端到端异步并行；引入训练网格管理逻辑使框架在任意节点失败时无需重启即可快速重配置当前训练步；dispatcher 冗余机制增强整体鲁棒性并原生支持动态扩缩容；相比协同部署框架训练效率约提升
-      160%
-    alternatives:
-    - 沿用主流协同部署框架（如 OpenRLHF、HybridFlow），接受同步开销
-    support_level: explicit
-    source_refs:
-    - Sec 4.2
-- id: E1
-  type: experiment
-  title: Physical AI SFT 训练：物理常识 + 具身推理两阶段全量微调
-  result: Cosmos-Reason1-7B 和 56B 在物理常识基准与具身推理基准上均大幅优于各自预训练骨干基线；7B 和 56B 的具身推理平均精度相比骨干模型均提升超过
-    10 个百分点，56B 物理常识精度略超 OpenAI o1
-  support_level: explicit
-  source_refs:
-  - Sec 7.1
-  - Tab. 7
-  - Tab. 8
-- id: E2
-  type: experiment
-  title: Physical AI RL 后训练对物理常识与具身推理的进一步提升效果
-  result: RL 后训练在大多数基准子集上相对 SFT 再次提升性能，7B 模型综合平均精度进一步提升；RoboFail 子集例外，SFT 与 RL 阶段均未见明显改善，原因归结为代表性训练数据不足及模型在分布外难题上存在过度推理现象
-  support_level: explicit
-  source_refs:
-  - Sec 7.2
-  - Tab. 9
-- id: E3
-  type: experiment
-  title: 直觉物理专项实验：Arrow-of-Time、Spatial Puzzle、Object Permanence 的 SFT+RL 效果
-  result: SFT 后 Cosmos-Reason1-7B 在三项直觉物理任务上均大幅超越随机猜测基线及其他对比模型；RL 进一步提升 Spatial Puzzle
-    和 Object Permanence 精度；Arrow-of-Time 任务即使在 RL 后仍具挑战性，是当前最难突破的直觉物理子任务
-  support_level: explicit
-  source_refs:
-  - Sec 7.1.3
-  - Sec 7.2.3
-  - Tab. 10
-- id: DE1
-  type: dead_end
-  title: 对 Arrow-of-Time 任务沿用「caption 压缩→R1 推理迹提取」流程效果次优
-  hypothesis: 将视频帧压缩为结构化 caption 后输入 DeepSeek-R1，可为时间方向判断生成合理的推理迹
-  failure_mode: 将视频视觉上下文压缩为文字后，R1 生成的推理迹质量次优，无法有效区分正向与逆向播放的视觉证据；R1 的纯文本推理难以捕捉运动方向、熵增等时序视觉线索
-  lesson: 时间箭头数据改用 VLM 直接处理视频帧生成推理迹；提示中需明确标注当前播放方向（正向/逆向），并精心设计提示以保持两种方向推理风格和长度一致；为鼓励多样性，每段视频各方向各生成两条推理迹
-  support_level: explicit
-  source_refs:
-  - Sec 5.1.3
-- id: DE2
-  type: dead_end
-  title: 对 Object Permanence 任务使用 caption 压缩视觉上下文提取推理迹效果不佳
-  hypothesis: 与其他具身推理数据相同，将仿真视频转为结构化 caption 后交由外部模型（DeepSeek-R1 或 VLM）提取物体永久性推理迹，可产生高质量
-    SFT 样本
-  failure_mode: 遮挡、消失等时序细节在文字压缩过程中丢失，外部模型无法从 caption 中还原物体出现与消失的视觉证据，导致生成的推理迹无效
-  lesson: 改用中间版 Cosmos-Reason1-7B 直接处理视频帧提取推理迹；在提示中加入 hint（明示哪些物体消失且未重新出现）以引导模型生成正确结论；最终
-    SFT 数据集中移除 hint 以避免信息泄漏
-  support_level: explicit
-  source_refs:
-  - Sec 5.1.3
-- id: P1
-  type: pivot
-  title: 物体永久性推理迹来源从 DeepSeek-R1 转向中间版 Cosmos-Reason1-7B
-  from: 使用 DeepSeek-R1 + caption 文字上下文生成物体永久性推理迹（与其他具身推理数据流程一致）
-  to: 使用中间版 Cosmos-Reason1-7B 直接基于视频帧处理，在提示中加入 hint 指示消失物体，生成有效推理迹后从最终 SFT 样本中移除 hint
-  trigger: 发现标准 caption 压缩流程对物体永久性任务产生次优推理迹：视觉时序细节在文字压缩中丢失，R1 无法基于 caption 还原物体出现/消失的关键证据
-  support_level: explicit
-  source_refs:
-  - Sec 5.1.3
-  also_depends_on:
-  - DE2
+    - Sec 5.1.3
+    hypothesis: 将视频帧内容压缩为文本 caption 后送入 DeepSeek-R1 的通用推理链提取流程，可普遍适用于所有直觉物理子任务（包括时间方向与物体恒存性）
+    failure_mode: 对「时间方向（AoT）」任务，通用流程导致 R1 提取的推理链质量次优；对「物体恒存性」任务，caption 压缩造成关键视觉信息丢失，无法提取有效推理链
+    lesson: 不同直觉物理子任务需定制化数据策展策略：AoT 需在提示中明确注明播放方向，且由 VLM 直接提取推理链；物体恒存性需改用 Cosmos-Reason1-7B
+      中间版本而非 R1 来提取推理链

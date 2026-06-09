@@ -1,50 +1,50 @@
 # Heuristics
 
-## H1: RL训练中将所有数据源以均等概率采样,确保各领域均衡表示
-- **Rationale**: 防止特定领域主导训练,避免分布偏移与奖励作弊
+## H1: SFT阶段7B模型使用余弦退火学习率, 从 $1 \times 10^{-5}$ 衰减至 $1 \times 10^{-6}$
+- **Rationale**: 余弦退火在训练末期平稳降低学习率, 有助于稳定收敛并避免过拟合
+- **Sensitivity**: 中: 初始学习率边界对最终性能影响较显著
+- **Bounds**: 初始 $1 \times 10^{-5}$, 最终 $1 \times 10^{-6}$
+- **Code ref**: [N/A]
+- **Source**: Sec. 7.1
+
+## H2: SFT阶段56B模型先以学习率 $1 \times 10^{-5}$ 训练, 再以衰减后的 $1 \times 10^{-6}$ 继续训练
+- **Rationale**: 两段式学习率调度适合大规模模型, 前段充分学习后段精细收敛
 - **Sensitivity**: 中
-- **Bounds**: 论文未给出具体数值范围
-- **Code ref**: [论文第7.2.1节训练设置]
-- **Source**: Sec 7.2.1
+- **Bounds**: 第一段 $1 \times 10^{-5}$, 第二段 $1 \times 10^{-6}$
+- **Code ref**: [N/A]
+- **Source**: Sec. 7.1
 
-## H2: RL训练中每个问题采样9个输出,每个输出最大序列长度截断为6144个token
-- **Rationale**: 组大小9用于GRPO优势归一化;6144 token为长链式思维推理提供充足空间
-- **Sensitivity**: 高
-- **Bounds**: 组大小=9,最大长度=6144 token
-- **Code ref**: [论文第7.2.1节]
-- **Source**: Sec 7.2.1
-
-## H3: RL训练中对MCQ选项进行动态实时打乱(on-the-fly shuffle)
-- **Rationale**: 鼓励模型泛化,防止模型记忆答案位置顺序从而产生奖励作弊
+## H3: SFT阶段使用fused Adam优化器, $\beta_1, \beta_2 = (0.9, 0.95)$, 权重衰减0.1; 7B全局批大小256, 56B全局批大小32
+- **Rationale**: 较高的 $\beta_2$ 使梯度平方估计更稳定, 适合大模型; 权重衰减抑制过拟合; 56B批大小受限于显存
 - **Sensitivity**: 中
-- **Bounds**: 论文未给出具体量化分析
-- **Code ref**: [论文第7.2.1节]
-- **Source**: Sec 7.2.1
+- **Bounds**: $\beta_1=0.9$, $\beta_2=0.95$, weight_decay=0.1
+- **Code ref**: [N/A]
+- **Source**: Sec. 7.1
 
-## H4: 箭头时间(AoT)数据优先选取运动幅度大的视频片段
-- **Rationale**: 大运动视频是区分时间箭头方向最具代表性的样本,有助于模型学习宏观尺度上时间的不可逆性
-- **Sensitivity**: 中
-- **Bounds**: 论文未给出运动幅度的定量阈值
-- **Code ref**: [论文第5.1.3节]
-- **Source**: Sec 5.1.3
+## H4: 推理评估时对同一问题采样5次(temperature=0.6, top-p=0.95), 取平均准确率作为最终指标
+- **Rationale**: 多次采样平均可降低解码随机性带来的评估方差, 使结果更稳定可靠
+- **Sensitivity**: 低: 5次平均已足够稳定
+- **Bounds**: temperature=0.6, top-p=0.95, 采样次数=5
+- **Code ref**: [N/A]
+- **Source**: Sec. 7.1
 
-## H5: 空间拼图任务中为每个目标图像引入7张额外干扰图像,每个样本共提供32帧供模型推理
-- **Rationale**: 类比对比学习,要求模型在干扰项中区分相关帧并推理空间关系,培养更强的空间推理能力
-- **Sensitivity**: 高
-- **Bounds**: 干扰图像数=7,每个样本总帧数=32
-- **Code ref**: [论文第5.1.3节]
-- **Source**: Sec 5.1.3
+## H5: RL阶段全局批大小128个问题, 每题采样9个输出, 每输出最大长度6144 tokens, 学习率 $4 \times 10^{-6}$, KL惩罚系数0.005, 训练500迭代步
+- **Rationale**: 每题多路输出是GRPO组内归一化优势估计的核心需求; 小学习率与KL约束共同保证RL阶段策略稳定
+- **Sensitivity**: 高: 每题输出数量直接影响优势函数质量; KL系数过大限制改进空间
+- **Bounds**: batch=128, outputs_per_q=9, max_tokens=6144, lr=$4 \times 10^{-6}$, kl_coeff=0.005, iters=500
+- **Code ref**: [N/A]
+- **Source**: Sec. 7.2.1
 
-## H6: RL后训练KL惩罚系数设为0.005,学习率设为$4\times10^{-6}$,共训练500次迭代
-- **Rationale**: KL惩罚防止策略偏离参考模型过远;低学习率保证稳定收敛
-- **Sensitivity**: 高
-- **Bounds**: KL系数=0.005,学习率=$4\times10^{-6}$,迭代次数=500
-- **Code ref**: [论文第7.2.1节]
-- **Source**: Sec 7.2.1
+## H6: 56B视频输入每帧统一调整至448×448像素, 每帧产生1024个视觉token后经PixelShuffle 2×2下采样至256 tokens; 每视频最多均匀采样32帧, 最大帧率2帧/秒
+- **Rationale**: 限制帧数与分辨率是视频理解质量与计算开销之间的工程权衡
+- **Sensitivity**: 中: 帧数减少会丢失时序细节
+- **Bounds**: frame_size=448×448, tokens_per_frame=256 (downsampled from 1024), max_frames=32, max_fps=2
+- **Code ref**: [N/A]
+- **Source**: Sec. 3.1
 
-## H7: SFT阶段采用平衡数据采样策略,避免特定领域在微调期间过度表示
-- **Rationale**: 训练数据包含物理常识、具身推理、直觉物理等异质领域,平衡采样有助于多任务能力均衡发展
-- **Sensitivity**: 中
-- **Bounds**: 论文未给出具体采样比例数值
-- **Code ref**: [论文第7.1节]
-- **Source**: Sec 7.1
+## H7: RL训练中MCQ选项在每个训练步在线随机打乱, 确保模型泛化到不同选项顺序
+- **Rationale**: 防止模型对固定选项位置产生偏差, 避免奖励破解(reward hacking)
+- **Sensitivity**: 中: 不打乱会导致位置偏差
+- **Bounds**: N/A
+- **Code ref**: [N/A]
+- **Source**: Sec. 7.2.1
