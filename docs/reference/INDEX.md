@@ -2,7 +2,7 @@
 
 > **Scope**: `docs/reference/` — full clones of the three upstream repositories
 > paper-rolling drew code and design from, kept for provenance and offline
-> reference. This `index.md` is the **only** git-tracked file in this directory;
+> reference. This `INDEX.md` is the **only** git-tracked file in this directory;
 > the cloned repos are gitignored (they carry their own `.git` and are large).
 
 ---
@@ -27,12 +27,12 @@ these references. They were re-cloned fresh from GitHub on **2026-06-07**.
 
 ## Git policy
 
-- **Tracked**: only this `index.md` (the manifest).
+- **Tracked**: only this `INDEX.md` (the manifest).
 - **Ignored**: every cloned repo under `docs/reference/` — see the root
   `.gitignore` rule:
   ```
   /docs/reference/*
-  !/docs/reference/index.md
+  !/docs/reference/INDEX.md
   ```
 - **Rationale**: the repos are large (~885 MB total — 3 source repos ≈150 MB +
   6 benchmark repos ≈735 MB; `docling` alone is ~400 MB) and regenerable from the
