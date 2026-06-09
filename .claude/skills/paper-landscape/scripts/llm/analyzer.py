@@ -125,11 +125,14 @@ _CHUNKS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     procedure:[...],metrics:[...],expected:"<方向性措辞,无精确数字>",
     baselines:[...],dependencies:[...]}, ...]  (Seal-1 需要 >= 3 个 experiment)
 - evidence_tables: [{name,headers:[...],rows:[[...]],caption,source,claims:["C1"]}, ...]
-    — 唯一可出现精确数字处,逐字照抄 MD。Seal-1 需要 >= 1 张表,headers 非空、>= 1 行、
-    source 非空(如 "Table 3")。
+    — 唯一可出现精确数字处,逐字照抄 MD。**完整抽取**:论文里每一张承载定量结果/消融的表
+    都要抽(尤其每个 experiment 若对应一张论文结果表,该表必须出现),不要只抽部分;
+    source 用论文原表号(如 "Table 3")。Seal-1 需要 >= 1 张表,headers 非空、>= 1 行、source 非空。
 - related_work: [{id:"R1",cite,doi,type,what_changed,why,claims:["C1"],adopted:[...]}, ...]
 内部一致性:claims 的 proof/evidence_basis 必须引用本块 experiments 里真实存在的 E# id;
-evidence_tables.claims 与 related_work.claims 引用本块 claims 里真实存在的 C# id(不得悬空)。""",
+evidence_tables.claims 与 related_work.claims 引用本块 claims 里真实存在的 C# id(不得悬空);
+**无悬挂表引用**:凡 experiments/claims 按表号引用的结果表,都必须作为一条 evidence_tables
+出现(source 标签一致)——不得描述了某表却不抽取它。""",
     ),
     (
         "concepts",
