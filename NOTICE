@@ -22,6 +22,12 @@ and indication of changes:
 
   License: https://creativecommons.org/licenses/by-nc/4.0/
 
+Original paper figures embedded in the human reports (person_vault/**/images/)
+remain the copyright of their original authors/publishers. They are reproduced
+here for non-commercial academic citation and commentary (a faithful "paper
+guided tour"); no ownership is claimed and no commercial use is intended. See
+docs/adr/0005-public-cc-by-nc-keep-original-figures.md for the rationale.
+
 All other modules in this repo are original paper-rolling code (not vendored
 from ARS); they are covered by this repo's own CC-BY-NC 4.0 license, not by ARS's.
 Permissively-licensed material is cherry-picked with per-file attribution:

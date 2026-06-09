@@ -108,9 +108,12 @@ Delete `config/llm.yaml` to route everything to `claude -p`.
 - **Vault-key authority is `scripts/output/naming.py` ONLY.** Do not add ad-hoc
   naming helpers elsewhere — the divergent duplicates that lived in `paths.py` and
   `ledger/naming.py` were deliberately removed.
-- **Single ledger writer.** `_ledger/processed_ledger.yaml` is append-only with an
-  LS-1 `.lock`; only the hub writes it. Idempotency keys come from
-  `ledger/naming.py`; vault keys come from `output/naming.py` — different concerns.
+- **Single ledger writer (per lock holder).** `_ledger/processed_ledger.yaml` is
+  append-only with an LS-1 `.lock`. Two writers exist — the hub (`/loop` tick) and
+  the **批次复活赛 driver** (`scripts/revival.py`); both MUST hold the LS-1 lock, so
+  they are mutually exclusive (a second start fails fast with `LedgerLockError`) and
+  never race. Idempotency keys come from `ledger/naming.py`; vault keys come from
+  `output/naming.py` — different concerns.
 - **Tracked = products, ignored = regenerable inputs** (基调-D2): converted
   `corpus/{ID}/{ID}.md` + `.md_contract.json`, `person_vault/`, `ai_package/`,
   `_ledger/`, `landscapes/`, engine + `config/` are tracked; original `*.pdf`,

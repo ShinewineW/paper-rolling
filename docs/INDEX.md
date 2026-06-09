@@ -46,6 +46,7 @@
 - [`guides/codemaps/output-branches.md`](guides/codemaps/output-branches.md) — 双链原子产出、LLM 人链、图形策展。
 
 ### spec/ — 设计文档
+- [`spec/2026-06-09-失败现场与复活赛-impl.md`](spec/2026-06-09-失败现场与复活赛-impl.md) — 失败现场保全 + 外科手术重试 + 批次复活赛实施计划(依据 ADR-0006~0009)。
 - [`spec/2026-06-09-code-ref-repo-resolution-impl.md`](spec/2026-06-09-code-ref-repo-resolution-impl.md) — code_ref 官方仓定位级联(T1 grep+T2a PwC离线+T2b HF-live+T4 websearch)+ clone 验证闸门 + 三态语义实施计划(P0)。
 
 ### spec/archive/ — 设计文档(归档)
@@ -62,6 +63,7 @@
 - [`adr/0002-extend-on-rule-of-three.md`](adr/0002-extend-on-rule-of-three.md) — rule-of-three 扩展策略;抽象发现源 seam、推迟 tier/branch 框架。
 - [`adr/0003-skill-knowledge-layer-and-shipped-adapters.md`](adr/0003-skill-knowledge-layer-and-shipped-adapters.md) — 技能逻辑分层为知识层 + 出厂确定性 infra 适配器;LLM seam 由 agent 注入。
 - [`adr/0004-llm-seam-transport-claude-p-default.md`](adr/0004-llm-seam-transport-claude-p-default.md) — LLM seam = 同步注入 callable;默认传输锁死 `claude -p`,另留直连 API 适配器。
+- [`adr/0005-public-cc-by-nc-keep-original-figures.md`](adr/0005-public-cc-by-nc-keep-original-figures.md) — 保持公开 + CC-BY-NC;原图原样嵌入(不改 Apache、不只重绘);版权立场与权衡。
 
 ### handoff/ — 上下文接手(工作态)
 - [`handoff/debug-drivers/`](handoff/debug-drivers/) — 批量跑根因诊断期间的接手文档 + 复现驱动脚本(`loop_progress.md` 进度交接 + `run24.py` 等驱动,被 `reports/2026-06-09-…` 引用为复现配套)。
