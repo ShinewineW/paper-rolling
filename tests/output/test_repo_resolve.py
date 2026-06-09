@@ -135,3 +135,16 @@ def test_hf_official_repo_none_on_missing_or_error() -> None:
         raise TimeoutError("slow")
 
     assert hf_official_repo("2604.01765", http_get=boom) is None
+
+
+def test_make_repo_resolver_wires_t2b_default_and_optional_t4():
+    from scripts.output.repo_resolve import hf_official_repo, make_repo_resolver
+
+    r = make_repo_resolver()
+    assert r.keywords["hf_lookup"] is hf_official_repo  # T2b on by default
+    assert r.keywords["web_search"] is None  # T4 off unless supplied
+
+    def ws(_q):
+        return []
+
+    assert make_repo_resolver(web_search=ws).keywords["web_search"] is ws

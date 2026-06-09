@@ -246,6 +246,7 @@ campaign = load_campaign(Path("."))
 # is the human-chain writer — pass it so branch1 produces the RICH LLM report
 # (figures + sections); omit it and branch1 falls back to the thin renderer.
 from scripts.llm.seams import build_seams
+from scripts.output.repo_resolve import make_repo_resolver
 
 seams = build_seams()
 result = run_campaign(
@@ -262,6 +263,10 @@ result = run_campaign(
     ),
     http=build_http(),
     run_cli=build_run_cli(),
+    # code_ref repo resolution (P0). make_repo_resolver() turns T2b (HF-live) ON;
+    # to also enable T4, pass web_search=<a callable that runs an Agent WebSearch
+    # and returns result strings>. Omit repo_resolver entirely → pure T1+T2a.
+    repo_resolver=make_repo_resolver(),
 )
 ```
 

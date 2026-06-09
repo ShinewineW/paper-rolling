@@ -19,7 +19,8 @@ a CLI:
 run_campaign(*, workspace, discover, resolve_analysis, skeptic_votes,
              rigor_scores, entailment_judge, http, run_cli,
              cross_model_votes=None, cross_model_sample=0.0,
-             empirical_classifier=None, requested_topic=None,
+             empirical_classifier=None, write_report=None,
+             repo_resolver=None, requested_topic=None,
              requested_n=None) -> TickResult
 ```
 
@@ -108,10 +109,34 @@ other discovery work is deterministic API wiring. Override any adapter by passin
 your own callable to `run_campaign(...)` (e.g. wrap the agent's WebFetch in an
 `http(url) -> (status, body)` of your own).
 
+### (C) Optional: `repo_resolver` — code_ref repo-resolution cascade (P0)
+
+`repo_resolver(*, arxiv_id, md_path, candidate) -> list[RepoCandidate]` produces
+the ordered repo candidates branch2 clone-verifies for `src/code_ref.md`. Omit it
+→ the engine uses the pure offline default (`resolve_repo_candidates`: T1 grep of
+the paper MD + T2a the shipped Papers-with-Code `is_official` table). To extend
+coverage to post-PwC-freeze papers, inject the composed production resolver:
+
+```python
+from scripts.output.repo_resolve import make_repo_resolver
+
+repo_resolver = make_repo_resolver(            # T2b HF-live ON (deterministic, free)
+    web_search=my_websearch,                   # OPTIONAL T4: enable long-tail websearch
+)                                              #   a callable (query:str)->list[str]
+```
+
+`make_repo_resolver()` always wires **T2b** (`hf_official_repo`, a live
+`api/papers/{id}` lookup reusing the `.env` HF token). **T4** activates only when
+you pass `web_search` — a callable that runs an Agent WebSearch and returns the
+result strings (the engine extracts github URLs from them). Every candidate, from
+any tier, still passes the same clone-verification gate in `build_code_ref`
+(official → accept on clone; search → must match arxiv_id/title or an innovation
+symbol), so a wrong/reimplementation link is rejected, never linked.
+
 **Net runtime job to make the workspace go**: construct the 4 LLM seams (+ the
 query-expansion `llm`), call `build_http()` / `build_run_cli()` / `build_discover(...)`
-for the rest, and invoke `run_campaign(...)`. That is the entire wiring — see
-SKILL.md "Invoke the engine (quickstart)".
+for the rest, optionally `make_repo_resolver(...)`, and invoke `run_campaign(...)`.
+That is the entire wiring — see SKILL.md "Invoke the engine (quickstart)".
 
 ## Independence + isolation invariants [MUST]
 

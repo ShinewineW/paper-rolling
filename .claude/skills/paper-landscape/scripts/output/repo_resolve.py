@@ -23,6 +23,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 from scripts.output.pwc_lookup import official_repo as _pwc_official_repo
@@ -172,3 +173,14 @@ def resolve_repo_candidates(
             for m in _GH.finditer(result or ""):
                 add(m.group(0), "websearch", "search")
     return out
+
+
+def make_repo_resolver(*, web_search: Callable[[str], list[str]] | None = None) -> Callable:
+    """Compose the PRODUCTION code_ref resolver for the driver to inject.
+
+    Wires T1+T2a (always) + **T2b HF-live on by default** (deterministic, free) +
+    **T4 only when `web_search` is supplied** (an Agent WebSearch invocation that
+    returns result strings). Pass the result as `run_campaign(repo_resolver=...)`.
+    Unit tests use the bare `resolve_repo_candidates` instead, so they stay offline.
+    """
+    return partial(resolve_repo_candidates, hf_lookup=hf_official_repo, web_search=web_search)
