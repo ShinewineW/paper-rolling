@@ -19,7 +19,7 @@ import shutil
 import tempfile
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +37,9 @@ class ProduceResult:
     key: str
     person_path: Path
     ai_path: Path
+    # The branch2 analyzer bundle that produced this run, surfaced so a branch1-only
+    # G3 re-emit can reuse the branch2 SSOT without re-sampling the analyzer (ADR-0009).
+    analysis: dict | None = None
 
 
 class ProduceGateBlocked(Exception):
@@ -122,6 +125,7 @@ def stage_branch2(
     resolve_analysis: Callable[..., dict],
     repo_resolver: Callable | None = None,
     prior_failure: str | None = None,
+    analysis: dict | None = None,
 ) -> tuple[Path, dict]:
     """Stage branch2 (ARA) into ``staging/ai/ara`` and run Seal-1; return (stage_ai, analysis).
 
@@ -130,14 +134,18 @@ def stage_branch2(
     bundle (audit E). ``repo_resolver`` MUST thread through to write_branch2 or a
     re-emit silently loses code-link resolution (audit R10 — T2b/T4).
 
+    Pass a pre-computed ``analysis`` to REUSE the branch2 SSOT (a branch1-only G3
+    re-emit re-renders from it — no analyzer re-sample, ADR-0009).
+
     Raises:
         StructuralSealFailed: the staged ARA failed Seal-1 (carries ``staging``).
     """
     stage_ai = staging / "ai" / "ara"
-    # audit R5 Finding 1: only pass prior_failure when set — an older analyzer fake
-    # takes (md_path, candidate) only and would TypeError on an unexpected kwarg.
-    extra = {"prior_failure": prior_failure} if prior_failure is not None else {}
-    analysis = resolve_analysis(md_path, candidate, **extra)
+    if analysis is None:
+        # audit R5 Finding 1: only pass prior_failure when set — an older analyzer
+        # fake takes (md_path, candidate) only and would TypeError on an extra kwarg.
+        extra = {"prior_failure": prior_failure} if prior_failure is not None else {}
+        analysis = resolve_analysis(md_path, candidate, **extra)
     write_branch2(stage_ai, candidate, analysis, md_path=md_path, repo_resolver=repo_resolver)
     ara_errors = validate_ara_tree(stage_ai)
     if ara_errors:
@@ -236,6 +244,7 @@ def produce_outputs(
     write_report: Callable[..., dict] | None = None,
     cancel: threading.Event | None = None,
     repo_resolver: Callable | None = None,
+    reuse_analysis: dict | None = None,
     prior_failure_analyzer: str | None = None,
     prior_failure_branch1: str | None = None,
 ) -> ProduceResult:
@@ -294,6 +303,7 @@ def produce_outputs(
             resolve_analysis=resolve_analysis,
             repo_resolver=repo_resolver,
             prior_failure=prior_failure_analyzer,
+            analysis=reuse_analysis,
         )
 
         # G2 (after branch2, before branch1): adversarial data-fidelity gate on the
@@ -322,7 +332,7 @@ def produce_outputs(
         if cancel is not None and cancel.is_set():
             raise SpokeCancelled("spoke cancelled before vault promotion (stall budget exceeded)")
 
-        return promote(
+        result = promote(
             staging,
             key,
             candidate=candidate,
@@ -331,6 +341,8 @@ def produce_outputs(
             ai_package=ai_package,
             cancel=cancel,
         )
+        # Surface the branch2 bundle so a branch1-only G3 re-emit can reuse it.
+        return replace(result, analysis=analysis)
     except (StructuralSealFailed, ProduceGateBlocked, AnchorGateError):
         # A gate hard-failed: its exception carries `staging` (the failure scene),
         # so do NOT let `finally` delete it. SpokeCancelled + success keep this

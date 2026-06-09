@@ -15,7 +15,7 @@ from pathlib import Path
 
 from conftest import write_mineru_output
 from scripts.audit.rigor_rubric import DIMENSION_KEYS
-from scripts.audit.types import SkepticVote
+from scripts.audit.types import Finding, GateVerdict, Severity, SkepticVote
 from scripts.campaign import CampaignConfig, write_campaign
 from scripts.hub import run_campaign_tick
 from scripts.ledger.store import Ledger
@@ -325,8 +325,12 @@ _ANALYSIS = {
 }
 
 
-def _resolve_analysis(md_path, candidate):
-    """Inject a fresh deep copy so producer mutations never leak across runs."""
+def _resolve_analysis(md_path, candidate, *, prior_failure=None):
+    """Inject a fresh deep copy so producer mutations never leak across runs.
+
+    Accepts the optional ``prior_failure`` kwarg a branch2 re-emit injects (ADR-0009);
+    this fake ignores the feedback and returns the same clean bundle.
+    """
     return copy.deepcopy(_ANALYSIS)
 
 
@@ -693,6 +697,255 @@ def test_spoke_g3_failure_removes_promoted_vault(tmp_path, fake_http, fake_cli):
     # And the cross-paper landscape does NOT include the failed paper.
     land = generate_landscapes(tmp_path, topic="real-time planning")
     assert land.paper_count == 0
+
+
+# --- G3 BRANCH-LEVEL RE-EMIT DISPATCH (Task 4.4) ---------------------------
+
+
+def _hard_verdict(gate: str, target: str, obs: str = "forced") -> GateVerdict:
+    return GateVerdict(
+        gate=gate,
+        findings=(
+            Finding(
+                finding_id="F01",
+                severity=Severity.CRITICAL,
+                target=target,
+                observation=obs,
+                is_hard_block=True,
+            ),
+        ),
+    )
+
+
+def test_g3_reemit_seals_fresh_not_stale(tmp_path, fake_http, fake_cli):
+    """R2 Finding 1: _on_g3_reemit rebinds `produced` (nonlocal), so round 2 seals
+    the FRESH re-emitted product. rigor low→good across rounds → re-emit then pass."""
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
+    rigor_calls = {"n": 0}
+
+    def flaky_rigor(bundle):
+        rigor_calls["n"] += 1
+        return _low_rigor(bundle) if rigor_calls["n"] == 1 else _good_rigor(bundle)
+
+    spoke = make_spoke(
+        workspace=tmp_path,
+        http=fake_http,
+        run_cli=fake_cli,
+        resolve_analysis=_resolve_analysis,
+        skeptic_votes=_all_found_skeptic,
+        rigor_scores=flaky_rigor,
+        entailment_judge=_entailed,
+        ledger=_ledger(tmp_path),
+        n_skeptics=3,
+        max_gate_rounds=2,
+    )
+    result = spoke(dict(_CANDIDATE))
+    assert result.status == "done"  # round-2 fresh product sealed
+    assert rigor_calls["n"] == 2  # G3 ran twice (round 1 low re-emitted, round 2 good)
+
+
+def test_g3_ingest_root_raises_to_scene(tmp_path, fake_http, fake_cli, monkeypatch):
+    """R1 Finding 5: an ingest-rooted G3 finding (equation fidelity) is unfixable →
+    _Unfixable → 最终门 scene; never re-emits a branch, never escapes as stalled."""
+    import scripts.audit.g3_seal as g3
+
+    monkeypatch.setattr(
+        g3,
+        "check_equation_fidelity",
+        lambda _md, _cl: _hard_verdict("equation-fidelity", "2411.15139v1.md", "eq mismatch"),
+    )
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    spoke = _make_spoke(tmp_path, fake_http, fake_cli, analysis_md=_SOURCE_MD)
+    result = spoke(dict(_CANDIDATE))
+    assert result.status == "failed" and result.failure_class == FAILURE_AUDIT_BLOCK
+    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
+    assert scenes and json.loads(scenes[0].read_text())["failed_gate"] == "最终门"
+    ai_root = tmp_path / "ai_package"
+    assert not ai_root.exists() or not any(p for p in ai_root.iterdir() if p.name != ".gitkeep")
+
+
+def test_g3_branch2_reemit_hits_g2_lands_scene(tmp_path, fake_http, fake_cli):
+    """branch2 re-emit (rigor root) re-samples the analyzer; if the fresh sample
+    hits G2 before re-promotion → 数字门 scene, staged ai/ kept, old vault removed."""
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
+    acalls = {"n": 0}
+
+    def flaky_analyzer(_md, _cand, *, prior_failure=None):
+        acalls["n"] += 1
+        bundle = copy.deepcopy(_ANALYSIS)
+        if acalls["n"] >= 2:  # the branch2 re-emit fabricates a number → G2 blocks
+            bundle["evidence_tables"][0]["rows"].append(["Bogus", "888.88", "777.77"])
+        return bundle
+
+    spoke = make_spoke(
+        workspace=tmp_path,
+        http=fake_http,
+        run_cli=fake_cli,
+        resolve_analysis=flaky_analyzer,
+        skeptic_votes=_honest_skeptic,
+        rigor_scores=_low_rigor,
+        entailment_judge=_entailed,
+        ledger=_ledger(tmp_path),
+        n_skeptics=3,
+        max_gate_rounds=2,
+    )
+    result = spoke(dict(_CANDIDATE))
+    assert result.status == "failed"
+    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
+    m = json.loads(scenes[0].read_text())
+    assert m["failed_gate"] == "数字门"
+    assert (scenes[0].parent / "ai" / "ara").is_dir()
+    ai_root = tmp_path / "ai_package"
+    assert not ai_root.exists() or not any(p for p in ai_root.iterdir() if p.name != ".gitkeep")
+
+
+def test_g3_branch2_reemit_hits_seal1_lands_scene(tmp_path, fake_http, fake_cli, monkeypatch):
+    """branch2 re-emit hits Seal-1 → 结构门 scene; _findings_of(StructuralSealFailed)
+    lands non-empty findings; staged ai/ kept; old vault removed."""
+    import scripts.output.produce as prod
+
+    real_validate = prod.validate_ara_tree
+    vcalls = {"n": 0}
+
+    def flaky_validate(ara):
+        vcalls["n"] += 1
+        if vcalls["n"] == 1:
+            return real_validate(ara)
+        return ["N1: also_depends_on references unknown node 'D'"]
+
+    monkeypatch.setattr(prod, "validate_ara_tree", flaky_validate)
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
+    spoke = make_spoke(
+        workspace=tmp_path,
+        http=fake_http,
+        run_cli=fake_cli,
+        resolve_analysis=_resolve_analysis,
+        skeptic_votes=_all_found_skeptic,
+        rigor_scores=_low_rigor,
+        entailment_judge=_entailed,
+        ledger=_ledger(tmp_path),
+        n_skeptics=3,
+        max_gate_rounds=2,
+    )
+    result = spoke(dict(_CANDIDATE))
+    assert result.status == "failed"
+    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
+    m = json.loads(scenes[0].read_text())
+    assert m["failed_gate"] == "结构门"
+    assert m["attempts"][-1]["findings"]  # _findings_of(StructuralSealFailed) non-empty
+    assert (scenes[0].parent / "ai" / "ara").is_dir()
+
+
+def test_g3_branch1_reemit_hits_anchor_lands_scene(tmp_path, fake_http, fake_cli, monkeypatch):
+    """branch1 re-emit (anchor root) hits AnchorGateError in stage_branch1 → 锚点门
+    scene with staged ai/ + person/ (R4 Finding 1: staged_dir set inside stage_branch1)."""
+    import scripts.audit.g3_seal as g3
+    import scripts.output.produce as prod
+    from scripts.output.branch1_report import AnchorGateError
+
+    monkeypatch.setattr(
+        g3,
+        "check_branch1_md_anchors",
+        lambda *a, **k: _hard_verdict("G3-anchor", "report.md", "unresolvable anchor"),
+    )
+    real_wb1 = prod.write_branch1
+    wcalls = {"n": 0}
+
+    def flaky_wb1(*a, **k):
+        wcalls["n"] += 1
+        out = real_wb1(*a, **k)  # writes staging/person/report.md (so the scene has person/)
+        if wcalls["n"] >= 2:  # the branch1 re-emit fails its own anchor lint
+            raise AnchorGateError("re-emit branch1 unanchorable")
+        return out
+
+    monkeypatch.setattr(prod, "write_branch1", flaky_wb1)
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
+    spoke = make_spoke(
+        workspace=tmp_path,
+        http=fake_http,
+        run_cli=fake_cli,
+        resolve_analysis=_resolve_analysis,
+        skeptic_votes=_all_found_skeptic,
+        rigor_scores=_good_rigor,
+        entailment_judge=_entailed,
+        ledger=_ledger(tmp_path),
+        n_skeptics=3,
+        max_gate_rounds=2,
+    )
+    result = spoke(dict(_CANDIDATE))
+    assert result.status == "failed"
+    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
+    m = json.loads(scenes[0].read_text())
+    assert m["failed_gate"] == "锚点门"
+    assert (scenes[0].parent / "ai").is_dir() and (scenes[0].parent / "person").is_dir()
+
+
+def test_g3_branch2_root_recalls_analyzer_with_feedback(tmp_path, fake_http, fake_cli):
+    """rigor (branch2) root → _attempt(prior_failure_analyzer=...) re-samples the
+    analyzer WITH the feedback injected (audit R8, moved from 4.3)."""
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
+    seen: list = []
+
+    def rec_analyzer(_md, _cand, *, prior_failure=None):
+        seen.append(prior_failure)
+        return copy.deepcopy(_ANALYSIS)
+
+    spoke = make_spoke(
+        workspace=tmp_path,
+        http=fake_http,
+        run_cli=fake_cli,
+        resolve_analysis=rec_analyzer,
+        skeptic_votes=_all_found_skeptic,
+        rigor_scores=_low_rigor,
+        entailment_judge=_entailed,
+        ledger=_ledger(tmp_path),
+        n_skeptics=3,
+        max_gate_rounds=2,
+    )
+    result = spoke(dict(_CANDIDATE))
+    assert result.status == "failed"  # rigor always low → escalates to a scene
+    assert len(seen) >= 2  # analyzer was re-sampled on the branch2 re-emit
+    assert any(p is not None for p in seen[1:])  # the re-emit injected prior_failure feedback
+
+
+def test_g3_branch1_root_reuses_branch2(tmp_path, fake_http, fake_cli, monkeypatch):
+    """anchor (branch1) root → _attempt(prior_failure_branch1=...) REUSES the branch2
+    SSOT: the analyzer is NOT re-sampled (audit R8, moved from 4.3)."""
+    import scripts.audit.g3_seal as g3
+
+    monkeypatch.setattr(
+        g3,
+        "check_branch1_md_anchors",
+        lambda *a, **k: _hard_verdict("G3-anchor", "report.md", "unresolvable anchor"),
+    )
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
+    acalls = {"n": 0}
+
+    def counting_analyzer(_md, _cand, *, prior_failure=None):
+        acalls["n"] += 1
+        return copy.deepcopy(_ANALYSIS)
+
+    spoke = make_spoke(
+        workspace=tmp_path,
+        http=fake_http,
+        run_cli=fake_cli,
+        resolve_analysis=counting_analyzer,
+        skeptic_votes=_all_found_skeptic,
+        rigor_scores=_good_rigor,
+        entailment_judge=_entailed,
+        ledger=_ledger(tmp_path),
+        n_skeptics=3,
+        max_gate_rounds=2,
+    )
+    result = spoke(dict(_CANDIDATE))
+    assert result.status == "failed"  # anchor always fails → escalates to a scene
+    assert acalls["n"] == 1  # branch1 re-emit reused branch2 — analyzer NOT re-sampled
 
 
 # --- branch1 ANCHOR GATE (failure isolation) ------------------------------

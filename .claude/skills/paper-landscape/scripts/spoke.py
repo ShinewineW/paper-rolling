@@ -158,13 +158,23 @@ def make_spoke(
 
         # 4. The analyzer seam is passed as a parameter (no module-global
         #    mutation) so concurrent spokes never share one analyzer.
+        cached_analysis: dict | None = None
+
         def _attempt(
             *, prior_failure_branch1: str | None = None, prior_failure_analyzer: str | None = None
         ) -> ProduceResult:
             # prior_failure_analyzer routes to stage_branch2 (re-sample the analyzer);
-            # prior_failure_branch1 routes to stage_branch1 (rewrite the report). The
-            # branch-level G3 dispatch that supplies these arrives in Task 4.4.
-            return produce_outputs(
+            # prior_failure_branch1 routes to stage_branch1 (rewrite the report). A
+            # branch1-only re-emit REUSES the cached branch2 SSOT — no analyzer
+            # re-sample (ADR-0009); every other path (first attempt, G2 blind retry,
+            # branch2 re-emit) re-samples fresh.
+            nonlocal cached_analysis
+            reuse = (
+                cached_analysis
+                if prior_failure_branch1 is not None and prior_failure_analyzer is None
+                else None
+            )
+            result = produce_outputs(
                 ing.md_path,
                 candidate,
                 ledger,
@@ -174,9 +184,12 @@ def make_spoke(
                 write_report=write_report,
                 cancel=cancel,
                 repo_resolver=repo_resolver,
+                reuse_analysis=reuse,
                 prior_failure_analyzer=prior_failure_analyzer,
                 prior_failure_branch1=prior_failure_branch1,
             )
+            cached_analysis = result.analysis
+            return result
 
         # Scene helpers (audit F): a gate hard-block preserves the staged products
         # as a self-contained _failed/<key>/ scene (carrying every input revival
@@ -301,26 +314,114 @@ def make_spoke(
                 attempted_tier=str(ing.tier),
             )
 
-        outcome = run_with_budget(
-            _g3,
-            max_rounds=max_gate_rounds,
-            on_reemit=lambda i, verdict: _attempt(),  # branch-level dispatch arrives in Task 4.4
-            write_quarantine_note=False,  # the spoke preserves its own scene; no duplicate note
-            failed_dir=failed_dir,
-            key=produced.key,
-            paper_meta={
-                "arxiv_id": candidate.get("arxiv_id"),
-                "title": candidate.get("title"),
-                "source_url": source_url,
-                "tier": ing.tier,
-            },
-        )
+        # 6b. Branch-level G3 dispatch (ADR-0009): re-emit ONLY the failed branch,
+        #     attributed by Finding.target. An ingest-rooted finding is unfixable by
+        #     any engine re-run → scene immediately (don't burn the budget).
+        class _Unfixable(Exception):  # noqa: N818 — local sentinel, not a public error type
+            def __init__(self, verdict):
+                self.verdict = verdict
+
+        def _classify(verdict) -> set[str]:
+            # M2: endswith / exact-suffix, not fragile substrings. Observed targets:
+            # anchor→report.md (branch1); rigor→level2_report.json, entailment→
+            # claims.md:<id> (branch2); equation→<id>.md (ingest — unfixable).
+            roots: set[str] = set()
+            for f in verdict.hard_findings:
+                t = f.target
+                if t.endswith("report.md"):
+                    roots.add("branch1")
+                elif t.endswith("level2_report.json") or "claims.md" in t.split(":")[0]:
+                    roots.add("branch2")
+                else:
+                    roots.add("ingest")
+            return roots
+
+        def _findings_of(exc) -> list[dict]:
+            if isinstance(exc, StructuralSealFailed):
+                return [{"target": "ara", "observation": e} for e in exc.errors]
+            if isinstance(exc, ProduceGateBlocked):
+                return [f.as_dict() for f in exc.verdict.hard_findings]
+            return [{"target": "report.md", "observation": str(exc)}]  # AnchorGateError
+
+        def _reemit_for_g3(verdict) -> ProduceResult:
+            roots = _classify(verdict)
+            fb = "\n".join(f"- {f.target}: {f.observation}" for f in verdict.hard_findings)
+            # audit R1 Finding 5: ANY ingest root (e.g. equation fidelity) is unfixable
+            # by re-running a branch — bail to a scene rather than burn the whole budget
+            # re-emitting a branch that can't move that finding. G3 aggregates equation
+            # (ingest) + anchor (branch1) + entailment/rigor (branch2) into one verdict,
+            # so a {ingest, branch1/branch2} mix is reachable.
+            if "ingest" in roots:
+                raise _Unfixable(verdict)
+            if "branch2" in roots:
+                return _attempt(
+                    prior_failure_analyzer=fb
+                )  # re-sample analyzer + downstream branch1
+            return _attempt(prior_failure_branch1=fb)  # reuse branch2 SSOT, rewrite branch1 only
+
+        def _on_g3_reemit(_i, verdict) -> None:
+            # run_with_budget discards the callback's return value and `_g3` reads
+            # `produced`, so rebind it here or round 2 re-seals the STALE product
+            # (audit R2 Finding 1). _Unfixable propagates (the assignment never runs).
+            nonlocal produced
+            produced = _reemit_for_g3(verdict)
+
+        try:
+            outcome = run_with_budget(
+                _g3,
+                max_rounds=max_gate_rounds,
+                on_reemit=_on_g3_reemit,
+                write_quarantine_note=False,  # the spoke preserves its own scene; no note
+                failed_dir=failed_dir,
+                key=produced.key,
+                paper_meta={
+                    "arxiv_id": candidate.get("arxiv_id"),
+                    "title": candidate.get("title"),
+                    "source_url": source_url,
+                    "tier": ing.tier,
+                },
+            )
+        except _Unfixable as exc:
+            # An ingest-rooted G3 finding → don't spin the budget; land the 最终门 scene.
+            return _g3_to_scene(exc.verdict)
+        except (StructuralSealFailed, ProduceGateBlocked, AnchorGateError) as exc:
+            # A re-emitted branch hit its own downstream gate before re-promotion.
+            # `produced` still points at the PRIOR round's promoted product (the
+            # _on_g3_reemit assignment never completed) — remove it so a G3-failed
+            # product never lingers in the vault, then land the matching scene from
+            # the re-emit's staged_dir (audit R3 Finding 1).
+            shutil.rmtree(produced.person_path, ignore_errors=True)
+            shutil.rmtree(produced.ai_path, ignore_errors=True)
+            gate = {
+                "StructuralSealFailed": "结构门",
+                "ProduceGateBlocked": "数字门",
+                "AnchorGateError": "锚点门",
+            }[type(exc).__name__]
+            write_scene(
+                workspace=workspace,
+                key=produced.key,
+                ledger_key=cand_key,
+                failed_gate=gate,
+                findings=_findings_of(exc),
+                engine_commit=current_commit(workspace),
+                candidate=candidate,
+                md_path=ing.md_path,
+                content_list_path=content_list_path,
+                analysis=None,
+                staged_dir=getattr(exc, "staged_dir", None),
+            )
+            return SpokeResult(
+                status="failed",
+                person_vault_path=None,
+                ai_package_path=None,
+                failure_class=FAILURE_AUDIT_BLOCK,
+                failure_reason=f"G3 re-emit {gate} failed: {exc}",
+                source_url=source_url,
+                attempted_tier=str(ing.tier),
+            )
         if outcome.escalated:
-            # G3 ran AFTER promotion; the seal failed for the whole budget. Preserve
-            # the promoted products as a self-contained final-gate scene (audit F) so
-            # revival can re-run the failed branch against the current engine —
-            # rather than just deleting them. (run_with_budget's note is suppressed
-            # via write_quarantine_note=False, so the scene dir is the sole record.)
+            # G3 seal failed the whole budget → preserve the promoted product as a
+            # 最终门 scene (audit F) so revival can re-run the failed branch later.
             return _g3_to_scene(outcome.final_verdict)
 
         # 7. Success — return produce_outputs' EXACT paths (no re-derivation).
