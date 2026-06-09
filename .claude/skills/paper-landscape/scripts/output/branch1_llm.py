@@ -217,6 +217,7 @@ def write_branch1_llm(
     write_report: Any,
     *,
     key: str | None = None,
+    prior_failure: str | None = None,
 ) -> None:
     """Write the LLM human report into ``person_dir`` (report.md + report.html).
 
@@ -231,7 +232,11 @@ def write_branch1_llm(
     key = key or person_dir.name
     md_text = md_path.read_text(encoding="utf-8")
 
-    result = write_report(ara_dir, md_path=md_path)
+    # 审计 R5 Finding 1: only forward prior_failure when set, so an older injected
+    # write_report fake/seam (without the param) stays TypeError-free on the happy
+    # path — only an actual feedback re-emit requires the seam to know prior_failure.
+    extra = {"prior_failure": prior_failure} if prior_failure is not None else {}
+    result = write_report(ara_dir, md_path=md_path, **extra)
     # Tolerate the older flat {id: md} shape; the seam now returns sections+figures.
     sections = result.get("sections", result) if isinstance(result, dict) else result
     figures_meta = result.get("figures", []) if isinstance(result, dict) else []
