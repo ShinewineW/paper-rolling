@@ -59,6 +59,9 @@ scripts/          the engine code (packages below)
 | `hub.py` | Hub-spoke orchestration (single ledger writer): `run_tick`, `run_campaign_tick`, `Watchdog`, `GateRequired`. Runs LS-4 self-heal before the batch. |
 | `spoke.py` | `make_spoke(...)` — the per-paper gated pipeline (ingest → branch2 → G2 → branch1 → G3), serial within one paper. |
 | `run_campaign.py` | The production DRIVER: composes `Ledger → make_spoke(seams) → (LS-1 lock) run_campaign_tick`. The `/loop` entry point. |
+| `failure_scene.py` | `write_scene(...)` — self-contained failure-scene writer (ADR-0007): a gate hard-fail preserves the staged products + revival inputs into a gitignored `_failed/<key>/`, via crash-safe `.new`/`.old` atomic rename. |
+| `revival.py` | Batch-revival driver (`revive_all`, CLI `-m scripts.revival`): scans `_failed/`, branch-level replay reusing upstream products, promote→record→delete; the SECOND legitimate ledger writer (holds the LS-1 lock, mutually exclusive with `/loop`). |
+| `engine_version.py` | `current_commit(...)` — engine short-hash for failure-scene diagnostics (not a reuse key). |
 | `landscapes.py` | Cross-paper synthesis (corpus-batch-comparator): regenerates `landscapes/{topic}/INDEX.md` + `report.md`. |
 
 `scripts/discovery/` — multi-source discovery + multi-signal OR authority ranking:
