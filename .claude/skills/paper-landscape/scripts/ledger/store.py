@@ -211,7 +211,8 @@ class Ledger:
         """LS-1: exclusive ledger lock. A second instance raises LedgerLockError.
 
         Uses a non-blocking flock on a PERSISTENT ``_ledger/.lock`` so a second
-        hub fails fast rather than silently racing the single-writer ledger.
+        writer (the hub /loop tick OR the batch-revival driver) fails fast rather
+        than silently racing the single-writer ledger.
 
         The lock file is intentionally NEVER unlinked: its flock state on a
         stable inode IS the lock. Unlinking it (even "best effort" on release)
@@ -229,7 +230,7 @@ class Ledger:
             os.close(fd)  # release only our own fd; never unlink — we are not the holder
             raise LedgerLockError(
                 f"another paper-landscape instance holds {self.lock_path}; "
-                "refusing to start a second hub"
+                "refusing to start another instance (hub /loop tick or revival driver)"
             ) from exc
         self._lock_fd = fd
         try:
