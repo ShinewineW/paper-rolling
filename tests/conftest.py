@@ -128,3 +128,27 @@ import types as _types  # noqa: E402
 
 for _engine_mod_name in ("naming", "corpus", "store"):
     sys.modules.setdefault(_engine_mod_name, _types.ModuleType(_engine_mod_name))
+
+
+# --- No-network guard: code_ref now resolves real repos (T2a PwC table), so a
+# branch2/spoke test with a real arxiv_id would otherwise `git clone` over the
+# network. Stub git so unit tests stay offline: clone -> empty local dir, rev-parse
+# -> fake SHA; every other subprocess call (and tests that set their own git stub,
+# e.g. test_code_ref) is unaffected — their in-body setattr overrides this.
+import subprocess as _subprocess  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _offline_git(monkeypatch):
+    real_run = _subprocess.run
+
+    def stub(cmd, *args, **kwargs):
+        head = list(cmd[:2]) if isinstance(cmd, (list, tuple)) else []
+        if head == ["git", "clone"]:
+            Path(cmd[-1]).mkdir(parents=True, exist_ok=True)
+            return _subprocess.CompletedProcess(list(cmd), 0, "", "")
+        if head == ["git", "rev-parse"]:
+            return _subprocess.CompletedProcess(list(cmd), 0, "stub000\n", "")
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(_subprocess, "run", stub)

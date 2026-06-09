@@ -29,6 +29,7 @@ import yaml
 
 from scripts.output.code_ref import Innovation, build_code_ref
 from scripts.output.figures import extract_figures, is_architecture_caption
+from scripts.output.repo_resolve import author_declares_closed, resolve_repo_candidates
 
 SCHEMA_VERSION = "1.0"
 ARA_VERSION = "1.0"
@@ -310,13 +311,18 @@ def write_branch2(
     figures = extract_figures(md_path) if md_path is not None else []
     _w(ara_dir / "evidence/README.md", _evidence_readme(analysis["evidence_tables"], figures))
 
-    # Shallow code analysis → pointer (clone deleted inside, 分析-D2). Use .get():
-    # discovered papers may carry no github_repo / arxiv_id key (closed-source or
-    # DOI-only) — None -> a "_not found_" code_ref, never a KeyError crash.
+    # Shallow code analysis → pointer (clone deleted inside, 分析-D2). Resolve repo
+    # candidates (T1 paper-text + T2a PwC-official + discovery), clone-verify in
+    # order, write a three-state pointer — never the old None→"closed-source" lie.
+    arxiv_id = candidate.get("arxiv_id")
+    candidates = resolve_repo_candidates(arxiv_id=arxiv_id, md_path=md_path, candidate=candidate)
     build_code_ref(
-        github_repo=candidate.get("github_repo"),
+        candidates=candidates,
         innovations=[Innovation(name=i["name"], grep=i["grep"]) for i in analysis["innovations"]],
         out_path=ara_dir / "src/code_ref.md",
         clone_root=Path("/tmp/paper-repos"),
-        idbase=candidate.get("arxiv_id") or candidate.get("doi") or "repo",
+        idbase=arxiv_id or candidate.get("doi") or "repo",
+        arxiv_id=arxiv_id,
+        title=candidate.get("title"),
+        declared_closed=author_declares_closed(md_path),
     )
