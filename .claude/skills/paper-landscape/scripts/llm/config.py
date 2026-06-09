@@ -139,13 +139,14 @@ def load_llm_config(workspace: Path) -> LLMConfig:
     routing: dict[str, str] = {}
     modes: dict[str, str] = {}
     for s in SEAMS:
-        if seams_cfg.get(s) is None:
+        entry = seams_cfg.get(s)
+        if entry is None:
             raise ValueError(
                 f"{LLM_CONFIG_REL}: seam {s!r} is not routed to any provider — every "
                 f"seam must be explicitly routed (no default). Defined providers: "
                 f"{sorted(providers)}."
             )
-        provider, mode = _seam_entry(seams_cfg.get(s), _DEFAULT_MODES.get(s, "inline"))
+        provider, mode = _seam_entry(entry, _DEFAULT_MODES.get(s, "inline"))
         if provider not in providers:
             raise ValueError(
                 f"{LLM_CONFIG_REL}: seam {s!r} routed to undefined provider {provider!r}; "

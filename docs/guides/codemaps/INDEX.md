@@ -25,9 +25,9 @@
 
 ```
 scripts/llm/
-├── providers.py      # LLMProvider 协议 + ClaudeCodeProvider (claude -p)
+├── providers.py      # LLMProvider 协议 + ClaudeCodeProvider (claude -p, model 必填)
 │                       + OpenAICompatibleProvider（API 令牌）
-│                       + FallbackProvider（强制 claude-code 回退）
+│                       + StrictProvider（无兜底,失败 → EngineAbort）
 ├── config.py         # LLMConfig 从 config/llm.yaml 加载
 ├── seams.py          # build_seams() — 6 个 provider 路由的 seam 实例
 ├── analyzer.py       # 分块平行接地分析器（formula-fidelity 纪律）
@@ -37,8 +37,8 @@ scripts/llm/
 
 **关键特性**：
 - **Vendor-neutral**: `openai_compatible` 适配任何 OpenAI API 兼容端点（OpenCode、DeepSeek、OpenRouter 等）
-- **Per-seam routing**: `config/llm.yaml` 独立声明每个 seam 的提供商和模式（inline / grounded / agent_team）
-- **Mandatory fallback**: 所有 seam 最后都回退到 claude-code；两层都失败 → `EngineAbort`（中止整个 tick）
+- **Per-seam routing**: `config/llm.yaml`（必需）独立声明每个 seam 的提供商和模式（inline / grounded / agent_team）；每 seam 必须显式路由,无默认
+- **无兜底,失败 loudly**: provider 失败 → `EngineAbort`（中止整个 tick）；不再静默回落 claude-code 主订阅,避免额度被悄悄消耗
 - **Grounded mode**: analyzer 在 grounded 模式下让 claude -p 自己读文件，避免超大文本嵌入
 
 ### 2. **人链 LLM 写入器** （`scripts/output/branch1_llm.py` + `branch1_report.py` 重组）

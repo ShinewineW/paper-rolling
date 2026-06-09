@@ -1,8 +1,8 @@
 # LLM Pipeline & Provider Layer 代码地图
 
 > **范围**: `scripts/llm/` + `config/llm.yaml` + `config/audit.yaml`
-> **最后更新**: 2026-06-08
-> **关键特性**: Vendor-neutral 提供商路由、强制 claude-code 回退、Per-seam 独立调用
+> **最后更新**: 2026-06-09
+> **关键特性**: Vendor-neutral 提供商路由、**无兜底**(provider 失败 → `EngineAbort` loudly,绝不静默回落主订阅)、Per-seam 独立调用、每 seam 必须显式路由
 
 <!-- Generated: 2026-06-08 | Files scanned: 9 | Token estimate: ~3500 -->
 
@@ -51,9 +51,9 @@ Execution Flow:
            ↓
   [ JSON parsing + nudge retry ]
            ↓
-  Result OR FallbackProvider → claude -code fallback
+  Result OR StrictProvider 捕获 ProviderError → EngineAbort（无兜底）
            ↓
-  Success OR EngineAbort (总线中止，不退化)
+  Success OR EngineAbort (tick 中止，loudly 报错，绝不退化到主订阅)
 ```
 
 ---
@@ -73,9 +73,9 @@ Execution Flow:
 | 类 | 协议/基类 | 职责 |
 |---|---------|------|
 | `LLMProvider` | Protocol | 运输接口：`complete(prompt, *, tier, effort, tools) → str` |
-| `ClaudeCodeProvider` | frozen dataclass | Headless `claude -p` subprocess；指数退避重试；支持 grounded `--allowedTools` |
+| `ClaudeCodeProvider` | frozen dataclass | Headless `claude -p` subprocess；指数退避重试；支持 grounded `--allowedTools`；**model 必填,无默认** |
 | `OpenAICompatibleProvider` | frozen dataclass | 任何 OpenAI chat-completions API；从 `.env` 读 token（不硬编码） |
-| `FallbackProvider` | frozen dataclass | Primary → fallback（`claude-code` 强制）；两层都失败 → `EngineAbort` |
+| `StrictProvider` | frozen dataclass | 包裹路由到的 provider；`ProviderError` → `EngineAbort`（**无兜底**,绝不静默切换后端/主订阅） |
 | `ProviderError` | RuntimeError | Provider 调用失败（经过重试预算用尽） |
 
 **关键函数**：
@@ -99,11 +99,12 @@ class OpenAICompatibleProvider:
         # 重试：max 3 次（transient 错误）
         # 返回 choice[0].message.content
 
-class FallbackProvider:
+class StrictProvider:
+    provider: LLMProvider                # 唯一字段:被路由到的 provider
     def complete(prompt, *, tier="strong", effort="high", timeout=900, tools=None) → str
-        # 尝试 primary provider
-        # 失败 → 尝试 fallback (claude-code)
-        # 两者都失败 → raise EngineAbort（从 scripts.paths 导入）
+        # 调用 self.provider.complete(...)
+        # ProviderError（重试已用尽）→ raise EngineAbort（从 scripts.paths 导入）
+        # 无 fallback —— 失败 loudly 上抛,绝不静默切到别的后端
 ```
 
 **关键不变式**：
@@ -119,14 +120,15 @@ class FallbackProvider:
 ```python
 class LLMConfig:
     providers: dict[str, LLMProvider]  # name → provider instance
-    seams: dict[str, str | dict]       # seam → provider name OR {provider, mode}
+    routing: dict[str, str]            # seam → provider name（每 seam 必有,load 时强校验）
+    modes: dict[str, str]              # seam → inline | grounded | agent_team
 
-    def resolve(seam: str) → FallbackProvider
-        # 查表 seams[seam]，返回 FallbackProvider(primary, fallback=claude-code)
+    def resolve(seam: str) → StrictProvider
+        # 查表 routing[seam]，返回 StrictProvider(provider)（无 fallback）
 
 def load_llm_config(workspace_root: Path) → LLMConfig
-    # 读 config/llm.yaml（可选；不存在 → 全 claude-code 默认）
-    # 解析 providers 块 + seams 块
+    # 读 config/llm.yaml（必需；不存在 → ValueError 硬报错,无默认）
+    # 解析 providers 块 + seams 块；每个 seam 必须显式路由,否则 ValueError
     # 实例化所有 provider（从 .env 读 token）
     # 返回 LLMConfig
 ```
@@ -135,9 +137,9 @@ def load_llm_config(workspace_root: Path) → LLMConfig
 
 ```yaml
 providers:
-  claude-code:                         # 强制存在，是回退
+  claude-code:                         # 仅被显式路由到此的 seam 使用（如 grounded analyzer）
     type: claude_code
-    strong_model: claude-sonnet-4-6
+    strong_model: claude-sonnet-4-6    # 必填,无默认
     fast_model: claude-haiku-4-5-20251001
   
   opencode:                            # 示例：任何 OpenAI 兼容端点
@@ -157,8 +159,9 @@ seams:
   writer: opencode
 ```
 
-**可选特性**：
-- 删除 `config/llm.yaml` 或任何 key → 回到硬编码默认（全 claude-code）
+**特性**：
+- `config/llm.yaml` 必需；缺文件 / 任一 seam 未路由 / provider 未定义 → `ValueError` 硬报错（无默认回落）
+- `grounded` 模式仍要求 claude_code provider（本地 Read/Grep 能力校验,与额度无关）
 - Per-seam override via `_SEAM_OVERRIDE` dict（测试用）
 - Future: seam 值可能变成 provider 列表（多模型 A/B，暂未活跃）
 
@@ -168,7 +171,7 @@ seams:
 
 ```python
 def build_seams() → dict[str, Callable]
-    # 单次调用，返回所有 6 个 seam（已路由 + 已回退）
+    # 单次调用，返回所有 6 个 seam（已路由 + StrictProvider 包裹,无回退）
     # 返回 {
     #   "resolve_analysis": seam_fn,
     #   "skeptic_votes": seam_fn,
@@ -178,9 +181,9 @@ def build_seams() → dict[str, Callable]
     #   "write_report": seam_fn,
     # }
 
-def _provider_for(seam: str) → FallbackProvider
+def _provider_for(seam: str) → StrictProvider
     # 从 config/llm.yaml 查表 → provider name
-    # 返回 FallbackProvider(primary, fallback=claude-code)
+    # 返回 StrictProvider(provider)（无 fallback；失败 → EngineAbort）
     # 支持 _SEAM_OVERRIDE 测试覆盖
 
 def _ask_json(prompt, *, seam, tier="strong", retries=2, ...) → dict | list
@@ -311,7 +314,7 @@ def _fix_latex_escapes(text: str) → str
 
 ## 数据流
 
-### Per-seam routing & fallback
+### Per-seam routing（无 fallback）
 
 ```
 call seam("analyzer", prompt)
@@ -320,9 +323,8 @@ _ask_json(prompt, seam="analyzer")
   ↓
 provider = _provider_for("analyzer")
            ↓
-           FallbackProvider(
-             primary=claude-code (from config, grounded mode),
-             fallback=claude-code (hardcoded)
+           StrictProvider(
+             provider=claude-code (显式路由, grounded mode)
            )
   ↓
 attempt 1: provider.complete(prompt, tier="strong", tools=("Read", "Grep"))
@@ -331,11 +333,9 @@ parse JSON → ARA dict
   ↓ (failure)
 attempt 2: provider.complete(prompt + nudge, ...)
   ↓
-success → return; else → ProviderError → caught by FallbackProvider
+success → return; else → ProviderError（provider 内部重试已用尽）
   ↓
-FallbackProvider tries fallback = claude-code
-  ↓
-success → return; else → EngineAbort (fatality, abort tick)
+StrictProvider 捕获 → EngineAbort (loudly, abort tick；无兜底,绝不回落主订阅)
 ```
 
 ### Config flow
@@ -351,9 +351,9 @@ read config/llm.yaml + config/audit.yaml
   ↓
 instantiate providers (read .env for tokens)
   ↓
-LLMConfig(providers={...}, seams={...})
+LLMConfig(providers={...}, routing={...}, modes={...})
   ↓
-_ask_json for each seam → FallbackProvider(primary, fallback)
+_ask_json for each seam → StrictProvider(provider)（无 fallback）
   ↓
 return dict[str, Callable] of all 6 seams
   ↓
@@ -387,7 +387,7 @@ run_campaign(..., resolve_analysis=seams["resolve_analysis"], ...)
 
 2. **Per-seam independent calls** — 每个 seam 是独立 LLM 调用（不共享上下文）。G2 skeptic ≠ generator，G3 rigor ≠ generator → 无相关性。
 
-3. **Mandatory claude-code fallback** — 所有 seam 最终都有 claude-code 作回退。两层都失败 → `EngineAbort`（中止，不静默退化）。
+3. **无兜底,失败 loudly** — 取消了原 claude-code 强制回退。任一 seam 的 provider 失败(重试用尽)→ `EngineAbort`（中止整个 tick,向上抛）。动机:静默回落到 Claude Code 主订阅会让额度急剧消耗且不可感知,故改为强制暴露给操作者修 key/config。主订阅仅在 seam 被显式路由到 claude-code 时使用。
 
 4. **Grounded analyzer** — Analyzer 在 grounded 模式下让 claude -p 自己读文件，避免嵌入 200k+ 字符文本到 prompt。
 
