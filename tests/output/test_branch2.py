@@ -50,3 +50,23 @@ def test_evidence_table_holds_exact_numbers(tmp_path, candidate, analysis):
     ev = (ara / "evidence/tables/table1_nuscenes.md").read_text(encoding="utf-8")
     assert "0.61" in ev and "0.52" in ev
     assert "**Source**" in ev
+
+
+def test_evidence_readme_indexes_figure_captions_when_md_given(tmp_path, candidate, analysis):
+    # P1-a: the ARA evidence layer must carry a figures INDEX (caption + source
+    # ref, NO binary), so an AI reader knows what each figure shows. branch2
+    # reuses the deterministic extract_figures() over the frozen MD.
+    md = tmp_path / "src.md"
+    md.write_text(
+        "![](images/aaa.jpg)\n\nFigure 2: overall architecture of our model.\n\n"
+        "![](images/bbb.jpg)\n\nFigure 5: qualitative results on the test set.\n",
+        encoding="utf-8",
+    )
+    ara = tmp_path / "ara"
+    write_branch2(ara, candidate, analysis, md_path=md)
+    readme = (ara / "evidence/README.md").read_text(encoding="utf-8")
+    assert "## Figures" in readme
+    assert "overall architecture of our model" in readme  # caption surfaced
+    assert "qualitative results on the test set" in readme
+    assert "images/aaa.jpg" in readme  # source ref for provenance (no binary copied)
+    assert not (ara / "evidence/figures").exists()  # caption-only: no binary dir

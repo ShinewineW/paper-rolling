@@ -21,12 +21,14 @@ the unified metric table without re-parsing evidence tables.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from scripts.output.code_ref import Innovation, build_code_ref
+from scripts.output.figures import extract_figures, is_architecture_caption
 
 SCHEMA_VERSION = "1.0"
 ARA_VERSION = "1.0"
@@ -248,7 +250,7 @@ def _evidence_table_md(t: dict) -> str:
     )
 
 
-def _evidence_readme(tables: list[dict]) -> str:
+def _evidence_readme(tables: list[dict], figures: Sequence[Any] = ()) -> str:
     out = [
         "# Evidence Index",
         "",
@@ -260,11 +262,29 @@ def _evidence_readme(tables: list[dict]) -> str:
         out.append(
             f"| [tables/{t['name']}.md](tables/{t['name']}.md) | {t['source']} | {t['claims']} | {t['caption']} |"  # noqa: E501
         )
+    # P1-a: caption-only figure index (no binaries) — an AI reader learns what each
+    # figure shows without loading the image; `Role` flags the core method diagram.
+    if figures:
+        out += [
+            "",
+            "## Figures",
+            "| Source ref | Role | Caption |",
+            "|------------|------|---------|",
+        ]
+        for f in figures:
+            role = "architecture" if is_architecture_caption(f.caption) else "result"
+            out.append(f"| `{f.ref}` | {role} | {f.caption} |")
     return "\n".join(out)
 
 
-def write_branch2(ara_dir: Path, candidate: Any, analysis: dict) -> None:
-    """Write the full branch2 ARA tree under `ara_dir`."""
+def write_branch2(
+    ara_dir: Path, candidate: Any, analysis: dict, md_path: Path | None = None
+) -> None:
+    """Write the full branch2 ARA tree under `ara_dir`.
+
+    `md_path` (optional): the frozen {ID}.md — when given, its original figures are
+    indexed (caption + source ref, no binary) into evidence/README.md (P1-a).
+    """
     _w(ara_dir / "PAPER.md", _paper_md(candidate, analysis))
     _w(ara_dir / "logic/problem.md", _problem_md(analysis["problem"]))
     _w(ara_dir / "logic/claims.md", _claims_md(analysis["claims"]))
@@ -287,7 +307,8 @@ def write_branch2(ara_dir: Path, candidate: Any, analysis: dict) -> None:
 
     for t in analysis["evidence_tables"]:
         _w(ara_dir / f"evidence/tables/{t['name']}.md", _evidence_table_md(t))
-    _w(ara_dir / "evidence/README.md", _evidence_readme(analysis["evidence_tables"]))
+    figures = extract_figures(md_path) if md_path is not None else []
+    _w(ara_dir / "evidence/README.md", _evidence_readme(analysis["evidence_tables"], figures))
 
     # Shallow code analysis → pointer (clone deleted inside, 分析-D2). Use .get():
     # discovered papers may carry no github_repo / arxiv_id key (closed-source or

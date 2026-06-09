@@ -142,7 +142,7 @@ def produce_outputs(
     try:
         stage_ai = staging / "ai" / "ara"
         stage_person = staging / "person"
-        write_branch2(stage_ai, candidate, analysis)
+        write_branch2(stage_ai, candidate, analysis, md_path=md_path)
 
         ara_errors = validate_ara_tree(stage_ai)
         if ara_errors:
