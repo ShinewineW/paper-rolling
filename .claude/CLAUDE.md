@@ -109,6 +109,12 @@ seams to an `openai_compatible` provider, keys from `.env` (gitignored).
   exemption) was auto-revoked by Hugging Face the moment it hit public git history
   — it now lives only in `.env` (unset `HF_TOKEN` → anonymous HF). Reintroducing a
   hardcoded token is a regression; this is the standing project convention.
+- **No silent fallback to the Claude Code subscription** (cost guard). The 6 LLM
+  seams have **no default provider and no fallback**: a missing/failing/misconfigured
+  provider aborts loudly (`EngineAbort`), surfacing the key/config problem instead
+  of quietly degrading to `claude -p`. Reintroducing any default-to-`claude -p` or
+  auto-fallback is a **cost regression** — it silently drains the paid main account
+  — not a resilience feature. Standing convention.
 - **Vault-key authority is `scripts/output/naming.py` ONLY.** Do not add ad-hoc
   naming helpers elsewhere — the divergent duplicates that lived in `paths.py` and
   `ledger/naming.py` were deliberately removed.
