@@ -57,3 +57,6 @@ _ledger/.lock
 
 # claude-mem project memory (per-machine SQLite state; not a product)
 .claude/mem.db*
+
+# macOS 噪声
+.DS_Store

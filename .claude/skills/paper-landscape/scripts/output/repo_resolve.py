@@ -1,11 +1,13 @@
 """code_ref repo resolution — ordered candidate cascade (分析-D1).
 
 Generates an ORDERED list of repo candidates for a paper; `build_code_ref` then
-clone-verifies them in order and the first ACCEPTED one wins. Authority order:
+clone-verifies them in order and the first ACCEPTED one wins. Authority order is
+HIGHEST-TRUST-FIRST (the curated official repo must beat an unverified paper-text
+link — see resolve_repo_candidates for why):
 
+  T2a pwc-official — Papers-with-Code `is_official` offline table (high trust)
   T1  paper-text   — github links the authors wrote in the frozen MD (verify:
                      could also be a cited baseline's repo, so it is not trusted blindly)
-  T2a pwc-official — Papers-with-Code `is_official` offline table (high trust)
   discovery        — a github_repo carried by a discovery source, if any (verify)
 
 T2b (HF live) and T4 (websearch) are Phase 2: they add injected seams to this
@@ -139,10 +141,16 @@ def resolve_repo_candidates(
     hf_lookup: Callable[[str | None], str | None] | None = None,
     web_search: Callable[[str], list[str]] | None = None,
 ) -> list[RepoCandidate]:
-    """Ordered, de-duplicated repo candidates (T1 → T2a → discovery → T2b → T4).
+    """Ordered, de-duplicated repo candidates, HIGHEST TRUST FIRST: T2a pwc-official
+    → T1 paper-text → discovery → T2b hf-live → T4 websearch.
 
-    T2b (`hf_lookup`) and T4 (`web_search`) are injected by the driver and OFF by
-    default — so the pure path (and every unit test) never touches the network.
+    Order matters: build_code_ref accepts the FIRST candidate that verifies, so the
+    curated `is_official` repo must be tried BEFORE the paper-text grep — a paper's
+    text lists its own repo AND cited-baseline repos indistinguishably, and a
+    baseline that cites this paper's arxiv id would otherwise verify and win over the
+    real official repo (observed: Cosmos-WFM's text → NVlabs/TokenBench beating
+    nvidia-cosmos/cosmos-predict1). T2b (`hf_lookup`) / T4 (`web_search`) are injected
+    by the driver and OFF by default — the pure path never touches the network.
     """
     out: list[RepoCandidate] = []
     seen: set[str] = set()
@@ -153,12 +161,13 @@ def resolve_repo_candidates(
             seen.add(url)
             out.append(RepoCandidate(url=url, source=source, trust=trust))
 
-    # T1 — links the authors wrote in the paper (verify; may be a baseline repo).
+    # T2a — Papers-with-Code is_official offline table (high trust): tried FIRST so a
+    # curated official repo beats an unverified paper-text link (see docstring).
+    add(pwc_lookup(arxiv_id), "pwc-official", "official")
+    # T1 — links the authors wrote in the paper (verify; may be a cited baseline).
     if md_path is not None and Path(md_path).exists():
         for url in _grep_md_github(Path(md_path)):
             add(url, "paper-text", "search")
-    # T2a — Papers-with-Code is_official offline table (high trust).
-    add(pwc_lookup(arxiv_id), "pwc-official", "official")
     # A repo a discovery source already carried (e.g. HF Papers); verify.
     add(candidate.get("github_repo"), "discovery", "search")
     # T2b — HF live (post-PwC-freeze papers); injected, verify.

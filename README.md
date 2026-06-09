@@ -70,7 +70,7 @@ scripts/          the engine code (packages below)
 | `openalex.py` | OpenAlex source (uses the polite-pool `mailto`, D-发现-2). |
 | `s2.py` | Semantic Scholar source. |
 | `arxiv_src.py` | arXiv source (category-restricted). |
-| `hf_papers.py` | Hugging Face Papers source (hardcoded read-only HF token, owner exemption; `HF_TOKEN` env overrides, D-发现-4). |
+| `hf_papers.py` | Hugging Face Papers source. READ-ONLY `HF_TOKEN` from the gitignored `.env` only — nothing hardcoded; unset → anonymous (D-发现-4). |
 | `dblp.py` | DBLP venue-authority source (`venue_for_title`) — enrichment, feeds the S2 venue signal. |
 | `authority.py` | Multi-signal OR authority scorer (ADR-0001): S1 cite / S2 venue / S3 institution / S4 heat. |
 | `dedup.py` | Cross-source dedup + field merge (D-发现-7). |
@@ -119,7 +119,11 @@ scripts/          the engine code (packages below)
 | `naming.py` | **The single live vault-key authority**: `vault_key`, `derive_name`, `identity_base`, `find_existing_entries`. |
 | `ara_schema.py` | ARA Seal Level 1 structural validator. |
 | `anchor_lint.py` | Three-layer citation anchor lint (HARD gate) + the anchor-lint CLI. |
-| `code_ref.py` | Shallow code analysis with clone-delete-pointer hygiene. |
+| `figures.py` | Original-figure inventory: extract `(ref, caption)` from the MD; flag the architecture figure; copy selected images (branch1). |
+| `code_ref.py` | code_ref pointer: clone-verify ordered repo candidates → three-state (`found` / `searched-not-found` / `author-declared-closed`), clone-delete hygiene. |
+| `repo_resolve.py` | code_ref repo-resolution cascade: T1 grep MD + T2a offline PwC `is_official` table + T2b HF-live + T4 websearch; `make_repo_resolver()` composes the production resolver. |
+| `pwc_lookup.py` | T2a offline `arxiv_id → official repo` lookup over the shipped gzipped Papers-with-Code `is_official` table. |
+| `check_ara_bundle.py` | ARA bundle regression gate (审计 §6.1): code_ref three-state + evidence tables + review↔tables drift. Importable `check_bundle` + sweep CLI. |
 
 `scripts/audit/` — the adversarial gates:
 
@@ -134,6 +138,16 @@ scripts/          the engine code (packages below)
 | `anchor_resolution.py` | branch1↔MD anchor resolution. |
 | `rigor_rubric.py` | 6-dim rigor rubric (ARA Seal Level 2). |
 | `gate_runner.py` | Bounded gate runner: max-N rounds, then quarantine + flag. |
+
+`scripts/tools/` — offline maintenance scripts (NOT runtime; run via `uv run <path>`):
+
+| Script | Purpose |
+|--------|---------|
+| `build_pwc_table.py` | Build the shipped `data/pwc_official_arxiv2repo.tsv.gz` from the Papers-with-Code `is_official` dump (offline; uses duckdb). |
+| `rescan_code_ref.py` | Offline spot-check of code_ref resolution (T1+T2a) over the local `corpus/`. |
+
+`data/` — shipped engine data (tracked): `pwc_official_arxiv2repo.tsv.gz` — the
+offline `arxiv_id → official repo` lookup (T2a), read with stdlib gzip at runtime.
 
 ### Data dirs (the accumulated product + transient inputs)
 
@@ -152,7 +166,9 @@ scripts/          the engine code (packages below)
 ```bash
 uv sync --group dev      # set up the venv
 uv run pytest            # run the test suite (the executable spec)
-uv run ruff check .      # lint (repo-wide)
+uv run ruff check .claude/skills/paper-landscape/scripts/   # lint the ENGINE source
+# NB: scope ruff to the engine source (and tests/), NOT `ruff check .` — docs/handoff/
+# driver scripts are intentionally not excluded and carry lint noise (see .claude/CLAUDE.md).
 # Environment preflight — verify pandoc + mineru + runtime deps before a campaign
 # (exit 1 + install hints if any is missing; the skill runs this FIRST as a gate):
 PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.preflight
@@ -256,12 +272,11 @@ model seams" documents the exact input/output shape of each:
   `MINERU_MODEL_SOURCE=modelscope`) — a user-level cache, never the project tree.
 - **OpenAlex polite pool**: a non-secret `mailto` email (D-发现-2) lifts the rate
   limit. Configured via the OpenAlex source's `polite_email`.
-- **Hugging Face Papers**: the source **hardcodes a fine-grained READ-ONLY HF
-  token** (`HF_READONLY_TOKEN` in `scripts/discovery/hf_papers.py`, D-发现-4) — an
-  owner-granted exemption to the no-hardcoded-secrets rule, for self-contained
-  distribution; it lands in git history (read-only scope → public-metadata reads).
-  `HF_TOKEN` (env) overrides it without editing source; if the constant is reset
-  to the placeholder sentinel, HF requests fall back to **anonymous**.
+- **Hugging Face Papers**: the source reads a **READ-ONLY `HF_TOKEN` from the
+  gitignored `.env` only** (`scripts/discovery/hf_papers.py`, D-发现-4) — nothing is
+  hardcoded in source (an earlier shipped constant was auto-revoked by HF once it
+  hit public git history). Unset `HF_TOKEN` → HF requests fall back to **anonymous**
+  (lower rate). `HF_TOKEN` also powers T2b live code_ref resolution (`api/papers/{id}`).
 - **API sources**: OpenAlex, Semantic Scholar, arXiv, DBLP, HF Papers — all reached
   through the shared throttled HTTP client (polite pacing).
 
@@ -292,7 +307,9 @@ engine + `config/`. Git **ignores inputs** (regenerable): original `*.pdf`, Mine
 ## Current status + validation
 
 - Test suite: **green** (`uv run pytest` passes; the count moves as fixes land).
-- Lint: **clean** (`uv run ruff check .` → "All checks passed!").
+- Lint: **clean** (`uv run ruff check .claude/skills/paper-landscape/scripts/` →
+  "All checks passed!"). NB: the gate is engine-scoped, not repo-wide `ruff check .`
+  (docs/handoff/ driver scripts intentionally carry lint noise — see `.claude/CLAUDE.md`).
 - Quality history: the engine passed internal adversarial review and a cross-model
   (Codex) acceptance audit; the findings from that audit are fixed in the current
   tree.

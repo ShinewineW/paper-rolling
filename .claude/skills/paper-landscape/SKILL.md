@@ -265,7 +265,8 @@ result = run_campaign(
     run_cli=build_run_cli(),
     # code_ref repo resolution (P0). make_repo_resolver() turns T2b (HF-live) ON;
     # to also enable T4, pass web_search=<a callable that runs an Agent WebSearch
-    # and returns result strings>. Omit repo_resolver entirely → pure T1+T2a.
+    # and returns result strings>. Omit repo_resolver entirely → the offline
+    # default (T1 grep + T2a PwC + any discovery-carried github_repo), no network.
     repo_resolver=make_repo_resolver(),
 )
 ```

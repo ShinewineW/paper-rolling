@@ -4,11 +4,17 @@ Asserts, per produced ARA bundle (the `ara/` dir under an `ai_package/{key}/`):
 
   1. **code_ref three-state** — `src/code_ref.md` exists and is one of the valid
      states (found / searched-not-found / author-declared-closed / unreachable),
-     and NEVER the retired `None→"closed-source paper"` mislabel (P0).
+     NEVER the retired `None→"closed-source paper"` mislabel, and NEVER asserts
+     closed-source outside the explicit author-declared state (P0).
   2. **evidence tables non-empty** — `evidence/tables/` has at least one table, i.e.
-     the substantive numeric evidence is present (P1-a/baseline).
+     the substantive numeric evidence is present.
   3. **no review↔tables drift** — `level2_report.json` must not claim the evidence
      tables are missing while `evidence/tables/` is non-empty (P1-b).
+
+Scope note: the P1-a figure-caption-index wiring is regression-guarded by the test
+suite (tests/output/test_branch2.py — branch2 indexes figures when the MD has
+them), NOT here: figure presence is paper-dependent (a genuinely figureless paper
+is legitimate), so "must have a Figures section" is not a sound per-bundle assertion.
 
 `check_bundle(ara_dir)` returns a list of violation strings ([] = pass). The CLI
 sweeps `ai_package/*/ara` (or given paths) and exits non-zero on any violation:
@@ -28,6 +34,11 @@ from pathlib import Path
 # NOT contain this exact substring, so the check is precise.
 _RETIRED_MISLABEL = "closed-source paper"
 
+# The ONLY legitimate lower-cased 'closed-source' mentions across the engine's
+# renders: the author-declared state header and the not-found disclaimer. Stripping
+# these, any residual 'closed-source' is an illegitimate assertion (P0).
+_CLOSED_OK = re.compile(r"author-declared closed-source|not a closed-source")
+
 # A recognized three-state (or unreachable) pointer carries one of these markers.
 _VALID_MARKERS = (
     "## Innovation → code location",  # found
@@ -36,12 +47,18 @@ _VALID_MARKERS = (
     "unavailable — clone failed",  # declared repo unreachable
 )
 
-# level2 text claiming the tables are absent (P1-b drift), lower-cased match.
+# level2 text claiming the tables/numbers are absent (P1-b drift), lower-cased match.
+# Covers the family of "tables are only descriptions / metadata / not included / no
+# real numbers" phrasings a reviewer uses when it was fed the index but not the tables.
 _DRIFT = re.compile(
     r"only a[a-z ]*index"
     r"|not included in the bundle"
     r"|tables?[^.]{0,40}\bnot (?:included|present)"
     r"|evidence tables?[^.]{0,40}(?:missing|absent)"
+    r"|no actual (?:numeric|numerical)"
+    r"|only (?:the )?(?:metadata|table descriptions)"
+    r"|only (?:contains?|provides?|includes?|has) (?:the )?(?:table )?descriptions"
+    r"|only (?:contains?|provides?|includes?|has) (?:table )?metadata"
 )
 
 
@@ -59,8 +76,18 @@ def check_bundle(ara_dir: Path) -> list[str]:
         violations.append("missing src/code_ref.md")
     else:
         text = code_ref.read_text(encoding="utf-8", errors="ignore")
-        if _RETIRED_MISLABEL in text:
+        low = text.lower()
+        if _RETIRED_MISLABEL in low:
             violations.append("code_ref.md uses the retired None→closed-source mislabel (P0)")
+        elif "closed-source" in _CLOSED_OK.sub("", low):
+            # The ONLY legitimate 'closed-source' mentions are the author-declared
+            # state header and the not-found state's "...NOT a closed-source"
+            # disclaimer. Strip those; ANY remaining 'closed-source' anywhere in the
+            # file is an illegitimate assertion (P0) — robust to a file mixing the
+            # legit disclaimer with a later bad claim.
+            violations.append(
+                "code_ref.md asserts closed-source outside the author-declared state (P0)"
+            )
         elif not any(marker in text for marker in _VALID_MARKERS):
             violations.append("code_ref.md is not a recognized three-state pointer")
 

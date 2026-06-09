@@ -19,16 +19,19 @@
 
 ## 2. 锁定的架构
 
-**级联(按权威性,命中即停;候选统一过验证闸门)**:
+**级联(按权威性,命中即停;候选统一过验证闸门)**。**尝试顺序 = 最高信任优先**:
 
-| 层 | 源 | 性质 | 依赖 |
+| 顺位 | 源 | 性质 | 依赖 |
 |---|---|---|---|
-| **T1** | grep 论文全文 MD 的 `github.com` 链接(作者自报) | 纯确定性 | `md_path` |
-| **T2a** | PwC 离线 `is_official` 查找表 | 纯确定性、零网络 | 随包 `data/` 表 |
-| **T2b** | HF live `api/papers/{arxiv_id}` → `githubRepo` | 网络 | 注入 `http` 适配器 |
-| **T4** | websearch 兜底 | 网络/LLM | 注入 `web_search` seam(可选) |
+| **1. T2a** | PwC 离线 `is_official` 查找表(curated 官方) | 纯确定性、零网络 | 随包 `data/` 表 |
+| **2. T1** | grep 论文全文 MD 的 `github.com` 链接(作者自报,**可能是引用基线**) | 纯确定性 | `md_path` |
+| **3. discovery** | discovery 源带的 `github_repo` | 确定性 | candidate |
+| **4. T2b** | HF live `api/papers/{arxiv_id}` → `githubRepo` | 网络 | 注入 `hf_lookup` |
+| **5. T4** | websearch 兜底 | 网络/LLM | 注入 `web_search`(可选) |
 | **闸门** | `clone --depth1` + `_locate` 验证候选 | I/O | 复用 `code_ref.py` |
 | **输出** | 三态 code_ref.md | — | — |
+
+> **顺序修正(交叉审计回填中发现)**:`build_code_ref` 接受首个通过验证的候选,故 **curated 的 T2a pwc-official 必须排在 T1 paper-text 之前**——论文正文同时列出作者自己的仓库与**引用的基线仓库**,而某个引用了本文 arxiv id 的基线会通过"repo 含 arxiv_id"验证、抢在真正官方仓前命中(实测:Cosmos-WFM 正文 → `NVlabs/TokenBench` 击败 `nvidia-cosmos/cosmos-predict1`)。
 
 **验证闸门接受规则**:
 - T2a `is_official=true` → **高信任**,clone 成功即接受(clone 失败仍记录链接 + "unavailable" 注记,沿用现有 `clone_error` 分支)。

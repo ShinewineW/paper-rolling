@@ -34,7 +34,9 @@ def test_to_repo_url_strips_trailing_sentence_punctuation(tmp_path: Path) -> Non
     assert cands[0].trust == "search"
 
 
-def test_resolution_order_paper_text_then_pwc_then_discovery(tmp_path: Path) -> None:
+def test_resolution_order_pwc_official_before_paper_text(tmp_path: Path) -> None:
+    # Highest-trust-first: the curated pwc-official MUST precede the paper-text grep
+    # so a cited-baseline link in the text never beats the real official repo.
     md = tmp_path / "p.md"
     md.write_text("see https://github.com/auth/paperrepo for code\n", encoding="utf-8")
     cands = resolve_repo_candidates(
@@ -44,8 +46,8 @@ def test_resolution_order_paper_text_then_pwc_then_discovery(tmp_path: Path) -> 
         pwc_lookup=lambda _i: "https://github.com/pwc/official",
     )
     assert cands == [
-        RepoCandidate("https://github.com/auth/paperrepo", "paper-text", "search"),
         RepoCandidate("https://github.com/pwc/official", "pwc-official", "official"),
+        RepoCandidate("https://github.com/auth/paperrepo", "paper-text", "search"),
         RepoCandidate("https://github.com/disc/fromdiscovery", "discovery", "search"),
     ]
 
@@ -91,9 +93,7 @@ def test_t2b_hf_lookup_added_after_offline_tiers() -> None:
         hf_lookup=lambda _i: "https://github.com/youngzhou1999/DriveDreamer-Policy",
     )
     assert cands == [
-        RepoCandidate(
-            "https://github.com/youngzhou1999/DriveDreamer-Policy", "hf-live", "search"
-        )
+        RepoCandidate("https://github.com/youngzhou1999/DriveDreamer-Policy", "hf-live", "search")
     ]
 
 
@@ -110,9 +110,7 @@ def test_t4_websearch_extracts_github_urls_from_results() -> None:
         pwc_lookup=lambda _i: None,
         web_search=lambda _q: results,
     )
-    assert cands == [
-        RepoCandidate("https://github.com/xiaomi-mlab/Orion", "websearch", "search")
-    ]
+    assert cands == [RepoCandidate("https://github.com/xiaomi-mlab/Orion", "websearch", "search")]
 
 
 def test_hf_official_repo_parses_and_strips_version() -> None:

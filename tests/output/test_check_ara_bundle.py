@@ -77,3 +77,56 @@ def test_freshly_produced_bundle_passes_gate(tmp_path, candidate, analysis):
     ara = tmp_path / "ara"
     write_branch2(ara, candidate, analysis)
     assert check_bundle(ara) == []
+
+
+_CLOSED_VARIANT = (
+    "# Code Reference\n\n**No public repository found** — treating this as closed-source\n"
+)
+
+
+def test_closed_source_assertion_outside_author_declared_flagged(tmp_path):
+    # Codex Round 1: a not-found pointer that still asserts closed-source (in any
+    # wording, not just the exact retired phrase) must be flagged (P0).
+    ara = _bundle(tmp_path, code_ref=_CLOSED_VARIANT, tables={"t1.md": "x\n"})
+    assert any("asserts closed-source" in v for v in check_bundle(ara))
+
+
+def test_valid_states_do_not_trip_closed_source_guard(tmp_path):
+    # The legitimate not-found ("NOT a closed-source") and author-declared states
+    # both mention 'closed-source' and must NOT be flagged.
+    declared = "# Code Reference\n\n**Author-declared closed-source** — the paper states...\n"
+    for i, cr in enumerate((_NOT_FOUND, declared)):
+        ara = _bundle(tmp_path / f"b{i}", code_ref=cr, tables={"t1.md": "x\n"})
+        assert check_bundle(ara) == []
+
+
+_COMBO_BYPASS = (
+    "# Code Reference\n\n**No public repository found** ... NOT a closed-source claim ... "
+    "treating the implementation as closed-source.\n"
+)
+
+
+def test_closed_source_combo_bypass_flagged(tmp_path):
+    # Codex Round 2: a file mixing the legit "NOT a closed-source" disclaimer with a
+    # later bad "...as closed-source" assertion must still be flagged (whole-file
+    # substring exceptions were insufficient).
+    ara = _bundle(tmp_path, code_ref=_COMBO_BYPASS, tables={"t1.md": "x\n"})
+    assert any("asserts closed-source" in v for v in check_bundle(ara))
+
+
+def test_drift_catches_descriptions_and_no_numbers_phrasings(tmp_path):
+    # Codex Round 5: reviewer phrasings the narrow regex missed — "only ... table
+    # descriptions" and "only metadata with no actual numerical data".
+    for i, obs in enumerate(
+        [
+            "The evidence bundle only contains table descriptions, not the data.",
+            "These evidence files are only metadata with no actual numerical data.",
+        ]
+    ):
+        ara = _bundle(
+            tmp_path / f"d{i}",
+            code_ref=_FOUND,
+            tables={"t1.md": "| a |\n|---|\n| 1 |\n"},
+            level2={"findings": [{"observation": obs}]},
+        )
+        assert any("drift" in v for v in check_bundle(ara)), obs

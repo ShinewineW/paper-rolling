@@ -300,9 +300,10 @@ def write_branch2(
 
     `md_path` (optional): the frozen {ID}.md — when given, its original figures are
     indexed (caption + source ref, no binary) into evidence/README.md (P1-a).
-    `repo_resolver` (optional): the code_ref candidate cascade; defaults to the pure
-    `resolve_repo_candidates` (T1+T2a). The driver injects a partial wired with T2b
-    (`hf_lookup`) / T4 (`web_search`) to extend coverage to post-PwC-freeze papers.
+    `repo_resolver` (optional): the code_ref candidate cascade; defaults to the
+    offline `resolve_repo_candidates` (T1 grep + T2a PwC + any discovery-carried
+    github_repo). The driver injects a partial wired with T2b (`hf_lookup`) / T4
+    (`web_search`) to extend coverage to post-PwC-freeze papers.
     """
     _w(ara_dir / "PAPER.md", _paper_md(candidate, analysis))
     _w(ara_dir / "logic/problem.md", _problem_md(analysis["problem"]))
