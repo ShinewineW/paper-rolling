@@ -285,7 +285,8 @@ def make_spoke(
         outcome = run_with_budget(
             _g3,
             max_rounds=max_gate_rounds,
-            on_reemit=lambda i: _attempt(),
+            on_reemit=lambda i, verdict: _attempt(),  # branch-level dispatch arrives in Task 4.4
+            write_quarantine_note=False,  # the spoke preserves its own scene; no duplicate note
             failed_dir=failed_dir,
             key=produced.key,
             paper_meta={
@@ -299,8 +300,8 @@ def make_spoke(
             # G3 ran AFTER promotion; the seal failed for the whole budget. Preserve
             # the promoted products as a self-contained final-gate scene (audit F) so
             # revival can re-run the failed branch against the current engine —
-            # rather than just deleting them. (The duplicate run_with_budget
-            # _failed/<key>.md note is suppressed in Task 4.2.)
+            # rather than just deleting them. (run_with_budget's note is suppressed
+            # via write_quarantine_note=False, so the scene dir is the sole record.)
             return _g3_to_scene(outcome.final_verdict)
 
         # 7. Success — return produce_outputs' EXACT paths (no re-derivation).
