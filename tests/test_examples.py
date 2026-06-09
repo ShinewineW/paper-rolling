@@ -21,15 +21,15 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 _BUNDLE = _REPO_ROOT / ".claude/skills/paper-landscape/examples/sample-ara-bundle.json"
 
 _CANDIDATE = {
-    "arxiv_id": "2403.04567",
+    "arxiv_id": "2301.04104",
     "doi": None,
     "github_repo": None,
-    "title": "Latent World Models for Sample-Efficient Robotic Planning",
-    "year": 2024,
-    "venue": "NeurIPS",
-    "authors": ["Chen, A."],
+    "title": "Mastering Diverse Domains through World Models",
+    "year": 2023,
+    "venue": None,
+    "authors": ["Hafner, D."],
 }
-_KEY = "2026-06-07_Chen_2403.04567"
+_KEY = "2026-06-08_Dreamer_2301.04104"
 
 
 def _load_bundle() -> dict:
@@ -50,10 +50,13 @@ def test_shipped_sample_passes_seal1_and_full_round_trip(tmp_path):
     ara = tmp_path / "ai_package" / _KEY / "ara"
     ara.mkdir(parents=True)
     person = tmp_path / "person_vault" / _KEY
-    md = tmp_path / "corpus" / "2403.04567" / "2403.04567.md"
+    md = tmp_path / "corpus" / "2301.04104" / "2301.04104.md"
     md.parent.mkdir(parents=True)
     md.write_text(
-        "# Paper\nWe report 87.3% success, a 12.4 point gain over the 74.9% baseline.\n",
+        "# Mastering Diverse Domains through World Models\n"
+        "One fixed configuration spans more than 150 tasks in 8 domains. "
+        "On Minecraft Diamond it reaches a 9.1 episode return at 100M environment "
+        "steps, versus 7.1 for the strongest baseline.\n",
         encoding="utf-8",
     )
 
@@ -66,6 +69,6 @@ def test_shipped_sample_passes_seal1_and_full_round_trip(tmp_path):
     assert lint_text((person / "report.md").read_text(encoding="utf-8")) == []
 
     summary = load_paper_summary(tmp_path, _KEY)
-    assert summary.headline_metric == "success_rate"
-    assert summary.headline_value == 87.3
-    assert summary.params_million == 42.0
+    assert summary.headline_metric == "Minecraft Diamond Return"
+    assert summary.headline_value == 9.1
+    assert summary.params_million == 200.0

@@ -1,114 +1,114 @@
 {
-  "_comment": "ILLUSTRATIVE sample — a SYNTHETIC paper and INVENTED numbers, shown only to teach the exact shape resolve_analysis must return. Not a real paper; do not cite. Delete the _comment key in real output (the engine ignores it). See ../examples/worked-example.md for the end-to-end walkthrough and ../references/ara-schema.md for the field contract.",
+  "_comment": "WORKED EXAMPLE derived from the real, top-scoring in-place ARA: DreamerV3 (Mastering Diverse Domains through World Models, arXiv 2301.04104) — Seal-2 grade Strong Accept (mean 4.67), the best of the落位 ai_package set. Shown to teach the EXACT shape resolve_analysis must return, using real content. Numbers are the paper's own. Delete the _comment key in real output (the engine ignores it). See ../examples/worked-example.md for the end-to-end walkthrough and ../references/ara-schema.md for the field contract.",
 
-  "domain": "world models / model-based reinforcement learning",
+  "domain": "model-based reinforcement learning / world models",
 
-  "overview": "A latent world model is learned from interaction and used for imagination-based planning, decoupling representation learning from control so the policy can be optimized inside the model rather than on the environment.",
+  "overview": "DreamerV3 is a general-purpose model-based RL algorithm that learns a world model of the environment and optimizes an actor-critic policy entirely inside imagined latent trajectories. With a single fixed hyperparameter configuration it matches or beats domain-specialized expert algorithms across more than 150 diverse tasks. Its core contribution is a set of robustness techniques (symlog transforms, KL free bits, percentile return normalization, symexp twohot loss) that remove the cross-domain training instability caused by signal-magnitude differences.",
 
   "problem": {
     "observations": [
-      {"id": "O1", "statement": "Model-free control is sample-inefficient on long-horizon manipulation.", "evidence": "Reported environment-step counts in prior work are large.", "implication": "Real-robot training is impractical."}
+      {"id": "O1", "statement": "Reward magnitudes, observation scales, and exploration needs differ by orders of magnitude across domains (continuous vs discrete actions, vision vs low-dim, dense vs sparse reward).", "evidence": "Specialized RL methods are tuned per-domain and do not transfer their hyperparameters.", "implication": "Applying RL to a new domain requires expert manual tuning, which bottlenecks adoption."}
     ],
     "gaps": [
-      {"id": "G1", "statement": "Prior latent models drift over long rollouts.", "why_fail": "One-step reconstruction loss does not penalize compounding error.", "caused_by": "O1", "attempts": ["pixel reconstruction", "contrastive latents"]}
+      {"id": "G1", "statement": "No single fixed configuration reaches competitive performance simultaneously across continuous control, discrete games, sparse reward, and 3D open worlds.", "why_fail": "Cross-domain signal-magnitude differences make any one configuration break on some domain.", "caused_by": "O1", "attempts": ["per-domain hyperparameter tuning", "fixed-HP PPO"]}
     ],
     "insight": {
-      "statement": "Predicting value-equivalent quantities, not pixels, keeps long imagined rollouts useful for planning.",
+      "statement": "Compressing signal magnitude (symlog), stabilizing representations (KL free bits), and normalizing returns by percentiles together eliminate cross-domain signal differences, so one fixed configuration learns everywhere; meanwhile the world model's unsupervised reconstruction objective itself yields rich representations.",
       "derived_from": "G1",
-      "enables": "Stable long-horizon imagination that the planner can trust."
+      "enables": "Tuning-free learning across more than 150 tasks with a single configuration."
     },
-    "assumptions": ["The reward is observable during training.", "The latent dynamics are approximately Markov."]
+    "assumptions": ["A reward and episode-continuation signal are available during training.", "The discrete latent dynamics are approximately Markov given the recurrent state."]
   },
 
   "claims": [
-    {"id": "C1", "title": "Sample-efficient planning", "statement": "The latent world model attains an 87.3% task success rate, a 12.4-point improvement over the strongest model-free baseline.", "status": "supported", "tags": ["improvement"], "falsification": "Success rate is not above the baseline under matched interaction budget.", "proof": ["E1"], "evidence_basis": ["E1"], "interpretation": "Imagination-based planning closes most of the sample-efficiency gap."},
-    {"id": "C2", "title": "Rollout stability", "statement": "Value-equivalent prediction reduces compounding rollout error versus pixel reconstruction.", "status": "supported", "tags": ["causal"], "falsification": "Ablating value-equivalence does not increase rollout error.", "proof": ["E2"], "evidence_basis": ["E2"], "interpretation": "The value-equivalence term is the load-bearing piece for long rollouts."}
+    {"id": "C1", "title": "Fixed-config cross-domain mastery", "statement": "DreamerV3 uses one fixed hyperparameter configuration to match or surpass specialized expert algorithms across more than 150 diverse tasks spanning 8 domains, and far exceeds general PPO.", "status": "supported", "tags": ["generalization"], "falsification": "Find a domain where fixed-config DreamerV3 is systematically worse than the tuned expert baseline.", "proof": ["E1"], "evidence_basis": ["E1"], "interpretation": "A single robust recipe replaces per-domain hyperparameter engineering."},
+    {"id": "C2", "title": "Minecraft diamonds from scratch", "statement": "DreamerV3 is the first algorithm to collect a diamond in Minecraft from scratch with no human data and no curriculum, reaching a 9.1 episode return at 100M environment steps versus 7.1 for the strongest baseline.", "status": "supported", "tags": ["improvement"], "falsification": "Show a prior algorithm collected diamonds under identical from-scratch conditions.", "proof": ["E2"], "evidence_basis": ["E2"], "interpretation": "World-model imagination makes long-horizon sparse-reward exploration tractable without human priors."}
   ],
 
   "concepts": [
-    {"name": "latent dynamics model", "definition": "A learned transition function over a compact latent state.", "notation": "z_{t+1} = f(z_t, a_t)", "related": ["imagination rollout"], "interpretation": "A compressed simulator of the environment.", "boundary": "Holds only within the training distribution of dynamics."},
-    {"name": "imagination rollout", "definition": "A trajectory generated entirely inside the latent model.", "notation": "", "related": ["latent dynamics model"], "interpretation": "Planning without touching the real environment.", "boundary": "Quality degrades past the horizon the model was trained to."},
-    {"name": "value-equivalent prediction", "definition": "Training the model to preserve quantities relevant to value, not raw observations.", "notation": "", "related": ["latent dynamics model"], "interpretation": "Predict what matters for the decision, not the pixels.", "boundary": "Requires a reward signal at training time."},
-    {"name": "world model", "definition": "A learned generative model of environment dynamics used for planning.", "notation": "", "related": ["latent dynamics model"], "interpretation": "An internal simulator the agent plans inside.", "boundary": "Accurate only where the training data covered the dynamics."},
-    {"name": "policy distillation", "definition": "Training a reactive policy to imitate the planner's chosen actions.", "notation": "", "related": ["imagination rollout"], "interpretation": "Compresses expensive planning into a fast reactive policy.", "boundary": "Bounded by the planner's own action quality."}
+    {"name": "Recurrent State-Space Model (RSSM)", "definition": "A world model with a deterministic recurrent state h_t and a stochastic discrete latent z_t, factored into a sequence model, an encoder, and a dynamics predictor.", "notation": "h_t = f(h_{t-1}, z_{t-1}, a_{t-1}),  z_t ~ q(z_t | h_t, x_t),  \\hat z_t ~ p(\\hat z_t | h_t)", "related": ["imagination training"], "interpretation": "A compressed simulator you can roll forward without touching real observations.", "boundary": "Open-loop rollouts stay reliable only within the horizon the dynamics were trained for."},
+    {"name": "symlog / symexp transform", "definition": "A sign-preserving logarithmic squashing of arbitrary-magnitude targets and its inverse.", "notation": "symlog(x) = sign(x) ln(|x|+1),  symexp(x) = sign(x)(exp(|x|)-1)", "related": ["symexp twohot loss"], "interpretation": "A volume knob that puts very large and very small targets on one comparable scale.", "boundary": "Distorts linear magnitude information, so it is used on targets, not on raw features that must stay linear."},
+    {"name": "symexp twohot loss", "definition": "Distributional regression over exponentially-spaced bins, training a softmax classifier whose expected bin value reconstructs the target.", "notation": "\\hat y = softmax(f(x))^T B,  L = -twohot(y)^T log softmax(f(x))", "related": ["symlog / symexp transform"], "interpretation": "Predict a value by voting across log-spaced buckets, decoupling gradient scale from target magnitude.", "boundary": "Applied only to the reward predictor and critic, not to every regression target."},
+    {"name": "KL balancing and free bits", "definition": "Separate dynamics and representation KL terms, each clipped at a small floor so optimization stops once the KL is small enough.", "notation": "L_dyn = max(1, KL[sg(q) || p]),  L_rep = max(1, KL[q || sg(p)])", "related": ["Recurrent State-Space Model (RSSM)"], "interpretation": "Stop pushing the KL once it is small to avoid degenerate zero-information latents and KL spikes.", "boundary": "The free-bits floor must be tuned in nats; too high a floor leaves the prior under-trained."},
+    {"name": "imagination training", "definition": "Training the actor and critic entirely on open-loop latent rollouts started from replayed model states, with no real-environment interaction during policy learning.", "notation": "R_t^\\lambda = r_t + \\gamma c_t((1-\\lambda) v_t + \\lambda R_{t+1}^\\lambda)", "related": ["Recurrent State-Space Model (RSSM)"], "interpretation": "The policy practices inside the learned dream rather than the real world, and uses no lookahead search.", "boundary": "Quality is bounded by the world model's fidelity over the rollout horizon."}
   ],
 
   "experiments": [
-    {"id": "E1", "title": "Sample-efficiency comparison", "verifies": ["C1"], "setup": {"model": "Latent world model + imagination planner", "hardware": "1x A100", "dataset": "Six simulated manipulation tasks", "system": "Matched interaction budget vs a model-free baseline"}, "procedure": ["Train both methods under the same environment-step budget.", "Evaluate mean task success rate across the six tasks."], "metrics": ["success_rate"], "expected": "Higher success rate than the model-free baseline under a matched budget.", "baselines": ["model-free RL"], "dependencies": ["frozen reward signal"]},
-    {"id": "E2", "title": "Value-equivalence ablation", "verifies": ["C2"], "setup": {"model": "Latent world model with the value-equivalence loss removed", "hardware": "1x A100", "dataset": "Same six manipulation tasks", "system": "Ablation isolating the value-equivalence term"}, "procedure": ["Remove the value-equivalence loss term.", "Measure long-horizon rollout error and downstream success."], "metrics": ["rollout_error", "success_rate"], "expected": "Rollout error rises and downstream success drops relative to the full model.", "baselines": ["full model"], "dependencies": ["E1 training pipeline"]},
-    {"id": "E3", "title": "Imagination-horizon sweep", "verifies": ["C2"], "setup": {"model": "Latent world model at varying imagined horizons", "hardware": "1x A100", "dataset": "Same six manipulation tasks", "system": "Horizon sweep over {5, 15, 50}"}, "procedure": ["Vary the imagined planning horizon.", "Measure rollout error and downstream success at each horizon."], "metrics": ["rollout_error", "success_rate"], "expected": "Success peaks near the trained horizon and degrades beyond it.", "baselines": ["full model at horizon 15"], "dependencies": ["E1 training pipeline"]}
+    {"id": "E1", "title": "Fixed-config cross-domain benchmark", "verifies": ["C1"], "setup": {"model": "DreamerV3 at the default model size with one fixed configuration", "hardware": "1x Nvidia A100 per agent", "dataset": "8 benchmark domains covering 150+ tasks (Atari, ProcGen, DMLab, Atari100K, BSuite, proprio and visual continuous control)", "system": "Each domain run under its standard protocol; DreamerV3 never re-tuned"}, "procedure": ["Train DreamerV3 with identical hyperparameters on every domain.", "Compare against fixed-HP PPO and per-domain tuned expert algorithms."], "metrics": ["normalized_score"], "expected": "At least matches tuned experts on most domains and far exceeds fixed-HP PPO.", "baselines": ["PPO", "Rainbow", "MuZero", "IQN", "DrQ-v2"], "dependencies": ["frozen reward and continue signals"]},
+    {"id": "E2", "title": "Minecraft diamond from scratch", "verifies": ["C2"], "setup": {"model": "DreamerV3 out-of-the-box at the default model size", "hardware": "1x A100 plus 64 parallel CPU env workers", "dataset": "MineRL Diamond environment, sparse reward, 12 milestone items", "system": "From-scratch training with no human data and no curriculum"}, "procedure": ["Train on sparse reward only within a 100M environment-step budget across 10 seeds.", "Report episode return and the fraction of runs that collect a diamond."], "metrics": ["episode_return", "diamond_rate"], "expected": "DreamerV3 collects diamonds while tuned baselines collect none.", "baselines": ["IMPALA (tuned)", "Rainbow (tuned)", "PPO"], "dependencies": ["MineRL environment"]},
+    {"id": "E3", "title": "Robustness-technique ablation", "verifies": ["C1"], "setup": {"model": "DreamerV3 with one robustness technique removed at a time", "hardware": "1x A100", "dataset": "A diverse subset of tasks", "system": "Single-technique ablation isolating each component"}, "procedure": ["Remove one of {KL free bits, return normalization, symexp twohot, observation symlog, unimix, critic EMA}.", "Measure the change in the cross-domain mean."], "metrics": ["normalized_score"], "expected": "Every technique contributes positively to the mean, with the KL objective contributing most.", "baselines": ["full DreamerV3"], "dependencies": ["E1 training pipeline"]}
   ],
 
   "related_work": [
-    {"id": "R1", "cite": "Latent-dynamics planners (prior work)", "doi": "10.0000/illustrative-1", "type": "builds-on", "what_changed": "Adds a value-equivalent objective on top of latent-dynamics planning.", "why": "Reconstruction-based latents waste capacity on detail irrelevant to control.", "claims": ["C1"], "adopted": ["latent rollout planning"]},
-    {"id": "R2", "cite": "Value-equivalent model learning (prior work)", "doi": "10.0000/illustrative-2", "type": "extends", "what_changed": "Couples value-equivalence with long imagined rollouts rather than short ones.", "why": "Short rollouts under-use the model's predictive horizon.", "claims": ["C2"], "adopted": ["value-equivalence loss"]}
+    {"id": "R1", "cite": "DreamerV2 and prior latent-imagination agents", "doi": "10.0000/illustrative-1", "type": "builds-on", "what_changed": "Keeps latent imagination training but adds magnitude-robust losses so one configuration works across all domains.", "why": "Earlier Dreamers still needed per-environment tuning of the representation-loss weight.", "claims": ["C1"], "adopted": ["RSSM world model", "actor-critic in imagination"]},
+    {"id": "R2", "cite": "VPT and curriculum-based Minecraft agents", "doi": "10.0000/illustrative-2", "type": "extends", "what_changed": "Removes the dependence on human demonstrations and hand-designed curricula for long-horizon sparse-reward play.", "why": "Prior Minecraft agents needed large human-play datasets or staged curricula to reach diamonds.", "claims": ["C2"], "adopted": ["sparse-reward evaluation protocol"]}
   ],
 
-  "architecture": "Encoder -> Latent Dynamics -> Reward/Value Heads -> Imagination Planner -> Policy. The encoder maps observations to z; the dynamics roll z forward; the planner optimizes actions inside the model; the policy is distilled from planned actions.",
+  "architecture": "World Model (RSSM) -> Imagination Rollout -> Actor-Critic -> Policy. A CNN/MLP encoder maps the observation to a discrete stochastic latent z; a block-diagonal GRU sequence model carries the recurrent state h; reward, continue, and decoder heads read the model state {h, z}; the actor and critic train on H-step imagined latent rollouts, and at inference the actor samples actions with no forward search.",
 
-  "algorithm": "Latent rollout objective (illustrative):\n$$ \\mathcal{L} = \\sum_{t} \\big\\| v_\\phi(z_t) - \\hat{v}_t \\big\\|^2 + \\lambda \\, \\mathrm{KL}\\!\\big(q(z_t\\mid o_t)\\,\\|\\,p(z_t\\mid z_{t-1},a_{t-1})\\big) $$",
+  "algorithm": "World-model loss (Eq. 2-3; weights beta_pred=1, beta_dyn=1, beta_rep=0.1):\n$$ \\mathcal{L}(\\phi) \\doteq \\mathrm{E}_{q_\\phi}\\!\\Big[ \\sum_{t=1}^{T} \\big( \\beta_{\\mathrm{pred}}\\,\\mathcal{L}_{\\mathrm{pred}}(\\phi) + \\beta_{\\mathrm{dyn}}\\,\\mathcal{L}_{\\mathrm{dyn}}(\\phi) + \\beta_{\\mathrm{rep}}\\,\\mathcal{L}_{\\mathrm{rep}}(\\phi) \\big) \\Big] $$\nKL terms with free bits (clip at 1 nat):\n$$ \\mathcal{L}_{\\mathrm{dyn}}(\\phi) \\doteq \\max\\!\\big(1,\\, \\mathrm{KL}[\\mathrm{sg}(q_\\phi(z_t\\mid h_t,x_t)) \\,\\|\\, p_\\phi(z_t\\mid h_t)]\\big),\\quad \\mathcal{L}_{\\mathrm{rep}}(\\phi) \\doteq \\max\\!\\big(1,\\, \\mathrm{KL}[q_\\phi(z_t\\mid h_t,x_t) \\,\\|\\, \\mathrm{sg}(p_\\phi(z_t\\mid h_t))]\\big) $$\nCritic loss on lambda-returns (Eq. 5; gamma=0.997, lambda=0.95):\n$$ \\mathcal{L}(\\psi) \\doteq -\\sum_{t=1}^{T} \\ln p_\\psi(R_t^\\lambda \\mid s_t),\\quad R_t^\\lambda \\doteq r_t + \\gamma c_t\\big((1-\\lambda) v_t + \\lambda R_{t+1}^\\lambda\\big) $$",
 
-  "constraints": "# Constraints\n\n- Requires a reward signal during training.\n- Imagined rollouts degrade past the trained horizon.\n",
+  "constraints": "# Constraints\n\n- No systematic exploration mechanism: near-random on active-exploration tasks; diamonds are collected in only a small fraction of Minecraft episodes.\n- One world model is trained per environment; cross-task or cross-domain sharing is left as future work.\n- The actor uses a REINFORCE gradient estimator for both discrete and continuous actions, giving higher policy-gradient variance.\n- Stride-2 convolutions compress images to a small spatial grid, losing precision on detail-sensitive tasks.\n",
 
   "heuristics": [
-    {"id": "H1", "desc": "Warm-start the planner from the policy's action.", "rationale": "The distilled policy is already a good action prior, so planning converges faster.", "sensitivity": "Low — affects planner iterations, not final quality.", "bounds": "Skip when the policy is untrained.", "code_ref": "src/execution/core.py:imagine", "source": "Section 4 (illustrative)"},
-    {"id": "H2", "desc": "Cap imagined horizon to the model's trained rollout length.", "rationale": "Beyond the trained horizon the latent dynamics leave their valid regime.", "sensitivity": "High — too long a horizon reintroduces compounding error.", "bounds": "Horizon <= 15 in this setup.", "code_ref": "src/execution/core.py:imagine", "source": "Section 4 (illustrative)"}
+    {"id": "H1", "desc": "Clip the dynamics and representation KL terms with free bits so optimization stops once the KL is already small.", "rationale": "Prevents degenerate zero-information latents and removes the KL spikes seen in deep variational models; the ablation shows removing the KL objective is the single largest hit to performance.", "sensitivity": "High — too high a free-bits floor leaves the prior under-trained.", "bounds": "Free-bits floor of about 1 nat.", "code_ref": "src/execution/core.py:world_model_loss", "source": "Section 3 (world model)"},
+    {"id": "H2", "desc": "Scale the actor gradient by a percentile range of returns with a denominator floor.", "rationale": "Under sparse reward the return standard deviation collapses and naive normalization amplifies noise; percentiles are outlier-robust and the floor stops tiny returns from being blown up.", "sensitivity": "High — without the floor, sparse-reward exploration stalls.", "bounds": "5th-to-95th percentile range, denominator floor L = 1.", "code_ref": "src/execution/core.py:actor_loss", "source": "Section 3 (actor-critic)"}
   ],
 
   "configs_training": [
-    {"name": "optimizer", "value": "Adam", "rationale": "Standard adaptive optimizer for latent-model training.", "range": "{Adam, AdamW}", "sensitivity": "Low", "source": "Appendix B (illustrative)"},
-    {"name": "lr", "value": "3e-4", "rationale": "Stable for the joint encoder/dynamics objective.", "range": "[1e-4, 1e-3]", "sensitivity": "Medium", "source": "Appendix B (illustrative)"},
-    {"name": "batch_size", "value": "50", "rationale": "Fits single-GPU memory at the chosen latent size.", "range": "[32, 128]", "sensitivity": "Low", "source": "Appendix B (illustrative)"},
-    {"name": "imagination_horizon", "value": "15", "rationale": "Longest horizon the dynamics stay reliable for.", "range": "[5, 50]", "sensitivity": "High", "source": "Section 4 (illustrative)"}
+    {"name": "optimizer", "value": "LaProp", "rationale": "Stable across domains with adaptive gradient clipping.", "range": "{LaProp, Adam}", "sensitivity": "Low", "source": "Table 4 (hyperparameters)"},
+    {"name": "lr", "value": "4e-5", "rationale": "One learning rate shared across all domains.", "range": "[1e-5, 1e-4]", "sensitivity": "Medium", "source": "Table 4 (hyperparameters)"},
+    {"name": "batch_size", "value": "16", "rationale": "Sequences of length 64 per batch element.", "range": "[16, 64]", "sensitivity": "Low", "source": "Table 4 (hyperparameters)"},
+    {"name": "imagination_horizon", "value": "15", "rationale": "Horizon over which imagined rollouts stay reliable.", "range": "[10, 20]", "sensitivity": "Medium", "source": "Table 4 (hyperparameters)"}
   ],
 
   "configs_model": [
-    {"name": "latent_dim", "value": "256", "rationale": "Enough capacity to encode task-relevant state without overfitting.", "range": "[128, 512]", "sensitivity": "Medium", "source": "Appendix B (illustrative)"},
-    {"name": "hidden_dim", "value": "512", "rationale": "Width of the dynamics/value MLPs.", "range": "[256, 1024]", "sensitivity": "Medium", "source": "Appendix B (illustrative)"},
-    {"name": "params_million", "value": "42.0", "rationale": "Total trainable parameters at the chosen widths.", "range": "—", "sensitivity": "—", "source": "Appendix B (illustrative)"}
+    {"name": "recurrent_units", "value": "8192", "rationale": "Block-diagonal GRU width at the default model size.", "range": "[1024, 8192]", "sensitivity": "Medium", "source": "Table 3 (model sizes)"},
+    {"name": "model_width", "value": "1024", "rationale": "Hidden width d of the dynamics and head MLPs at the default size.", "range": "[256, 1536]", "sensitivity": "Medium", "source": "Table 3 (model sizes)"},
+    {"name": "params_million", "value": "200.0", "rationale": "Total trainable parameters at the default (200M) model size; the family scales from 12M to 400M.", "range": "[12, 400]", "sensitivity": "—", "source": "Table 3 (model sizes)"}
   ],
 
   "environment": {
-    "python": "3.11",
-    "framework": "PyTorch 2.2",
-    "hardware": "Single A100 GPU",
-    "deps": ["torch", "gymnasium", "numpy"],
-    "seeds": "[0, 1, 2]"
+    "python": "—",
+    "framework": "Unspecified in the paper (a public implementation exists)",
+    "hardware": "Single Nvidia A100 GPU per agent; Minecraft adds 64 CPU env workers",
+    "deps": ["MineRL 0.4.4", "Minecraft 1.11.2"],
+    "seeds": "5 per benchmark (Minecraft: 10)"
   },
 
-  "execution_stub": "import torch\n\n\ndef imagine(z0, policy, dynamics, horizon):\n    z, traj = z0, []\n    for _ in range(horizon):\n        a = policy(z)\n        z = dynamics(z, a)\n        traj.append((z, a))\n    return traj\n",
+  "execution_stub": "def imagine(state, actor, world_model, horizon=15):\n    h, z = state\n    traj = []\n    for _ in range(horizon):\n        a = actor(h, z)\n        h = world_model.sequence(h, z, a)\n        z = world_model.dynamics(h)\n        traj.append((h, z, a))\n    return traj\n",
 
   "innovations": [
-    {"name": "Value-equivalent latent objective for long rollouts.", "grep": "value_equivalent"},
-    {"name": "Planner warm-started from a distilled policy.", "grep": "warm_start"}
+    {"name": "Magnitude-robust losses (symlog, symexp twohot, KL free bits, percentile return normalization) for fixed-config cross-domain learning.", "grep": "symexp_twohot"},
+    {"name": "First from-scratch Minecraft diamond collection with no human data or curriculum.", "grep": "minecraft_diamond"}
   ],
 
   "exploration_tree": [
-    {"id": "q1", "type": "question", "title": "Why do long imagined rollouts drift?", "description": "Diagnose what makes multi-step latent rollouts diverge from real dynamics.", "support_level": "inferred"},
-    {"id": "d1", "type": "decision", "title": "Choose the latent training signal", "choice": "value-equivalent prediction", "alternatives": ["pixel reconstruction", "contrastive latents"], "support_level": "explicit", "source_refs": ["Section 3"]},
-    {"id": "de1", "type": "dead_end", "title": "Pixel-reconstruction latents", "hypothesis": "Reconstructing pixels yields planning-useful latents.", "failure_mode": "Capacity is spent on control-irrelevant detail; long rollouts drift.", "lesson": "Predict decision-relevant quantities, not pixels.", "support_level": "inferred"},
-    {"id": "e1", "type": "experiment", "title": "Value-equivalence vs reconstruction rollout error", "result": "Value-equivalent latents show lower long-horizon drift.", "support_level": "explicit", "source_refs": ["Table 1"]},
-    {"id": "d2", "type": "decision", "title": "Choose the imagination horizon", "choice": "horizon 15", "alternatives": ["horizon 5", "horizon 50"], "support_level": "explicit", "source_refs": ["Section 4"]},
-    {"id": "de2", "type": "dead_end", "title": "Horizon-50 rollouts", "hypothesis": "Longer imagined horizons plan better.", "failure_mode": "Beyond ~15 steps the dynamics leave their trained regime and error compounds.", "lesson": "Cap the imagined horizon to the trained rollout length.", "support_level": "inferred"},
-    {"id": "e2", "type": "experiment", "title": "Planner warm-start ablation", "result": "Warm-starting the planner from the distilled policy speeds convergence.", "support_level": "inferred"},
-    {"id": "p1", "type": "pivot", "title": "From short to long imagined rollouts", "from": "short imagined rollouts", "to": "long value-equivalent rollouts", "trigger": "Short rollouts under-use the model's predictive horizon.", "support_level": "inferred"}
+    {"id": "q1", "type": "question", "title": "Why does one fixed configuration break across domains?", "description": "Diagnose what makes a single hyperparameter set fail when reward and observation magnitudes vary by orders of magnitude.", "support_level": "inferred"},
+    {"id": "d1", "type": "decision", "title": "Choose how to handle arbitrary-magnitude targets", "choice": "symlog squashing plus symexp twohot regression", "alternatives": ["running mean/std normalization", "plain MSE regression"], "support_level": "explicit", "source_refs": ["Section 3 (robustness)"]},
+    {"id": "de1", "type": "dead_end", "title": "Plain MSE on raw-magnitude targets", "hypothesis": "Regressing directly on raw reward and value magnitudes is sufficient.", "failure_mode": "Large targets explode gradients while clipped losses stall at the extremes.", "lesson": "Use a sign-preserving two-way compression rather than non-stationary running statistics.", "support_level": "inferred"},
+    {"id": "e1", "type": "experiment", "title": "Robustness-technique ablation", "result": "Each technique contributes positively to the cross-domain mean, with the KL objective contributing most.", "support_level": "explicit", "source_refs": ["Figure 6a"]},
+    {"id": "d2", "type": "decision", "title": "Choose how to normalize returns for the actor", "choice": "percentile return range with a denominator floor", "alternatives": ["mean/std advantage normalization", "no normalization"], "support_level": "explicit", "source_refs": ["Section 3 (actor-critic)"]},
+    {"id": "de2", "type": "dead_end", "title": "Mean/std advantage normalization under sparse reward", "hypothesis": "Standard advantage normalization handles sparse reward.", "failure_mode": "When the return standard deviation collapses, normalization amplifies tiny noise and drowns the entropy regularizer.", "lesson": "Normalize by an outlier-robust percentile range and floor the denominator.", "support_level": "inferred"},
+    {"id": "e2", "type": "experiment", "title": "Minecraft diamond from scratch", "result": "All DreamerV3 seeds eventually collect a diamond within the step budget while tuned baselines collect none.", "support_level": "explicit", "source_refs": ["Table 5"]},
+    {"id": "p1", "type": "pivot", "title": "From per-domain tuning to a single fixed recipe", "from": "per-domain hyperparameter tuning", "to": "one magnitude-robust configuration for all domains", "trigger": "Magnitude-robust losses removed the need to re-tune the representation-loss weight per environment.", "support_level": "inferred"}
   ],
 
   "evidence_tables": [
-    {"name": "main_results", "headers": ["Task", "Ours", "Baseline"], "rows": [["Manipulation suite (mean)", "87.3", "74.9"]], "caption": "Mean success rate (%), matched interaction budget.", "source": "Table 1", "claims": ["C1"]}
+    {"name": "minecraft_diamond", "headers": ["Task", "Dreamer", "Baseline"], "rows": [["Minecraft Diamond return (100M steps)", "9.1", "7.1"]], "caption": "Episode return on Minecraft Diamond at 100M environment steps.", "source": "Table 5", "claims": ["C2"]}
   ],
 
-  "math_intuition": "Like rehearsing a route in your head: you only need to remember the turns that change the outcome, not every shopfront along the way.",
-  "math_toy_example": "If two latent states lead to the same value, the model is free to merge them — it only must preserve what changes the decision.",
+  "math_intuition": "把它想成一个会自动调节的音量旋钮:无论目标信号极大还是极小,都被对称地压到同一个可比较的刻度上,于是同一套损失与同一个学习率就能跨任务通用,而不必为每个领域单独调参。",
+  "math_toy_example": "把一个很大的目标值和一个很小的目标值同时丢进 symlog,二者的差距会被对称地压缩;模型于是既不会为大信号分配过多梯度,也不会忽略小信号,跨任务训练因此更平稳。",
   "loss_highlight": {
-    "direction": "The value term keeps long imagined rollouts decision-relevant.",
-    "mechanism": "The KL term ties the posterior to the learned prior so the latent stays predictable.",
-    "baseline": "Dropping the value term is what lets rollout error compound, unlike pixel reconstruction."
+    "direction": "把奖励与价值这类幅度差异巨大的目标,统一压到对称对数刻度上,让单一配置能跨任务稳定训练。",
+    "mechanism": "twohot 软分类把价值回归变成在对数刻度的若干箱子上投票,使梯度幅度与目标原始尺度解耦(链 数学方法 推导)。",
+    "baseline": "相较直接对原始幅度做回归的做法,这套变换让训练在稀疏与稠密信号下都不易发散。"
   },
 
-  "trend": "Recent model-based methods move from reconstructing observations toward predicting decision-relevant quantities; this paper sits on that trajectory.",
+  "trend": "模型驱动的强化学习正从每个领域手工调参的专才,转向单一固定配置的通才;本文把世界模型方法推到了这一方向的前沿。",
 
-  "headline_metric": "success_rate",
-  "headline_value": 87.3,
-  "params_million": 42.0
+  "headline_metric": "Minecraft Diamond Return",
+  "headline_value": 9.1,
+  "params_million": 200.0
 }

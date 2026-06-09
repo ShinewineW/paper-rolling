@@ -20,8 +20,8 @@ claims_summary:                      # analysis.claims[:3] statements
   - {claim_2.statement}
   - {claim_3.statement}
 headline_metric: {analysis.headline_metric}   # str, e.g. "NDS" — REQUIRED
-headline_value: {analysis.headline_value}     # float, e.g. 87.3      — REQUIRED
-params_million: {analysis.params_million}      # float, e.g. 42.0      — REQUIRED
+headline_value: {analysis.headline_value}     # float, e.g. 9.1       — REQUIRED
+params_million: {analysis.params_million}      # float, e.g. 200.0     — REQUIRED
 ---
 
 # {candidate.title}

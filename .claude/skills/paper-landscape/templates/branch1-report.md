@@ -11,7 +11,7 @@ The anchor convention and the "number-free derivation" rule are LOAD-BEARING —
 <!-- analysis.claims, woven into prose. EVERY number that also appears in the frozen {ID}.md
      MUST be anchored, or the anchor lint hard-fails a number+metric-cue claim (AnchorGateError).
      Anchor shape (integers AND decimals, \d+(?:\.\d+)?): -->
-本文方法取得 87.3<!--ref:r1--><!--anchor:quote:87.3--> 的成功率,较最强 model-free 基线提升 12.4<!--ref:r2--><!--anchor:quote:12.4--> 个点。…
+本文方法在 Minecraft Diamond 上取得 9.1<!--ref:r1--><!--anchor:quote:9.1--> 的回合回报,强于最强基线的 7.1<!--ref:r2--><!--anchor:quote:7.1-->。…
 
 ## 整体架构
 本文方法的核心组件构成如下(原图为 ground truth,以下为简化示意,以原图为准):
