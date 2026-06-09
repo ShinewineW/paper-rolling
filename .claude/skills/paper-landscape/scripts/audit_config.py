@@ -37,6 +37,10 @@ class AuditConfig:
             Higher = stricter + more tokens.
         max_gate_rounds: How many times a blocked gate re-emits the offending
             branch before the paper is quarantined. 1 = no retry.
+        g2_blind_retry_rounds: Independent G2 number-gate blind-retry budget — how
+            many times a G2 hard-block re-runs the analyzer (fresh sampling, no
+            rubric injection) before quarantine. Separate from max_gate_rounds
+            (the content-gate re-emit budget). 1 = one blind retry. (ADR-0006)
         data_fidelity_tolerant: When True, a small number of unconfirmed evidence
             numbers (within the limits below) are FLAGGED but do NOT block the
             paper. When False (strict), any unconfirmed number hard-blocks it.
@@ -48,6 +52,7 @@ class AuditConfig:
 
     skeptic_votes: int = 1
     max_gate_rounds: int = 1
+    g2_blind_retry_rounds: int = 1  # 数字门盲重试预算（独立于内容门 max_gate_rounds，ADR-0006）
     data_fidelity_tolerant: bool = True
     data_fidelity_max_unconfirmed: int = 5
     data_fidelity_max_unconfirmed_ratio: float = 0.2
@@ -102,6 +107,7 @@ def load_audit_config(workspace: Path) -> AuditConfig:
     return AuditConfig(
         skeptic_votes=int(raw.get("skeptic_votes", defaults.skeptic_votes)),
         max_gate_rounds=int(raw.get("max_gate_rounds", defaults.max_gate_rounds)),
+        g2_blind_retry_rounds=int(raw.get("g2_blind_retry_rounds", defaults.g2_blind_retry_rounds)),
         data_fidelity_tolerant=(mode == "tolerant"),
         data_fidelity_max_unconfirmed=int(
             df.get("max_unconfirmed", defaults.data_fidelity_max_unconfirmed)
