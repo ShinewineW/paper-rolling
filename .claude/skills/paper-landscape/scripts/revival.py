@@ -379,3 +379,40 @@ def _revive_one(
         )
     finally:
         shutil.rmtree(staging, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    from scripts.ledger.store import Ledger
+    from scripts.llm.seams import build_seams
+    from scripts.output.repo_resolve import make_repo_resolver  # R10:复活也要码链解析
+
+    ap = argparse.ArgumentParser(description="批次复活赛:重放 _failed/ 所有现场")
+    ap.add_argument("--workspace", default=".")
+    ap.add_argument("--directive", default=None, help="可选:注入所有重放篇的一句人工指令")
+    args = ap.parse_args()
+    ws = Path(args.workspace)
+    _ledger = Ledger(ws)
+    # R10:构造与生产同款 repo_resolver(默认 T2b HF-live;对齐 run_campaign)。
+    _resolver = make_repo_resolver()
+    with _ledger.acquire():  # LS-1:与 /loop tick 互斥;整批持锁=复活期间 /loop 停摆
+        _res = revive_all(
+            workspace=ws,
+            ledger=_ledger,
+            seams=build_seams(),
+            repo_resolver=_resolver,
+            human_directive=args.directive,
+        )
+    _done = sum(1 for r in _res if r.status == "done")
+    _errs = sum(1 for r in _res if r.status == "error")
+    _manual = [r for r in _res if r.status == "manual"]
+    print(f"复活:{_done}/{len(_res)} 晋升" + (f"({_errs} 篇出错已隔离)" if _errs else ""))
+    if _manual:  # 审计 R15:ingest 根不可静默卡死,给可操作出口
+        print(f"\n⚠️ {len(_manual)} 篇为 ingest 根(MD 公式损坏),引擎内不可自动修,需人工 re-ingest:")
+        for r in _manual:
+            print(
+                f"  - {r.key}: python -m scripts.invalidate {r.ledger_key} "
+                "--topic-dir <dir>  # 清 deferred 行后重转 PDF→下次 /loop 重处理"
+            )
+    sys.exit(0 if (_done or not _res) else 1)
