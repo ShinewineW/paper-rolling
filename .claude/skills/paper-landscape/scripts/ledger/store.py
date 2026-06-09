@@ -128,9 +128,11 @@ class Ledger:
     def load_skip_set(self, now: datetime | None = None) -> set[str]:
         """§3.2 Step-0 key-only skip: done & not rescinded & retry not elapsed.
 
-        A deferred row with a future retry_after is also skipped (negative
-        cache still warm); once retry_after elapses the key drops out so it is
-        re-fetched (OT-2 / R7 — never permanently suppressed).
+        A deferred row with a future retry_after is skipped while the negative
+        cache is warm; once retry_after elapses the key drops out and is re-fetched
+        (discovery/conversion TTL — never permanently suppressed). A deferred row
+        with NO retry_after (audit hard-block, ADR-0007) is skipped UNCONDITIONALLY
+        — it waits for an explicit batch revival, not a /loop auto-retry.
         """
         now = now or _now()
         skip: set[str] = set()
@@ -141,8 +143,11 @@ class Ledger:
             retry_pending = ra is not None and now < _parse_iso(ra)
             if row["status"] == _DONE:
                 skip.add(key)
-            elif row["status"] == "deferred" and retry_pending:
-                skip.add(key)
+            elif row["status"] == "deferred":
+                # 发现/转换 deferred 带 retry_after(TTL 内 skip);audit deferred 无 TTL
+                # (retry_after=None)→ 无条件 skip,静等显式复活赛。两者都不被 /loop 自动重跑。
+                if retry_pending or row.get("retry_after") is None:
+                    skip.add(key)
         return skip
 
     # --- consumer-facing API (Round 5 F3: hub + Chunk 4 call these names) ----

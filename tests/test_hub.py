@@ -15,7 +15,14 @@ class FakeLedger:
         return set(self._skip)
 
     def record(
-        self, key, *, status, failure_class=None, person_vault_path=None, ai_package_path=None
+        self,
+        key,
+        *,
+        status,
+        failure_class=None,
+        person_vault_path=None,
+        ai_package_path=None,
+        retry_after=None,
     ) -> None:
         self.records.append(
             {
@@ -24,6 +31,7 @@ class FakeLedger:
                 "failure_class": failure_class,
                 "person_vault_path": person_vault_path,
                 "ai_package_path": ai_package_path,
+                "retry_after": retry_after,
             }
         )
         # 'done' keys join the skip-set so a subsequent tick won't reprocess.
