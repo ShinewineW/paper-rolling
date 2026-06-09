@@ -61,5 +61,5 @@ _ledger/.lock
 # macOS 噪声
 .DS_Store
 
-# git worktree 检出(using-git-worktrees skill)
-/.claude/worktrees/
+# git worktree 检出(根目录 .worktrees/,惯例位置)
+/.worktrees/
