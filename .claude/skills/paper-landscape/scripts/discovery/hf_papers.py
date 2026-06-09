@@ -6,14 +6,12 @@ Returned arxiv_id is fed back through OpenAlex before entering the authority
 set.
 
 # ===========================================================================
-# HF API TOKEN (D-发现-4). The shipped source HARDCODES a fine-grained READ-ONLY
-# Hugging Face token — an explicit, owner-granted exemption to the security.md
-# "no hardcoded secrets" rule, for self-contained distribution. Scope is
-# READ-ONLY (blast radius = public-metadata reads); it lands in git history by
-# design. Resolution: HF_TOKEN env var first (override without editing source),
-# else this constant. If the constant is ever reset to the placeholder sentinel,
-# requests go out ANONYMOUSLY (no Authorization header) — HF search still works
-# at a lower rate. Rotate at huggingface.co if exposed beyond this repo's audience.
+# HF API TOKEN (D-发现-4). The READ-ONLY token is read solely from the gitignored
+# ``.env`` (``HF_TOKEN``), surfaced into os.environ by ``llm.load_dotenv`` at
+# composition time. NOTHING is hardcoded — an earlier shipped constant was auto-revoked by
+# Hugging Face the moment it hit public git history, so the secret now lives only
+# in ``.env`` (security.md compliant). Unset ``HF_TOKEN`` -> requests go out
+# ANONYMOUSLY (no Authorization header); HF search still works at a lower rate.
 # ===========================================================================
 """
 
@@ -23,37 +21,21 @@ import os
 from collections.abc import Iterator
 from typing import Any
 
-# ===========================================================================
-# HF API TOKEN (D-发现-4) — see the module docstring. Hardcoded READ-ONLY token
-# (owner-granted exemption); HF_TOKEN env overrides without editing source. If
-# reset to the placeholder sentinel, no Authorization header is sent (anonymous).
-# ===========================================================================
-_PLACEHOLDER_TOKEN = "hf_REPLACE_WITH_READONLY_TOKEN"  # sentinel: "unconfigured" -> anonymous
-HF_READONLY_TOKEN = (
-    "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"  # owner-forced READ-ONLY hardcode (D-发现-4)
-)
-
 # OpenAlex polite-pool email (non-secret, D-发现-2).
 OPENALEX_POLITE_EMAIL = "ahhssxlcwjz@163.com"
 
 _BASE = "https://huggingface.co/api/papers/search"
 
 
-def _hf_token() -> str:
-    """Resolve the HF token: the HF_TOKEN env var first (override without editing
-    source), else the hardcoded read-only constant."""
-    return os.environ.get("HF_TOKEN") or HF_READONLY_TOKEN
+def _hf_token() -> str | None:
+    """Read the HF token from the gitignored .env (HF_TOKEN); None -> anonymous."""
+    return os.environ.get("HF_TOKEN") or None
 
 
 def _hf_headers() -> dict[str, str]:
-    """Authorization header when a real token is present (the hardcoded constant
-    or an HF_TOKEN override). If the token is the placeholder sentinel, return {}
-    so the request goes out anonymously — the placeholder must never be sent as a
-    bearer (it would 401 instead of falling back to anonymous)."""
+    """Authorization header when HF_TOKEN is set; otherwise {} (anonymous)."""
     token = _hf_token()
-    if token and token != _PLACEHOLDER_TOKEN:
-        return {"Authorization": f"Bearer {token}"}
-    return {}
+    return {"Authorization": f"Bearer {token}"} if token else {}
 
 
 class HFPapersSource:

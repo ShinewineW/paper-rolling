@@ -99,6 +99,12 @@ Delete `config/llm.yaml` to route everything to `claude -p`.
 
 ## Non-obvious invariants (will bite you otherwise)
 
+- **No hardcoded secrets — every token comes from the gitignored `.env`.** All API
+  tokens/keys (`OPENCODE_API_KEY`, `HELLOROBOTAXI_API_KEY`, `HF_TOKEN`) are read
+  from `.env`; source carries none. The former hardcoded HF token (D-发现-4
+  exemption) was auto-revoked by Hugging Face the moment it hit public git history
+  — it now lives only in `.env` (unset `HF_TOKEN` → anonymous HF). Reintroducing a
+  hardcoded token is a regression; this is the standing project convention.
 - **Vault-key authority is `scripts/output/naming.py` ONLY.** Do not add ad-hoc
   naming helpers elsewhere — the divergent duplicates that lived in `paths.py` and
   `ledger/naming.py` were deliberately removed.

@@ -20,7 +20,7 @@ discover(topic, llm=seams["expand_llm"], force_include, ...)
     │      ├─ OpenAlex (polite pool + venue signal)
     │      ├─ Semantic Scholar (venue, year, author)
     │      ├─ arXiv (category-restricted)
-    │      ├─ HF Papers (hardcoded read-only token)
+    │      ├─ HF Papers (read-only token from .env; unset → anonymous)
     │      └─ force_include papers (prepended, authority-bypassed)
     │
     ├─ 3. Cross-source dedup + field merge
@@ -348,20 +348,17 @@ def hf_papers_fetch(
     n: int = 50,
 ) → list[dict]:
     """Fetch from Hugging Face Papers (model/dataset research).
-    
-    Uses a HARDCODED READ-ONLY HF token (owner exemption, D-发现-4).
-    This is an exceptional case where a secret is hardcoded due to
-    self-contained distribution; the token is read-only + scoped to
-    public metadata queries only.
+
+    The READ-ONLY HF token is read ONLY from the gitignored .env
+    (HF_TOKEN), surfaced into os.environ by llm.load_dotenv at
+    composition time. NOTHING is hardcoded (D-发现-4) — an earlier
+    shipped constant was auto-revoked by HF once it hit public git
+    history. Unset HF_TOKEN -> anonymous (lower rate).
     """
-    
-    HF_READONLY_TOKEN = "hf_readonly_XXXXXX..."  # hardcoded, read-only scope
-    
-    headers = {"Authorization": f"Bearer {HF_READONLY_TOKEN}"}
-    
-    # Check env override (optional)
-    if os.getenv("HF_TOKEN"):
-        headers["Authorization"] = f"Bearer {os.getenv('HF_TOKEN')}"
+
+    # Token from .env only; unset -> anonymous (no Authorization header)
+    token = os.getenv("HF_TOKEN")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
     
     params = {
         "query": query,
@@ -393,9 +390,9 @@ def hf_papers_fetch(
 ```
 
 **关键特性**：
-- **Hardcoded read-only token**: 例外情况（owner exemption）
-- **Env override**: `HF_TOKEN` env 可覆盖（无需编辑源）
-- **Scope**: 仅公开元数据（无私有 repo 访问）
+- **Token 仅来自 `.env`**: `HF_TOKEN`（gitignored），源码零硬编码
+- **Unset → 匿名**: 无 `HF_TOKEN` 时不发 Authorization 头，HF search 仍可用（限速更低）
+- **Scope**: 只读，仅公开元数据（无私有 repo 访问）
 
 ---
 
@@ -628,7 +625,7 @@ def build_http(
 | `CITATION_THRESHOLD` | 50 | 至少 50 次引用 = S1 authority signal |
 | `RECENCY_THRESHOLD_MONTHS` | 12 | 最近 12 个月内发表 = S4 signal |
 | `_MD_CHAR_CAP` | 200k | query_expand seam 输入 cap |
-| `HF_READONLY_TOKEN` | hardcoded | Read-only Hugging Face token（owner exemption） |
+| `HF_TOKEN` (env) | `.env` only | Read-only Hugging Face token；源码零硬编码，unset → 匿名 |
 
 ---
 
