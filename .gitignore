@@ -60,3 +60,7 @@ _ledger/.lock
 
 # macOS 噪声
 .DS_Store
+
+# 失败现场=本地诊断 scratch，不是产物（ADR-0007）。保留 .gitkeep 占位。
+/_failed/*
+!/_failed/.gitkeep
