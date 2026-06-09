@@ -25,7 +25,7 @@ from typing import Any
 
 from scripts.output.ara_schema import validate_ara_tree
 from scripts.output.branch1_llm import write_branch1_llm
-from scripts.output.branch1_report import write_branch1
+from scripts.output.branch1_report import AnchorGateError, write_branch1
 from scripts.output.branch2_ara import write_branch2
 from scripts.output.naming import find_existing_entries, vault_key
 
@@ -42,13 +42,30 @@ class ProduceResult:
 class ProduceGateBlocked(Exception):
     """G2 hard-blocked the staged branch2 BEFORE branch1/promotion (OT-5 holds).
 
-    Carries the blocking verdict so the spoke can record the reason; nothing has
-    reached either real vault when this is raised.
+    Carries the blocking verdict so the spoke can record the reason, and the
+    staged dir (parent of `ai/`) so the spoke can preserve the failure scene
+    instead of letting `finally` delete the staged branch2 products (audit F).
     """
 
-    def __init__(self, verdict: Any) -> None:
+    def __init__(self, verdict: Any, *, staged_dir: Path | None = None) -> None:
         self.verdict = verdict
+        self.staged_dir = staged_dir
         super().__init__("branch2 hard-blocked by the G2 data-fidelity gate")
+
+
+class StructuralSealFailed(Exception):
+    """branch2 failed the Seal-1 structural validator BEFORE branch1/promotion.
+
+    Replaces the former bare ValueError (audit F / R1 Finding 1): carries the
+    structural errors + the staged dir (parent of `ai/`) so the spoke can
+    preserve the failure scene rather than let `finally` delete it. The failure
+    root is branch2 → revival re-runs the whole branch2 chain.
+    """
+
+    def __init__(self, errors: list[str], *, staged_dir: Path | None = None) -> None:
+        self.errors = errors
+        self.staged_dir = staged_dir
+        super().__init__(f"branch2 failed Seal-1: {'; '.join(errors[:5])}")
 
 
 class SpokeCancelled(Exception):
@@ -136,6 +153,8 @@ def produce_outputs(
 
     Raises:
         ProduceGateBlocked: G2 hard-blocked the staged branch2 (nothing promoted).
+        StructuralSealFailed: branch2 failed the Seal-1 structural validator.
+        AnchorGateError: branch1's three-layer anchor lint hard-failed.
         Exception: Any other failure aborts BEFORE either vault is touched (OT-5).
     """
     root = (root or Path.cwd()).resolve()
@@ -152,6 +171,10 @@ def produce_outputs(
 
     # Stage everything in a temp dir; promote only after both gates pass.
     staging = Path(tempfile.mkdtemp(prefix="paper-rolling-stage-"))
+    # audit F: when a gate hard-fails, the exception carries `staging` so the spoke
+    # can preserve it as a failure scene; `handed_off` then tells `finally` NOT to
+    # delete it. Success / SpokeCancelled keep it False → staging is cleaned up.
+    handed_off = False
     try:
         stage_ai = staging / "ai" / "ara"
         stage_person = staging / "person"
@@ -159,7 +182,8 @@ def produce_outputs(
 
         ara_errors = validate_ara_tree(stage_ai)
         if ara_errors:
-            raise ValueError(f"branch2 failed Seal-1: {'; '.join(ara_errors[:5])}")
+            handed_off = True
+            raise StructuralSealFailed(ara_errors, staged_dir=staging)
 
         # G2 (after branch2, before branch1): adversarial data-fidelity gate on
         # the staged ARA evidence. A hard block aborts BEFORE branch1 and any
@@ -167,7 +191,8 @@ def produce_outputs(
         if g2_gate is not None:
             verdict = g2_gate(staging / "ai")  # staged ai ENTRY dir (parent of ara/)
             if verdict.blocked:
-                raise ProduceGateBlocked(verdict)
+                handed_off = True
+                raise ProduceGateBlocked(verdict, staged_dir=staging)
             # Tolerant mode: G2 returned non-blocking (advisory) data-fidelity
             # findings. The paper is kept, but the tolerated numbers are MARKED in
             # the pack so the miss is visible downstream rather than silently
@@ -181,10 +206,20 @@ def produce_outputs(
         # With a `write_report` seam, the human report is LLM-written (vivid
         # Chinese sections + grounded assembly); else the deterministic thin
         # renderer. Both pass the SAME three-layer anchor hard-gate.
-        if write_report is not None:
-            write_branch1_llm(stage_person, candidate, stage_ai, md_path, write_report, key=key)
-        else:
-            write_branch1(stage_person, candidate, stage_ai, md_path, analysis, key=key)
+        # AnchorGateError (an unanchored empirical claim) is a branch1 failure
+        # whose staged products (ai/ + partial person/) must survive for the
+        # scene. It carries no path of its own, so attach `staging` and hand off.
+        # (audit R4 Finding 1: in Chunk 4.3 this wrap migrates into stage_branch1,
+        # which G3 branch1 re-emit & revival call directly, bypassing this try.)
+        try:
+            if write_report is not None:
+                write_branch1_llm(stage_person, candidate, stage_ai, md_path, write_report, key=key)
+            else:
+                write_branch1(stage_person, candidate, stage_ai, md_path, analysis, key=key)
+        except AnchorGateError as exc:
+            handed_off = True
+            exc.staged_dir = staging
+            raise
 
         # B2 / Codex R17: last safe point before any real-vault write. If the
         # per-paper guard already abandoned this spoke (stall budget exceeded), a
@@ -248,4 +283,8 @@ def produce_outputs(
             raise SpokeCancelled("spoke cancelled after vault promotion (stall budget exceeded)")
         return ProduceResult(key=key, person_path=person_dest, ai_path=ai_dest)
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        # audit F: a gate that handed `staging` off to the spoke (as a failure
+        # scene) must NOT have it deleted here. Success and SpokeCancelled both
+        # keep handed_off False, so staging is still cleaned on those paths.
+        if not handed_off:
+            shutil.rmtree(staging, ignore_errors=True)
