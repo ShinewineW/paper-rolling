@@ -54,3 +54,6 @@ _ledger/.lock
 # NOTE: .claude/settings.json IS tracked on purpose (shared project permissions).
 .claude/settings.local.json
 .mcp.json
+
+# claude-mem project memory (per-machine SQLite state; not a product)
+.claude/mem.db*
