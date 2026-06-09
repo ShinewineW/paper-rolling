@@ -1,3 +1,12 @@
 # Code Reference
 
-**No public repository** — closed-source paper; code locations unavailable.
+- **Repository**: https://github.com/bravegroup/drive-wm
+- **Pinned commit**: `eabe3c63bf362a2edf0fb6cbcb908424d2e18980`
+- **Source**: pwc-official (official-flagged)
+- **Reproduce**: re-clone at the pinned commit; this workspace keeps no runnable copy.
+
+## Innovation → code location
+
+| Innovation | Location (`file:line`) |
+|---|---|
+| 2311.17918 | README.md:7 |

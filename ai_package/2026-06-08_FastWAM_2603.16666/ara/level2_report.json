@@ -4,123 +4,82 @@
   "prerequisite": "Level 1 passed",
   "overall": {
     "grade": "Strong Accept",
-    "mean_score": 4.5,
+    "mean_score": 4.83,
     "passes_seal2": true
   },
   "dimensions": {
     "D1_evidence_relevance": {
       "score": 5,
       "strengths": [
-        "Every claim is directly linked to specific controlled experiments (E1–E3) that manipulate the factors of interest (video co-training vs. test-time imagination) in a type-appropriate causal ablation design.",
-        "Improvement and descriptive claims are evaluated against relevant baselines and latency measurements, respectively, matching their evidentiary requirements.",
-        "The experiments cover both simulation (LIBERO, RoboTwin) and real-world deployment, providing convergent evidence."
+        "Evidence perfectly matches the claim types: causal claims (C1, C4) are supported by rigorous ablation studies (E1, E2, E3) that cleanly isolate training objectives from inference mechanisms.",
+        "Improvement and descriptive claims (C2, C3) are backed by highly appropriate baseline comparisons (with/without embodied pre-training) and direct latency measurements."
       ],
-      "weaknesses": [
-        "The evidence is drawn from a single model architecture (MoT with Wan2.2-5B); relevance to other WAM designs is not directly tested, though this is more a scope concern."
-      ],
-      "suggestions": [
-        "To further strengthen relevance, a follow-up could replicate the key ablation on a different WAM backbone (e.g., a UNet-based video model) to show the finding is not architecture-specific."
-      ]
+      "weaknesses": [],
+      "suggestions": []
     },
     "D2_falsifiability": {
-      "score": 4,
+      "score": 5,
       "strengths": [
-        "All four claims include explicit, actionable falsification criteria that specify which comparisons would invalidate each claim.",
-        "The criteria are non-trivial and scope-matched, referencing the same benchmarks and variants as the positive claims.",
-        "Criteria for C4 provide a clear inequality (gap between Fast-WAM and imagine-then-execute variants < gap to no-co-training variant) that can be tested directly."
+        "Falsification criteria are highly specific, quantitative, and directly testable.",
+        "Criteria explicitly define the exact conditions under which each claim would fail (e.g., C4 fails if the performance gap between Fast-WAM and imagine-then-execute variants exceeds the gap with the no-video-co-training variant)."
       ],
-      "weaknesses": [
-        "Several criteria use the term '显著' (significant) without a pre-registered quantitative threshold or statistical test, leaving room for subjective judgment.",
-        "The falsification for C2 relies on 'significantly lower' success rates, but no non-inferiority margin is defined."
-      ],
-      "suggestions": [
-        "Augment falsification statements with precise effect-size thresholds or statistical decision rules (e.g., '>5% absolute drop' or 'p>0.05 in a non-inferiority test') to make them fully objective."
-      ]
+      "weaknesses": [],
+      "suggestions": []
     },
     "D3_scope_calibration": {
-      "score": 4,
+      "score": 5,
       "strengths": [
-        "Claims are carefully scoped to the specific benchmarks (LIBERO, RoboTwin, real-world towel folding) and the tested model variants.",
-        "Assumptions are explicitly listed (e.g., structured attention mask fully decouples factors; single forward pass of DiT is sufficient), clarifying the conditions under which the conclusions hold.",
-        "The paper's title itself is phrased as a question, framing the work more as a hypothesis test than a universal declaration."
+        "Claims are precisely bounded to the evaluated benchmarks (LIBERO, RoboTwin, real-world towel folding) and explicitly state the 'no embodied pre-training' condition.",
+        "Assumptions are clearly articulated in the problem specification, and concept definitions include explicit boundary conditions."
       ],
-      "weaknesses": [
-        "The central claim (C1) states that video co-training is the primary performance source 'in WAMs,' which generalizes beyond the single MoT-based architecture and specific video DiT tested; this over-claiming is not fully hedged in the main statement.",
-        "Generalization to domains with very different dynamics (e.g., navigation, non-manipulation tasks) is not discussed."
-      ],
+      "weaknesses": [],
       "suggestions": [
-        "Qualify C1 and C2 to explicitly state that the conclusion is drawn for the Fast-WAM architecture and the tested task distributions; note that other WAM designs may couple training and inference differently."
+        "Consider discussing the boundary conditions for the assumption that 'blocking action tokens from attending to future video tokens does not substantially harm action prediction quality', specifically regarding highly complex, long-horizon tasks where explicit future lookahead might become strictly necessary."
       ]
     },
     "D4_argument_coherence": {
       "score": 5,
       "strengths": [
-        "The argument follows a clear arc: observations about existing WAM latency and factor entanglement → identified gaps (G1, G2) → key insight that training signal is the main driver → solution design (Fast-WAM) → four testable claims → controlled experiments (E1–E3).",
-        "The exploration tree (trace) mirrors this logic, showing how the core question leads to a decision, experiments, and a pivot.",
-        "All identified gaps are directly addressed by the experimental design; there is no missing link between problem and evaluation."
+        "The logical arc from Observations to Gaps, Insight, Solution, Claims, and Evidence is seamless and highly coherent.",
+        "Every identified gap (G1: attribution of WAM gains, G2: high inference latency) is directly addressed by the core insight and subsequently validated by specific, well-designed experiments."
       ],
-      "weaknesses": [
-        "The assumption that the structured attention mask fully decouples training from inference-time video generation is stated but not independently verified (e.g., by analyzing whether information leaks through the shared video DiT weights).",
-        "The solution architecture description relies on the reader being familiar with the specific video DiT; a more self-contained presentation could close this minor gap."
-      ],
-      "suggestions": [
-        "Include a short empirical verification, such as an attention map analysis or a small ablation with a deliberately 'leaky' mask, to confirm the decoupling works as intended."
-      ]
+      "weaknesses": [],
+      "suggestions": []
     },
     "D5_exploration_integrity": {
       "score": 5,
       "strengths": [
-        "The exploration tree includes a genuine dead-end (DEAD1) where the hypothesis 'test-time imagination is the main performance gain' is explicitly tested and falsified by the controlled experiments.",
-        "The decision node (D1) honestly presents multiple alternative variants (Joint, IDM, w.o. video co-train) that were implemented and compared, demonstrating that the final design emerged from empirical elimination.",
-        "The pivot (P1) correctly captures the shift from the imagine-then-execute paradigm to a direct policy interface, and the recorded lessons align with the experimental outcomes."
+        "The exploration tree faithfully captures the research process, including a genuine dead-end (DEAD1) where the initial hypothesis about test-time imagination being the primary driver was falsified by controlled experiments.",
+        "Decision rationale (D1) clearly outlines the considered alternatives (Joint, IDM, no co-training) which are subsequently tested, demonstrating rigorous experimental design rather than post-hoc rationalization."
       ],
-      "weaknesses": [
-        "The tree is relatively streamlined; it does not document other potential dead-ends (e.g., attempts at partial test-time imagination, or different token grouping strategies) that may have been explored.",
-        "The dead-end hypothesis is arguably the paper's main rival, so its inclusion is somewhat expected—additional, less obvious dead-ends would show richer exploration."
-      ],
-      "suggestions": [
-        "Consider expanding the tree with more granular entries, such as failed architectures or hyperparameter settings that were attempted before settling on the MoT design, to more fully convey the research process."
-      ]
+      "weaknesses": [],
+      "suggestions": []
     },
     "D6_methodological_rigor": {
       "score": 4,
       "strengths": [
-        "The ablation design is comprehensive, separately removing video co-training and test-time imagination to isolate their contributions within the same architecture.",
-        "Baselines include a range of competitive models (π0.5, Motus, LingBot-VA) and both pretrained and non-pretrained variants, enabling fair comparison.",
-        "Reproducibility is supported by providing a pinned code repository with file:line map, model details (parameter counts, hardware), and training steps.",
-        "Multiple evaluation suites and a real-world experiment strengthen the robustness of the findings."
+        "Comprehensive and strong baselines, carefully distinguishing between methods with and without embodied pre-training to ensure fair comparison.",
+        "Excellent ablation coverage that perfectly isolates the variables of interest (training objective vs. inference mechanism).",
+        "Detailed reproducibility information including hardware, dataset sizes, training steps, and architectural hyperparameters."
       ],
       "weaknesses": [
-        "Statistical reporting lacks measures of variability (e.g., confidence intervals, standard deviations) for success rates, making it difficult to assess the significance of small performance differences.",
-        "There is no explicit significance test to substantiate claims that differences between Fast-WAM and imagine-then-execute variants are 'much smaller' than the drop from removing video co-training.",
-        "Details on how baselines were tuned or whether they were re-trained under identical conditions are not provided, which could affect the fairness of comparisons."
+        "Statistical reporting is limited to mean success rates; standard deviations, confidence intervals, or variance metrics are absent despite the high variance typically inherent in robotic manipulation and diffusion model tasks."
       ],
       "suggestions": [
-        "Report 95% confidence intervals or standard errors for all success rates, and apply a statistical test (e.g., Fisher's exact test or bootstrapping) when comparing the ablation gaps.",
-        "Include a brief description of baseline optimization procedures, or note which results come from original papers vs. re-implementation."
+        "Include standard deviations or confidence intervals across multiple random seeds in the result tables to establish statistical significance, especially for the marginal performance differences between Fast-WAM and its imagine-then-execute variants."
       ]
     }
   },
   "findings": [
     {
-      "dimension": "D3_scope_calibration",
-      "severity": "major",
-      "observation": "Claim C1 asserts that video co-training is the primary performance source 'in WAMs' without explicit restriction to the tested MoT architecture. Since all evidence comes from a single WAM design, the universal scope may over-claim the finding."
-    },
-    {
       "dimension": "D6_methodological_rigor",
       "severity": "minor",
-      "observation": "No standard deviations, confidence intervals, or formal significance tests are reported for the success rates. This makes it difficult to evaluate whether the small performance gaps between Fast-WAM and its imagine-then-execute variants are statistically indistinguishable."
+      "observation": "The experiments report only mean success rates across multiple trials (e.g., 100 trials per task, 2000 total trials) but omit standard deviations or confidence intervals. Given the stochastic nature of robotic control and diffusion models, statistical variance reporting is necessary to confirm that the marginal performance differences between Fast-WAM and imagine-then-execute variants are not due to random seed variance."
     },
     {
-      "dimension": "D2_falsifiability",
-      "severity": "minor",
-      "observation": "Falsification criteria for C1, C2, and C3 rely on subjective judgments of 'significant' performance differences without a pre-defined quantitative threshold, reducing the objectivity of potential falsification."
-    },
-    {
-      "dimension": "D4_argument_coherence",
+      "dimension": "D3_scope_calibration",
       "severity": "suggestion",
-      "observation": "The assumption that the structured attention mask achieves full decoupling is not empirically verified; a small validation step (e.g., checking information flow) would close this logical loop."
+      "observation": "While assumptions are well-listed, the assumption that 'blocking action tokens from future video tokens does not harm performance' lacks a discussion on its failure modes. The scope could be further calibrated by explicitly stating the complexity limits (e.g., horizon length or spatial reasoning depth) beyond which test-time explicit imagination might become strictly necessary."
     }
   ]
 }

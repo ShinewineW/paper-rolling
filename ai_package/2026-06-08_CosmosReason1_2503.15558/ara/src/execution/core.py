@@ -1,3 +1,8 @@
+# ⚠️ RECONSTRUCTED STUB — NOT the official implementation.
+# A minimal runnable reconstruction inferred from the paper text, for ARA
+# tracing only. For the authoritative code (repo + pinned SHA + file:line),
+# see ../code_ref.md. Do not cite this as the paper's real implementation.
+
 # Cosmos-Reason1 RL训练核心循环概念草图
 import torch
 

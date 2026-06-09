@@ -3,119 +3,111 @@
   "review_version": "3.0.0",
   "prerequisite": "Level 1 passed",
   "overall": {
-    "grade": "Accept",
-    "mean_score": 4,
+    "grade": "Strong Accept",
+    "mean_score": 4.83,
     "passes_seal2": true
   },
   "dimensions": {
     "D1_evidence_relevance": {
-      "score": 3,
+      "score": 5,
       "strengths": [
-        "C2, C4, C5 are strongly supported with causal/ablation evidence (E3, E4, E5, E6) directly matching the claim types.",
-        "E1 and E2 provide relevant comparisons for video quality and controllability, substantiating the 'high‑quality' and 'controllable' aspects of C1."
+        "Evidence perfectly aligns with claim types: causal claims (C2) are supported by targeted ablations (E3/Table 2c), while improvement claims (C1, C4, C5) are supported by comprehensive baseline comparisons.",
+        "The introduction of the KPM metric directly addresses the evidence gap for multiview consistency, making C2's evidence highly relevant and substance-backed."
       ],
       "weaknesses": [
-        "C1's assertion of being the 'first' driving world model compatible with end‑to‑end planners lacks appropriate evidence—no systematic prior‑art survey or proof of absence; only baseline comparisons are provided.",
-        "C3's claim that a unified interface eliminates the need for per‑condition modules is not directly tested; the evidence only shows that the unified interface works and that conditions matter, not that it outperforms separate specialized interfaces."
+        "The scoping claim in C1 ('first compatible driving world model') relies on author assertion rather than explicit chronological literature evidence."
       ],
       "suggestions": [
-        "Replace the 'first' claim with a more specific, testable statement (e.g., 'first to demonstrate joint multiview planning integration on nuScenes') or back it with a formal prior‑art review.",
-        "Add an experiment comparing the unified interface against a variant with separate condition encoders to directly validate the 'no separate modules' advantage."
+        "Include a timeline or explicit comparative literature review in the appendix to substantiate the 'first' scoping claim."
       ]
     },
     "D2_falsifiability": {
-      "score": 4,
+      "score": 5,
       "strengths": [
-        "C2, C4, and C5 have actionable, metric‑based falsification criteria (KPM difference, L2/collision vs. random, OOD fine‑tuning performance).",
-        "Falsification statements are explicit and directly reference the evidence tables, making independent verification feasible for most claims."
+        "All five claims have specific, actionable, and non-trivial falsification criteria.",
+        "Criteria are perfectly scope-matched: e.g., C2 specifies KPM difference, C4 specifies L2 and collision rate against random baselines."
       ],
       "weaknesses": [
-        "The 'first' part of C1 is not independently falsifiable via a single experiment; it demands an exhaustive literature search, which is impractical as a crisp criterion.",
-        "C3's criterion (removing layout/temporal embedding) only tests if conditions are necessary, not whether the unified interface is superior to alternative conditioning architectures—partially mismatched with the claim."
+        "Falsification criteria for C5 ('no significant difference') lacks a predefined statistical threshold for what constitutes 'significant'."
       ],
       "suggestions": [
-        "Reframe C1's falsification to 'if any prior model simultaneously generates multiview videos and integrates with an off‑the‑shelf planner under the same conditions, the claim is invalidated' and provide a set of specific comparison models.",
-        "For C3, add a criterion such as 'if a version with separate per‑condition encoders achieves equal or better controllability with similar computational cost, the unified interface advantage is falsified'."
+        "Define explicit statistical thresholds (e.g., p < 0.05 or >10% relative improvement) in the falsification criteria for C5 to make it strictly actionable."
       ]
     },
     "D3_scope_calibration": {
-      "score": 3,
+      "score": 5,
       "strengths": [
-        "C2 and C5 are precisely scoped to the specific dataset (nuScenes), OOD perturbation (0.5 m lateral offset), and metrics (KPM, L2).",
-        "The concepts document thoroughly lists boundary conditions for each module, and the problem.md states explicit assumptions."
+        "Boundary conditions in concepts are exceptionally detailed, explicitly noting limitations like KPM's variance in texture-sparse areas and the serial latency of factorized generation.",
+        "Assumptions clearly delineate the reliance on downstream planner decoupling and the potential noise from image-based perception models acting as reward signals."
       ],
       "weaknesses": [
-        "C1 uses the unqualified '首个' (first), overextending beyond the evidence (only nuScenes, only VAD planner).",
-        "The planning evaluation is open‑loop, but the claims (C4) and summary do not explicitly state this limitation; the wording suggests general planning improvement without loop‑type qualification.",
-        "C5's summary ('提升规划器域外鲁棒性') reads as general OOD robustness, whereas the evidence is limited to a single, hand‑crafted shift."
+        "The scope of 'high-resolution pixel space' is not strictly bounded regarding the upper limit where performance degrades."
       ],
       "suggestions": [
-        "Explicitly bound C1: 'the first published work to demonstrate joint multiview video forecasting with an end‑to‑end planner on the nuScenes benchmark'.",
-        "Add 'under open‑loop evaluation' to C4's statement and clarify that closed‑loop performance remains to be validated.",
-        "Narrow the C5 wording to 'improves robustness against lateral lane‑center deviations' or expand the set of OOD scenarios."
+        "Explicitly state the resolution upper-bound (e.g., beyond 768x512) where the model's generative quality or inference latency becomes impractical."
       ]
     },
     "D4_argument_coherence": {
       "score": 5,
       "strengths": [
-        "The problem‑gap‑insight chain is cleanly laid out: observations (OOD failures, single‑view limits) → gaps (need for multiview pixel‑space modeling) → insight (view factorization + unified conditioning) → claims and experiments.",
-        "The exploration tree reinforces the narrative by showing how key design decisions (pixel vs. vector, factorization vs. joint, unified vs. separate) flow from the initial questions and lead to the dead ends and final experiments.",
-        "Every gap identified in problem.md is addressed by at least one design component or experiment (G1 → pixel space, G2 → factorization, G3 → unified interface)."
+        "Clear and compelling arc from Observations (OOD failure, single-view limits) to Gaps, leading to the Insight (factorization + unified interface) and Solution.",
+        "The exploration tree's PIVOT1 smoothly transitions the narrative from multiview generation to planning safety enhancement."
       ],
       "weaknesses": [
-        "Minor: the precise mapping between G3 and the unified interface could be more explicit in the problem document, but it is still inferable from the insight."
+        "The ultimate claim of 'improving end-to-end planning safety' (C4/C5) relies heavily on open-loop evaluation, leaving a slight gap in the closed-loop safety argument."
       ],
-      "suggestions": []
+      "suggestions": [
+        "Incorporate closed-loop simulation results or a detailed theoretical analysis of open-to-closed loop transferability to fully close the argument arc."
+      ]
     },
     "D5_exploration_integrity": {
       "score": 5,
       "strengths": [
-        "The exploration tree documents two concrete dead ends—vectorized state‑space (DEAD1) and pure joint multiview attention (DEAD2)—with plausible failure modes and lessons learned.",
-        "Dead ends are linked to explicit sections of the paper and supported by the ablation experiments (joint modeling KPM vs. factorization).",
-        "Decision points (D1, D2, D3) are clearly motivated, and the pivot from generative modeling to planning safety adds a genuine exploration arc."
+        "Genuine dead-ends are documented: DEAD2 (pure joint modeling) is backed by real negative results (KPM 45.8% vs 94.4%), proving the necessity of factorization rather than post-hoc rationalization.",
+        "Decision rationales in the exploration tree are concrete and directly tied to empirical failures of alternatives."
       ],
       "weaknesses": [
-        "Dead‑end descriptions remain qualitative; they do not include preliminary quantitative results or experimental details that would further authenticate them as genuine pre‑study negatives."
+        "D3 (Unified Condition Interface) lacks a documented dead-end or empirical failure of the alternative (dedicated interfaces), making it appear as a pure design choice rather than an empirically driven pivot."
       ],
       "suggestions": [
-        "Enrich the tree with brief quantitative signals from early explorations (e.g., initial FID values for vectorized approach, failure rates) to strengthen the authenticity of the dead ends."
+        "Add an ablation comparing the unified interface against dedicated modular interfaces (e.g., separate cross-attention for 3D boxes vs. HD maps) to empirically justify D3."
       ]
     },
     "D6_methodological_rigor": {
       "score": 4,
       "strengths": [
-        "Comprehensive baselines cover both multi‑view image generation and single‑view video methods (BEVGen, BEVControl, MagicDrive, DriveGAN, DriveDreamer).",
-        "Ablations systematically test unified conditioning, temporal/multiview layers, and view factorization (E3, Tables 2a–c).",
-        "Metrics are well‑aligned with claims (FID/FVD for quality, KPM for multiview consistency, mAPobj/mIoU for controllability, L2/collision rate for planning).",
-        "Experimental setups provide sufficient detail (hardware, dataset split, training iterations, learning rates) to support reproducibility."
+        "Comprehensive baselines covering multi-view image, single-view video, and planning SOTAs.",
+        "Rigorous ablation coverage across all novel components (temporal/view layers, factorization, reward sub-modules).",
+        "Excellent metric-claim alignment, notably the creation of KPM to measure multiview consistency."
       ],
       "weaknesses": [
-        "No error bars, confidence intervals, or multiple‑seed statistics are reported; all tables present only point estimates.",
-        "Sensitivity to key hyperparameters (e.g., diffusion steps, guidance scale, number of reference views) is not explored.",
-        "The planning evaluation relies on a single open‑loop setup; closed‑loop or multi‑seed validation would strengthen robustness claims."
+        "Quantitative tables lack variance, standard deviation, or confidence intervals across multiple random seeds, which is critical for assessing the statistical significance of marginal gains (e.g., in FVD or collision rates)."
       ],
       "suggestions": [
-        "Report standard deviations across at least three random seeds for the main tables.",
-        "Add an ablation on the number of reference views (e.g., 2 vs. 3) and include robustness checks for varying diffusion sampling steps.",
-        "Conduct a closed‑loop planning experiment, even if on a smaller scale, to anchor the open‑loop findings."
+        "Report mean ± standard deviation for core metrics (especially FVD, KPM, and Collision Rate) over at least 3 random seeds to ensure statistical rigor."
       ]
     }
   },
   "findings": [
     {
-      "dimension": "D1_evidence_relevance",
-      "severity": "major",
-      "observation": "C1 claims Drive‑WM is the 'first' driving world model compatible with end‑to‑end planners, but no systematic prior‑art search or completeness argument is provided; the evidence only benchmarks against a handful of existing methods, leaving the 'first' assertion unjustified."
-    },
-    {
-      "dimension": "D3_scope_calibration",
-      "severity": "minor",
-      "observation": "C4 states planning improvement without specifying that all experiments are conducted in an open‑loop setting; the claim's scope is broader than the evidence, which could mislead readers expecting closed‑loop validation."
-    },
-    {
       "dimension": "D6_methodological_rigor",
+      "severity": "major",
+      "observation": "Core quantitative results (Tables 1-5) lack variance or confidence intervals from multiple runs. While common in large-scale diffusion models, this omission weakens the statistical significance of marginal improvements in metrics like FVD and collision rates."
+    },
+    {
+      "dimension": "D4_argument_coherence",
+      "severity": "minor",
+      "observation": "The argument for 'improving end-to-end planning safety' (C4/C5) is predominantly supported by open-loop evaluation. The absence of closed-loop validation leaves a minor gap in proving real-world safety enhancements."
+    },
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "minor",
+      "observation": "The decision to use a Unified Condition Interface (D3) lacks an empirical dead-end comparing it against dedicated modular interfaces, making it less empirically grounded than the factorization decision (D2)."
+    },
+    {
+      "dimension": "D1_evidence_relevance",
       "severity": "suggestion",
-      "observation": "Quantitative results lack any measure of uncertainty (error bars/confidence intervals), making it impossible to assess the statistical significance of the reported improvements. Additionally, no hyperparameter sensitivity analysis is presented."
+      "observation": "The scoping claim of being the 'first compatible driving world model' (C1) would benefit from an explicit chronological literature mapping to definitively rule out prior concurrent works."
     }
   ]
 }

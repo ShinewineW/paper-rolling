@@ -1,3 +1,8 @@
+# ⚠️ RECONSTRUCTED STUB — NOT the official implementation.
+# A minimal runnable reconstruction inferred from the paper text, for ARA
+# tracing only. For the authoritative code (repo + pinned SHA + file:line),
+# see ../code_ref.md. Do not cite this as the paper's real implementation.
+
 import torch
 
 def fast_wam_infer(obs_frame, lang_text, model, num_steps=10, H=32):

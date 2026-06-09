@@ -1,3 +1,8 @@
+# ⚠️ RECONSTRUCTED STUB — NOT the official implementation.
+# A minimal runnable reconstruction inferred from the paper text, for ARA
+# tracing only. For the authoritative code (repo + pinned SHA + file:line),
+# see ../code_ref.md. Do not cite this as the paper's real implementation.
+
 # env, rnn, vae 为全局变量（来自论文 Section 2.4 伪代码原文）
 def rollout(controller):
     obs = env.reset()

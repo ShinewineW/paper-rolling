@@ -1,3 +1,8 @@
+# ⚠️ RECONSTRUCTED STUB — NOT the official implementation.
+# A minimal runnable reconstruction inferred from the paper text, for ARA
+# tracing only. For the authoritative code (repo + pinned SHA + file:line),
+# see ../code_ref.md. Do not cite this as the paper's real implementation.
+
 import torch
 
 def build_condition(img_emb, layout_emb, text_emb, action_emb):

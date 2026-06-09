@@ -3,189 +3,118 @@
   "review_version": "3.0.0",
   "prerequisite": "Level 1 passed",
   "overall": {
-    "grade": "Weak Accept",
-    "mean_score": 3,
+    "grade": "Strong Accept",
+    "mean_score": 4.67,
     "passes_seal2": true
   },
   "dimensions": {
     "D1_evidence_relevance": {
-      "score": 3,
+      "score": 4,
       "strengths": [
-        "E1 correctly deploys ablation-style comparison (4 single-modal baselines) for improvement claims C1 and C5 — type-appropriate for causal/improvement tags",
-        "E2 varies foreground Vis weight across three discrete levels (0, 0.333, 0.5) and measures Pearson correlation, which is methodologically appropriate for the causal tag on C2",
-        "E5 measures scaling behaviour over six GPU counts (1→64), providing the right kind of evidence for a descriptive/measurement claim like C4",
-        "E4 uses independent downstream evaluation tools (StreamPetr, grounded SAM2) rather than the generating model's own metrics, reducing self-referential bias for C6"
+        "大多数 claim (C1, C2, C4, C5, C6, C7) 都有高度匹配的实验证据支持。",
+        "C2 的因果主张通过 E2 的权重消融和 Pearson 相关性分析得到了类型恰当（causal->ablation）的完美验证。",
+        "C5 的 descriptive/generalization 主张通过 E1 中不同模态的 Diversity LPIPS 对比得到了合理归纳。"
       ],
       "weaknesses": [
-        "C3 asserts 'per-modality independent training is superior to joint training' and cites E1 and E3 as proof — neither experiment involves a joint-training baseline; the claim is supported only by engineering argument, not empirical comparison",
-        "C2 is tagged 'causal' but the Pearson correlation evidence in E2 is associative, not causal; no counterfactual (ablating only weight while holding all else fixed) is demonstrated beyond the three discrete weight levels",
-        "C5's generalization tag implies transfer beyond the 120-video kitchen-scene corpus, but no out-of-distribution evaluation is cited"
+        "C3 主张独立训练在内存和灵活性上更优，但其证据 basis 引用了 E1（TransferBench 质量对比），E1 并未包含任何关于显存占用或推理灵活性的定量测量，属于证据与 claim 不匹配。"
       ],
       "suggestions": [
-        "Add a joint-training baseline to E1/E3, or explicitly retag C3 as 'engineering-scoped' and remove the empirical superiority claim",
-        "For C2, strengthen from correlation to causal evidence by including an intervention experiment that holds SalientObject segmentation fixed while varying only weights",
-        "For C5, either restrict the generalization tag or add a held-out scene category to demonstrate transfer"
+        "为 C3 补充独立的工程 profiling 实验（如对比联合训练与独立训练的 peak memory 和吞吐量），或将其 status 明确降级为纯架构设计动机，并移除对 E1 的引用。"
       ]
     },
     "D2_falsifiability": {
-      "score": 3,
+      "score": 5,
       "strengths": [
-        "C1's criterion ('any single-modal Quality Score exceeds multi-modal') is binary, independently executable, and directly measurable from Table 1",
-        "C4's criterion ('64-GPU end-to-end time > 5 seconds') is numerically precise and tied to the physical definition of real-time",
-        "C6's criterion ('single LiDAR Lane mIoU > fusion Lane mIoU') is a clear inequality checkable from Table 4"
+        "所有 7 个 claim 的 falsification criteria 都极其具体、可操作且非平凡。",
+        "C4 明确指出了“64块B200 GPU下端到端时间超过5秒”作为证伪条件，C2 明确了“不存在显著相关性”作为证伪条件，scope 匹配度极高。",
+        "C1 和 C7 的证伪条件清晰界定了 baseline 超越的阈值，具备独立可测试性。"
       ],
       "weaknesses": [
-        "C3's falsification criterion ('joint training achieves comparable performance under the same memory budget') is structurally unverifiable from the presented work because no joint-training experiment exists — the criterion cannot be falsified without new experiments not in the paper",
-        "C2's criterion uses 'significantly' without a quantitative threshold or effect-size specification, making borderline outcomes ambiguous",
-        "C5's criterion uses 'consistently' across prompts, which is undefined — 5/6 prompt superiority vs 6/6 superiority would yield different verdicts under different interpretations"
+        "无明显弱点，falsification criteria 设计堪称典范。"
       ],
       "suggestions": [
-        "For C3, replace the falsification criterion with one testable from existing experiments (e.g., 'if removing any single branch from the fusion does not degrade the corresponding modality metric'), and separately acknowledge that joint-training comparison is future work",
-        "Quantify 'significantly' in C2 with a minimum Δ or p-value threshold",
-        "Define 'consistently' in C5 as a fraction (e.g., ≥5/6 prompt conditions) or statistical majority"
+        "保持当前高标准，确保未来扩展新模态或新 claim 时维持同等水平的可证伪性设计。"
       ]
     },
     "D3_scope_calibration": {
-      "score": 3,
+      "score": 5,
       "strengths": [
-        "C4 is precisely scoped to specific hardware (NVIDIA GB200 NVL72, 64×B200) and video specs (5 s, 720p), avoiding unjustified generalization",
-        "problem.md explicitly enumerates four assumptions (linear superposition of branches, three generation modes of control maps, weight normalization, base model prior strength), which is uncommon and valuable",
-        "C6 is implicitly scoped to the RDS-HQ sensor configuration; the evidence does not over-claim to arbitrary AV sensor suites"
+        "对 claim 的边界条件界定非常清晰，如 C4 严格限定硬件配置（64块B200），C6 限定具体场景（20个厨房场景x6提示）。",
+        "Assumptions 和 Boundary conditions 坦诚地指出了自建数据集（TransferBench）的潜在偏差、独立训练线性叠加的未验证假设，以及推理并行化对特定硬件（GB200 NVL72）的依赖。",
+        "C3 明确标注为“描述性设计论断”，避免了将工程动机过度包装为实证 claim。"
       ],
       "weaknesses": [
-        "C3 claims engineering superiority ('在内存效率、数据灵活性和模态可扩展性上均优于') without empirically bounding where joint training might be competitive; the scope of the superiority claim exceeds what the evidence supports",
-        "TransferBench's 600-sample, 3-scene-type boundary is noted in concepts.md but is absent from the claim statements for C1 and C2 — the claims read as if they characterize Physical AI generally",
-        "The '3 Transformer blocks' architectural choice is described as an empirical decision in concepts.md but the sensitivity range is never stated — readers cannot judge where the boundary of the design choice lies"
+        "无明显弱点，scope 校准极其严谨。"
       ],
       "suggestions": [
-        "Append an explicit scope qualifier to C1 and C2: 'on TransferBench (600 samples, 3 scene categories)' rather than implying general Physical AI superiority",
-        "Bound C3's superiority claim: state which conditions (memory >X GB, N>1 modalities) make per-modality training advantageous versus when joint training might close the gap",
-        "Add a sentence to the architecture concept noting the untested range for block count"
+        "可以在 concepts.md 的“多模态自适应控制”边界条件中，简要讨论当模态数量 N 极大时，线性叠加可能导致的特征空间饱和或干扰问题，以进一步完善理论 scope。"
       ]
     },
     "D4_argument_coherence": {
-      "score": 4,
+      "score": 5,
       "strengths": [
-        "The three-gap structure (G1: heterogeneous multimodal fusion; G2: joint training infeasibility; G3: global weights miss regional variation) maps one-to-one onto the three main solution components (ControlNet branches; per-modality training; spatiotemporal control map), with no orphaned gaps",
-        "The insight statement cleanly synthesises G1+G2+G3 into a unified solution and is derivable from the observations without logical leaps",
-        "Exploration tree nodes P1 and DE1 reinforce and are consistent with the problem.md narrative — the dead end (DE1) is the empirical confirmation of O2, and the pivot (P1) is the direct response to G3"
+        "从 Observations (Sim2Real gap, 单模态权衡) 到 Gaps (缺乏空间差异化权重, 联合训练内存大) 再到 Insight (独立训练+推理时空融合) 的逻辑链条极其严密。",
+        "每一个 gap 都在后续的 solution 和 experiments 中得到了直接回应，没有遗留未解决的逻辑断层。",
+        "Layer Index 结构清晰，认知层与物理层、探索层、证据层相互印证。"
       ],
       "weaknesses": [
-        "The arc from G2 ('joint training is infeasible') to C3 ('per-modality training is superior') elides an important step: infeasibility due to memory is an engineering constraint, not a demonstration of quality superiority; the argument conflates avoiding a constraint with proving a quality claim",
-        "The assumption that independently trained branches can be linearly superposed without quality degradation versus joint training is load-bearing for the entire solution but is stated only as an assumption in problem.md — the arc would be complete only if this were empirically validated"
+        "无明显弱点，论证弧线完整且连贯。"
       ],
       "suggestions": [
-        "Split C3 into two sub-claims: C3a (engineering benefits: memory/data/scalability) supported by argument, and C3b (quality comparability with joint training) marked as assumed/future work — the current monolithic C3 mixes well-supported and unsupported sub-claims",
-        "Add an experiment or citation validating the linear superposition assumption, or flag it explicitly as an open question in claims.md"
+        "在 problem.md 中，可以将 C3 (Physical AI 数据稀缺) 与最终的 solution 建立更直接的逻辑连接，明确说明生成多样性（如 LPIPS 提升）如何具体缓解长尾场景覆盖不足的问题。"
       ]
     },
     "D5_exploration_integrity": {
-      "score": 3,
+      "score": 5,
       "strengths": [
-        "DE1 is a genuine, empirically grounded dead end: Table 1 data shows that high-fidelity (dense) modalities have low Diversity-LPIPS and vice versa, and this is acknowledged before the spatiotemporal control map solution is introduced",
-        "P1 has an explicit trigger condition ('discovered that foreground/background regions have essentially different optimal weight demands') that precedes the solution rather than rationalising it post-hoc",
-        "D1 and D2 list concrete alternatives (training-free attention guidance, UNet-based ControlNet, joint training) with reasons for rejection"
+        "exploration_tree 忠实记录了研究轨迹，结构丰富。",
+        "DE1 (联合训练 dead-end) 提供了真实的工程约束（内存和配对数据稀缺）作为失败原因，而非 post-hoc 的借口，体现了 genuine negatives。",
+        "PIV1 清晰解释了从 UNet 到 DiT 的架构迁移必要性，决策 rationale 充分。"
       ],
       "weaknesses": [
-        "For D2, the alternatives 'joint training' and 'end-to-end optimization' are listed as rejected alternatives but no failure mode or attempt is documented — the tree shows a choice without evidence of exploration; it reads as post-hoc justification rather than genuine dead-end experience",
-        "The '3 Transformer blocks' architectural choice appears in concepts.md as 'empirical selection but not systematic ablation' — but the exploration tree has no corresponding decision node, making this a hidden choice",
-        "EX4 (GPU scaling) is included in the exploration tree but represents an engineering measurement, not a research exploration; its presence inflates the apparent depth of the decision tree"
+        "无明显弱点，探索树真实反映了科研过程中的试错与迭代。"
       ],
       "suggestions": [
-        "Add a dead-end node for joint training documenting the actual failure mode observed (OOM, data mismatch, or quality drop from preliminary experiments), or explicitly mark the alternative as 'untested/rejected on principled grounds' to distinguish genuine exploration from theoretical dismissal",
-        "Add a D3 decision node for block count selection with alternatives (1 block, 5 blocks) and rationale for convergence on 3",
-        "Separate EX4 into a separate engineering annex so the core exploration tree reflects only research decisions"
+        "可以在探索树 D2（时空控制图生成方式）的分支中，补充关于“尝试使用神经网络直接预测权重图但因缺乏 ground-truth 监督而失败”的 dead-end 记录，以进一步增强决策 rationale 的完整性。"
       ]
     },
     "D6_methodological_rigor": {
-      "score": 2,
+      "score": 4,
       "strengths": [
-        "E2 includes a quantitative correlation analysis (Pearson r between weight values and alignment metrics) rather than purely qualitative claims",
-        "E5 measures scaling at six GPU counts, providing a scaling curve rather than a single data point",
-        "E4 uses independent, off-the-shelf evaluation pipelines (StreamPetr, Hydra-MDP, grounded SAM2) rather than metrics that the generation model itself was trained on"
+        "实验设计全面，包含了单模态 baseline、多模态均匀融合、逐一排除消融（E1）、区域权重互换消融（E2）以及下游任务评估（E3, E4）。",
+        "硬件（H100/B200）、数据集（TransferBench/RDS-HQ）、模型参数（7B）和推理配置（56K tokens）描述详尽，可复现性强。",
+        "Metric-claim alignment 良好，针对对齐、多样性、质量、3D一致性等维度选择了合适的指标。"
       ],
       "weaknesses": [
-        "No external baselines: all comparisons are between Cosmos-Transfer1-7B variants; no comparison with other controllable video generation models (e.g., CogVideoX-Fun, Wan-Control, ControlNeXt) — the headline Quality Score of 8.54 has no external reference point",
-        "No statistical uncertainty is reported anywhere: no confidence intervals, standard deviations, or significance tests across any table; single-run results are presented as definitive",
-        "C3's core claim (per-modality training is superior) has no empirical support — there is no joint-training ablation despite this being the paper's primary training-strategy contribution",
-        "DOVER-technical is a general video quality estimator not validated for Physical AI fidelity; using it as the headline metric for a world-model paper creates potential metric-claim misalignment",
-        "Key architectural choices (3 control blocks, zero-init linear layer, weight normalization when sum>1) lack ablation experiments",
-        "TransferBench sample sizes per scene category (200 each) are insufficient for computing meaningful statistical significance, and no power analysis or sample-size justification is provided"
+        "定量结果（Table 1, 3, 4）仅报告了点估计（均值），缺乏方差、标准差或置信区间，难以评估生成模型在不同随机种子下的稳定性。",
+        "核心评测集 TransferBench 为作者自建，缺乏与现有公开标准视频生成 benchmark 的交叉验证，存在潜在的评估偏差风险。"
       ],
       "suggestions": [
-        "Add at least one external baseline (e.g., a publicly available ControlNet-style video generation model) to contextualise the Quality Score",
-        "Report mean ± std over at least 3 inference seeds for all table entries; add pairwise significance tests (t-test or Wilcoxon) for key comparisons",
-        "Add a joint-training ablation for at least one modality (e.g., Vis+Edge jointly trained vs. independently trained) to provide empirical grounding for C3",
-        "Validate or supplement DOVER-technical with a downstream task metric (e.g., policy success rate in simulation) to align quality measurement with Physical AI goals",
-        "Ablate control block count and normalization strategy in a supplementary table"
+        "补充多次运行（如 3-5 个随机种子）的均值±标准差报告，以证明结果的统计显著性。",
+        "考虑在 VBench 或 EvalCrafter 等公开视频生成 benchmark 上补充零样本或微调后的评估，以证明模型在自建数据集之外的泛化能力。"
       ]
     }
   },
   "findings": [
     {
-      "dimension": "D6_methodological_rigor",
-      "severity": "critical",
-      "observation": "C3 — the primary training-strategy claim that per-modality independent training is superior to joint training — has zero empirical support. No joint-training baseline exists in any experiment. The claim is supported solely by a memory-feasibility argument, yet it is listed as 'supported' and receives the same epistemic status as claims backed by ablation experiments."
-    },
-    {
       "dimension": "D1_evidence_relevance",
-      "severity": "critical",
-      "observation": "E1 and E3, cited as proof for C3, measure only the quality of per-modality-trained models; they contain no joint-training condition. The citation link between C3 and its listed evidence is broken — the experiments do not actually verify what C3 claims."
+      "severity": "major",
+      "observation": "C3 的证据引用不当：C3 主张独立训练在内存与灵活性上更优，但引用的 E1 仅为 TransferBench 质量评估实验，缺乏显存占用或推理灵活性的定量对比数据，证据与 claim 实质不匹配。"
     },
     {
       "dimension": "D6_methodological_rigor",
-      "severity": "major",
-      "observation": "No external baselines from other video generation or controllable generation models are included. The reported Quality Score of 8.54 is interpretable only relative to other Cosmos-Transfer1 variants, making it impossible to assess whether the approach advances the state of the art or merely ablates within its own design space."
+      "severity": "minor",
+      "observation": "缺乏统计显著性报告：Table 1, 3, 4 等核心定量实验仅报告了点估计（均值），未提供方差、标准差或置信区间，无法评估生成模型在不同随机种子下的结果稳定性。"
     },
     {
       "dimension": "D6_methodological_rigor",
-      "severity": "major",
-      "observation": "Zero statistical uncertainty is reported across all five evaluation tables. All values appear to be single-run point estimates. Given the stochastic nature of diffusion sampling and the small benchmark sizes (600 total TransferBench samples, 120 robot videos), the absence of variance reporting makes it impossible to assess whether reported differences are statistically meaningful."
-    },
-    {
-      "dimension": "D2_falsifiability",
-      "severity": "major",
-      "observation": "C3's falsification criterion ('joint training achieves comparable performance under the same memory budget') requires an experiment that does not exist in the paper. The criterion is logically valid but practically unverifiable from the presented work, rendering C3 non-falsifiable from the provided evidence bundle."
-    },
-    {
-      "dimension": "D6_methodological_rigor",
-      "severity": "major",
-      "observation": "Key architectural hyperparameters — number of control branches (3 Transformer blocks), zero-initialization of the linear projection layer, and weight normalization behaviour when sum>1 — are design choices without any ablation. The sensitivity of results to these choices is unknown."
-    },
-    {
-      "dimension": "D3_scope_calibration",
-      "severity": "major",
-      "observation": "Claims C1 and C2 read as characterising Physical AI broadly, but TransferBench covers only 600 samples across 3 narrow scene categories. The scene-category and sample-size limitations are documented in concepts.md but absent from the claim statements, creating a scope gap between the claim's implied generality and the evidence's actual coverage."
+      "severity": "minor",
+      "observation": "评测集局限性：核心评测集 TransferBench 为作者自建，缺乏与现有公开标准视频生成 benchmark（如 VBench）的交叉验证，存在潜在的评估偏差和过拟合风险。"
     },
     {
       "dimension": "D5_exploration_integrity",
-      "severity": "major",
-      "observation": "Decision node D2 rejects joint training and end-to-end optimization as alternatives but provides no documented failure mode, preliminary experiment, or empirical dead-end to support the rejection. The listed alternatives appear as post-hoc rationalisations rather than genuinely explored paths."
-    },
-    {
-      "dimension": "D6_methodological_rigor",
-      "severity": "major",
-      "observation": "DOVER-technical, a general perceptual video quality metric, is used as the headline Quality Score for a Physical AI world-model paper. Its correlation with downstream Physical AI utility (policy generalisation, sim-to-real transfer success) is not validated, creating potential metric-claim misalignment for all improvement claims that rely on it."
-    },
-    {
-      "dimension": "D4_argument_coherence",
-      "severity": "minor",
-      "observation": "The argument arc conflates two distinct sub-claims within C3: (a) per-modality training avoids memory infeasibility (engineering constraint, well-argued) and (b) per-modality training produces comparable or better quality than joint training (empirical claim, undemonstrated). The coherent arc for (a) breaks down for (b)."
-    },
-    {
-      "dimension": "D2_falsifiability",
-      "severity": "minor",
-      "observation": "C2's falsification criterion uses 'significantly' without a quantitative threshold. Borderline outcomes (e.g., Δ Blur SSIM = 0.01) would be ambiguously classified as falsifying or non-falsifying, reducing the criterion's practical utility."
-    },
-    {
-      "dimension": "D5_exploration_integrity",
-      "severity": "minor",
-      "observation": "The exploration tree contains no decision node for the number of control blocks (3), which is explicitly acknowledged as an empirical but non-ablated choice. This leaves a hidden design choice unrepresented in the stated research decision process."
-    },
-    {
-      "dimension": "D1_evidence_relevance",
       "severity": "suggestion",
-      "observation": "C2 is tagged 'causal' but the Pearson correlation evidence in E2 is associative. While the weight-variation design moves toward causal inference, the three discrete levels (0, 0.333, 0.5) are insufficient to rule out confounders from the SalientObject segmentation step. Consider retagging as 'descriptive' or adding an experiment that controls the segmentation mask."
+      "observation": "探索树可进一步丰富：建议在 D2（时空控制图生成方式）的探索分支中，补充关于“使用神经网络预测权重图”的 dead-end 记录，以增强该设计决策 rationale 的完整性。"
     }
   ]
 }
