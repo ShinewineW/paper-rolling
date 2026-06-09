@@ -107,3 +107,24 @@ def test_write_scene_self_referential_content_list_survives_append(tmp_path: Pat
     )
     assert (scene / "content_list.json").read_text() == '[{"type":"equation"}]'
     assert len(json.loads((scene / "scene.json").read_text())["attempts"]) == 2
+
+
+def test_write_scene_warns_when_no_staged_products(tmp_path: Path, capsys):
+    """审计 sharp-edges:staged_dir 缺失时现场只剩 scene.json,必须 fail-loud(stderr 警告),
+    而非静默写空壳(配合 deferred 无 TTL 会变成无产物的永久 skip)。"""
+    scene = write_scene(
+        workspace=tmp_path,
+        key="k1",
+        ledger_key="1.2",
+        failed_gate="数字门",
+        findings=[{"target": "ara", "observation": "x"}],
+        engine_commit="c",
+        candidate={"arxiv_id": "1.2", "title": "F", "doi": None},
+        md_path=tmp_path / "x.md",
+        content_list_path=None,
+        analysis=None,
+        staged_dir=None,
+    )
+    assert (scene / "scene.json").exists()
+    assert not (scene / "ai").exists()  # 空壳:无产物被搬入
+    assert "may not be self-contained" in capsys.readouterr().err

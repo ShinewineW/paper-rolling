@@ -10,12 +10,18 @@ from __future__ import annotations
 import json
 import os  # 审计 R15:os.replace 原子换入现场
 import shutil
+import sys
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 FAILED_REL = Path("_failed")
+
+
+def _log(msg: str) -> None:
+    """stderr 行日志(引擎无统一 logger 模块,同 seams.py 约定)。"""
+    print(f"[failure_scene] {msg}", file=sys.stderr, flush=True)
 
 
 def _iso_now() -> str:
@@ -114,6 +120,15 @@ def write_scene(
             if src.exists():
                 shutil.move(str(src), str(scene_new / sub))
         shutil.rmtree(staged_dir, ignore_errors=True)
+    else:
+        # 审计 sharp-edges:每个调用方在写现场时都应携带 staged 产物;若 staged_dir 缺失,
+        # 现场将只剩 scene.json(不再自包含)→ 复活无产物可复用。这在当前所有调用路径上
+        # 不可达(三道门异常都挂了 staged_dir),但 fail-loud 让任何未来回归立即可见,而非
+        # 静默写出一个空壳现场(配合 deferred 无 TTL 会变成"无产物的永久 skip")。
+        _log(
+            f"WARNING: scene {key} built without staged products (staged_dir={staged_dir!r}); "
+            "scene may not be self-contained — revival will have nothing to reuse"
+        )
     if content_bytes is not None:  # R3:从内存快照写回(源可能在旧 scene 内)
         (scene_new / "content_list.json").write_bytes(content_bytes)
 

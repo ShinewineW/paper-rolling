@@ -349,6 +349,14 @@ def _revive_one(
             ai_package=ai_package,
             cancel=cancel,
         )
+        # 审计 sharp-edges/race:看门狗可能在 promote 返回后、record(done) 前才触发。一个被
+        # 放弃(超时)的 daemon 绝不能在 driver 已记 error 之后还 record(done)+删现场。再重检
+        # cancel:若已 set → 不写 ledger、不删现场(留 deferred + 完好现场),promote 刚晋升的
+        # vault 产物成无 done 行的孤儿,由 consistency_check 下个 tick 剪除,自愈。
+        if cancel is not None and cancel.is_set():
+            return RevivalResult(
+                key=scene_dir.name, ledger_key=ledger_key, status="error", failed_gate=failed_gate
+            )
         # 先写 ledger 后删现场(sim-review 角度 1):崩在 record 前 → 现场完好(已 copy),
         # consistency_check 删 vault 孤儿后下轮从完好现场重来,自愈。
         ledger.record(
