@@ -101,6 +101,38 @@ def test_run_g3_blocks_on_entailment_failure(tmp_path: Path) -> None:
     assert any("baseline" in f.observation for f in verdict.hard_findings)
 
 
+def test_run_g3_feeds_evidence_tables_to_rigor_reviewer(tmp_path: Path) -> None:
+    # P1-b: the evidence README is only an INDEX (file links + descriptions, no
+    # numbers). The rigor reviewer must also receive the actual evidence/tables/
+    # files so it can verify numerical support instead of reporting "only an index
+    # is present". Without this the D1 (evidence_relevance) dimension is blind.
+    md, cl, person, ai = _build_paper(tmp_path, good=True)
+    evidence = ai / "ara" / "evidence"
+    (evidence / "tables").mkdir(parents=True)
+    (evidence / "README.md").write_text(
+        "# Evidence Index\n\n## Tables\n| File | Source |\n|---|---|\n"
+        "| [tables/results.md](tables/results.md) | Table 2 |\n",
+        encoding="utf-8",
+    )
+    (evidence / "tables" / "results.md").write_text(
+        "| model | BLEU |\n|---|---|\n| ours | 28.4 |\n",
+        encoding="utf-8",
+    )
+
+    captured: dict[str, dict[str, str]] = {}
+
+    def capturing_rigor(ara_bundle):
+        captured["bundle"] = ara_bundle
+        return _good_rigor(ara_bundle)
+
+    run_g3(person, ai, md, cl, rigor_scores=capturing_rigor, entailment_judge=_entailed)
+    bundle = captured["bundle"]
+    assert any(rel.startswith("evidence/tables/") for rel in bundle), (
+        "rigor reviewer never received evidence/tables/ files"
+    )
+    assert "28.4" in "".join(bundle.values()), "table numbers did not reach the reviewer"
+
+
 def test_run_g3_hard_blocks_when_branch1_report_missing(tmp_path: Path) -> None:
     # A person_vault entry with NO report.md must HARD-block (cannot seal an empty
     # human branch); previously the anchor check was skipped silently and passed.

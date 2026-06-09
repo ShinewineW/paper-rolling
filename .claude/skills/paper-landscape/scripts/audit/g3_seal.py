@@ -68,6 +68,13 @@ def _load_ara_bundle(ara_dir: Path) -> dict[str, str]:
         path = ara_dir / rel
         if path.exists():
             bundle[rel] = path.read_text(encoding="utf-8")
+    # P1-b: evidence/README.md is only an INDEX (file links + descriptions, no
+    # numbers). Feed the actual table files too, else the reviewer reports "only
+    # an index present" and the D1 (evidence_relevance) dimension scores blind.
+    tables_dir = ara_dir / "evidence" / "tables"
+    if tables_dir.is_dir():
+        for tbl in sorted(tables_dir.glob("*.md")):
+            bundle[f"evidence/tables/{tbl.name}"] = tbl.read_text(encoding="utf-8")
     return bundle
 
 
