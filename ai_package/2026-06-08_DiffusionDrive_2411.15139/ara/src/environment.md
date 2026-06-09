@@ -1,6 +1,6 @@
 # Environment
-- **Python**: 未在论文中明确说明
-- **Framework**: 未在论文中显式说明（代码仓库 hustvl/DiffusionDrive 公开，框架推断为PyTorch，但论文未显式声明）
-- **Hardware**: 训练：8×NVIDIA 4090 GPU；推理基准测试：1×NVIDIA 4090 GPU
-- **Key dependencies**: ResNet-34 / ResNet-50 骨干网络（ImageNet预训练权重初始化）, DDIM采样器（用于截断去噪推理，Denoising Diffusion Implicit Models）, 可变形空间交叉注意力（Deformable Spatial Cross-Attention，基于Deformable DETR）, AdamW优化器, NAVSIM数据集（navtrain/navtest split，基于OpenScene/nuPlan）, nuScenes数据集, SparseDrive阶段1感知预训练权重（nuScenes配置下使用）, CARLA模拟器（泛化性验证实验，Longest6 benchmark）
-- **Random seeds**: 未在论文中明确说明
+- **Python**: 论文未说明
+- **Framework**: 论文未明确说明（分析推断,论文未显式声明）
+- **Hardware**: 训练：8块NVIDIA 4090 GPU；推理FPS测量：单块NVIDIA 4090 GPU
+- **Key dependencies**: ResNet主干网络（ImageNet预训练权重初始化，用于NAVSIM实验）, DDIM采样器（用于推理阶段的去噪更新规则）, K-Means聚类算法（用于从训练集构建先验锚点轨迹）, AdamW优化器, 可变形注意力机制（基于Deformable DETR [62]）, NAVSIM数据集（基于OpenScene/nuPlan，用于闭环规划评估）, nuScenes数据集（用于开环指标验证）, SparseDrive感知预训练权重（用于nuScenes第二阶段初始化）
+- **Random seeds**: 论文未说明

@@ -1,55 +1,69 @@
-## 推理去噪步数
-- **Value**: 2
-- **Rationale**: 截断扩散策略从锚定高斯分布出发，2步即可达到良好规划质量，满足实时约束
-- **Search range**: ablation探索了1/2/3步（Tab. 4）
+## 图像主干网络（NAVSIM）
+- **Value**: ResNet-34
+- **Rationale**: 与Transfuser基线保持一致以进行公平比较
+- **Search range**: ResNet-34（NAVSIM），ResNet-50（nuScenes）
+- **Sensitivity**: 高
+- **Source**: Sec 4.2
+
+## 图像主干网络（nuScenes）
+- **Value**: ResNet-50
+- **Rationale**: 遵循SparseDrive基线配置
+- **Search range**: 论文未进行消融实验
+- **Sensitivity**: 高
+- **Source**: Sec 4.7
+
+## 图像输入分辨率
+- **Value**: 1024×256
+- **Rationale**: 三张裁剪并下采样的前向摄像头图像水平拼接而成
+- **Search range**: N/A
 - **Sensitivity**: 中
-- **Source**: Sec 4.2，Tab. 4
+- **Source**: Sec 4.2
 
 ## 级联扩散解码器层数
 - **Value**: 2
-- **Rationale**: 2层级联在规划质量与参数量/推理时间之间取得平衡；4层虽可略微提升但代价更高
-- **Search range**: ablation探索了1/2/4层（Tab. 5）
-- **Sensitivity**: 低
-- **Source**: Sec 4.2，Tab. 5
-
-## 图像骨干网络
-- **Value**: ResNet-34（NAVSIM）/ ResNet-50（nuScenes）
-- **Rationale**: 与基线Transfuser/SparseDrive对齐，保证公平比较；ImageNet预训练初始化
-- **Search range**: N/A
+- **Rationale**: 消融实验（Table 5）表明2层在性能与参数量之间取得最佳平衡，4层时性能趋于饱和且参数增加
+- **Search range**: 1-4
 - **Sensitivity**: 中
-- **Source**: Sec 4.2，Sec 4.7，补充材料 Sec A
+- **Source**: Sec 4.2, Table 5
 
-## 模型总参数量（NAVSIM ResNet-34配置）
-- **Value**: 60M
-- **Rationale**: Transformer扩散解码器替代UNet，相比TransfuserTD（102M）减少参数约39%，同时提升规划质量
-- **Search range**: Tab. 3中不同消融配置从57M到102M
-- **Sensitivity**: 低
-- **Source**: Tab. 2，Tab. 3
+## 推理去噪步数
+- **Value**: 2
+- **Rationale**: 截断扩散策略使仅需2步即可获得高质量多模式轨迹，相比标准DDIM的20步减少10倍
+- **Search range**: 1-3
+- **Sensitivity**: 低（消融实验显示1步已达到接近质量）
+- **Source**: Sec 4.2, Table 4
 
-## 推理采样轨迹数量N_infer
-- **Value**: 20
-- **Rationale**: 推理阶段可灵活调整，训练时N_anchor=20，推理时N_infer可不同；默认20条覆盖潜在动作空间
-- **Search range**: ablation探索了10/20/40（Tab. 6）
-- **Sensitivity**: 中
-- **Source**: Tab. 6，Sec 3.3
-
-## 规划输出路径点数及时域范围
+## 规划时域输出格式
 - **Value**: 8个路径点，覆盖4秒
-- **Rationale**: 与NAVSIM评估协议对齐
+- **Rationale**: 与Transfuser基线保持一致的输出格式
 - **Search range**: N/A
-- **Sensitivity**: 低
+- **Sensitivity**: 中
 - **Source**: Sec 4.2
 
-## 空间交叉注意力特征来源
-- **Value**: BEV特征（NAVSIM）/ PV特征（nuScenes）
-- **Rationale**: 根据上游感知模块特性选择：Transfuser产出BEV特征，SparseDrive产出PV特征
-- **Search range**: N/A
+## 推理采样轨迹数量（N_infer）
+- **Value**: 20
+- **Rationale**: 消融实验（Table 6）显示20个采样轨迹在规划质量与计算效率之间取得良好平衡
+- **Search range**: 10-40
 - **Sensitivity**: 中
-- **Source**: Sec 4.2，补充材料 Sec A
+- **Source**: Table 6
 
-## 推理速度（NAVSIM ResNet-34）
-- **Value**: 45 FPS（NVIDIA 4090）
-- **Rationale**: 截断扩散2步+高效Transformer解码器（每步3.8ms，总规划耗时7.6ms）实现实时驾驶帧率
+## LiDAR感知范围
+- **Value**: 前后左右各32m
+- **Rationale**: 遵循Transfuser基线的LiDAR输入范围配置
 - **Search range**: N/A
-- **Sensitivity**: N/A
-- **Source**: Abstract，Tab. 2
+- **Sensitivity**: 低
+- **Source**: Appendix A
+
+## 扩散解码器空间注意力类型
+- **Value**: 稀疏可变形交叉注意力
+- **Rationale**: 基于轨迹坐标与BEV或透视视图特征进行空间交叉注意力，消融实验（ID-3与ID-2对比）验证其对规划质量至关重要
+- **Search range**: N/A
+- **Sensitivity**: 高
+- **Source**: Sec 3.4, Table 3
+
+## 模型总参数量
+- **Value**: 60M
+- **Rationale**: 采用轻量级Transformer解码器替代UNet，相比TransfuserDP的101M减少约39%参数，同时达到更高规划质量
+- **Search range**: N/A
+- **Sensitivity**: 低
+- **Source**: Table 2, Table 3

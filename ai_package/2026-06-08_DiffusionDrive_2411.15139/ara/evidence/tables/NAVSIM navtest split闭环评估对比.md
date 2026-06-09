@@ -1,6 +1,6 @@
-# NAVSIM navtest闭环评测对比
+# NAVSIM navtest split闭环评估对比
 - **Source**: Table 1
-- **Caption**: "在NAVSIM navtest分割闭环指标上的方法对比。「C&L」表示同时使用相机和LiDAR输入。「V8192」表示8192个锚点。Hydra-MDP-V8192-W-EP额外使用规则评分器监督和加权置信度后处理。DiffusionDrive直接从人类示范学习，推理不含后处理。粗体和下划线分别表示最优和次优结果。"
+- **Caption**: "在规划导向的NAVSIM navtest split上进行闭环指标对比。C&L表示同时使用相机和激光雷达传感器输入。V8192表示8192个锚点。Hydra-MDP-V8192-W-EP是Hydra-MDP的变体,使用规则评估器额外监督和加权置信度后处理。DiffusionDrive仅从人类演示中学习且无后处理。"
 
 | Method | Input | Img. Backbone | Anchor | NC↑ | DAC↑ | TTC↑ | Comf.↑ | EP↑ | PDMS↑ |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

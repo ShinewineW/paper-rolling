@@ -2,97 +2,114 @@
 tree:
 - id: Q1
   type: question
-  title: 如何将扩散模型引入端到端自动驾驶规划以实现多模态、实时轨迹生成？
+  title: 如何将扩散模型引入端到端自动驾驶并同时满足实时性与多模式轨迹生成需求？
   support_level: explicit
   source_refs:
   - Abstract
   - Sec 1
-  description: 端到端自动驾驶需同时满足多模态轨迹规划（覆盖不同驾驶意图）和实时推理约束，扩散模型具备多模态分布建模能力，但将其直接应用于驾驶场景面临模式崩溃和推理开销两大挑战
+  description: 标准扩散策略在机器人领域已被证明能建模多模式动作分布，但直接应用于自动驾驶面临两大障碍：大量去噪步骤导致推理速度无法满足实时要求，以及开放世界交通场景下随机高斯噪声引发的模式坍塌问题。
   children:
   - id: E1
     type: experiment
-    title: 将Transfuser改造为原始扩散策略基线（TransfuserDP）验证可行性
+    title: 验证标准DDIM扩散策略的基础能力：将Transfuser改造为TransfuserDP
     support_level: explicit
     source_refs:
     - Sec 3.2
-    - Tab. 2
-    result: 规划质量略有提升，但出现严重模式崩溃现象（不同随机噪声收敛到相近轨迹），且推理开销大幅增加，不满足实时要求
-    children:
-    - id: DE1
-      type: dead_end
-      title: 原始扩散策略在驾驶场景下的模式崩溃与计算瓶颈
-      support_level: explicit
-      source_refs:
-      - Sec 3.2
-      - Fig. 2
-      - Tab. 2
-      hypothesis: 从随机高斯噪声出发经多步去噪可在驾驶场景中生成多样的多模态轨迹
-      failure_mode: 不同随机噪声收敛到相近轨迹（模式崩溃），定量模式多样性得分D极低；多步去噪导致推理延迟大幅增加，无法满足实时驾驶需求
-      lesson: 纯随机高斯初始化在动态开放交通场景下无法有效覆盖多模态动作空间；必须引入驾驶先验知识引导去噪起点，同时需截断去噪步数以降低开销
-  - id: DE2
+    - Table 2
+    result: 规划质量略有提升，但需要20步去噪，FPS从60降至7，且不同随机噪声去噪后收敛至相似轨迹，出现严重模式坍塌
+  - id: DE1
     type: dead_end
-    title: 大词表固定锚点离散化方法（如8192个锚点词表）的根本局限
+    title: 直接适配标准DDIM扩散策略（20步）用于驾驶轨迹生成
     support_level: explicit
     source_refs:
-    - Sec 1
-    - Tab. 1
-    hypothesis: 用大量固定锚点轨迹离散化动作空间可覆盖多样驾驶行为并实现多模态规划
-    failure_mode: 词表外场景（out-of-vocabulary scenarios）无法有效处理；维护大量锚点带来显著计算负担；规划性能上限受锚点数量与质量的根本约束
-    lesson: 固定词表范式难以泛化到分布外驾驶场景，且不适合实时应用；需要一种不依赖大词表、表达能力更强的多模态规划方案
-  - id: D1
-    type: decision
-    title: 采用截断扩散策略替代原始扩散策略作为核心生成机制
+    - Sec 3.2
+    hypothesis: 从随机高斯噪声出发经20步DDIM去噪可直接生成多样化多模式驾驶轨迹
+    failure_mode: 交通场景的动态与开放世界特性导致不同噪声收敛至相似轨迹（模式坍塌），且20步去噪使规划模块运行时间增加约650倍，无法满足实时驾驶需求
+    lesson: 驾驶场景与机器人操控场景本质不同，需要将先验驾驶模式嵌入扩散过程，仅靠随机高斯噪声无法有效覆盖驾驶动作空间
+  - id: Q2
+    type: question
+    title: 如何通过引入先验驾驶知识同时解决模式坍塌与过多去噪步骤问题？
     support_level: explicit
     source_refs:
     - Sec 3.3
-    - Fig. 3
-    choice: 将扩散起始点从随机高斯噪声替换为以少量K-Means锚点为中心的锚定高斯分布，并在训练与推理两端截断扩散步数；利用扩散模型的多模态表达能力，仅需少量锚点即可覆盖潜在动作空间
-    alternatives:
-    - 继续使用原始扩散策略（因模式崩溃和延迟问题已排除，见DE1）
-    - 大词表固定锚点离散化（因词表外泛化性差已排除，见DE2）
-    - 单模态确定性MLP回归（无法建模多模态不确定性，已排除）
-    also_depends_on:
-    - DE1
-    - DE2
+    description: 模式坍塌源于从随机高斯噪声出发缺乏结构性先验约束，过多去噪步骤源于从完全随机状态出发需要较长恢复路径。嵌入先验驾驶模式可同时解决这两个问题。
     children:
-    - id: E2
-      type: experiment
-      title: 截断扩散策略基础验证（TransfuserTD消融实验）
+    - id: D1
+      type: decision
+      title: 采用K-Means聚类构建多模式锚点，以锚定高斯分布替代随机高斯分布作为去噪起点
       support_level: explicit
       source_refs:
-      - Tab. 2
+      - Sec 3.3
+      choice: 对训练集轨迹进行K-Means聚类得到20个先验锚点，通过截断至前50/1000步的噪声调度仅在锚点附近添加少量高斯噪声，形成锚定高斯分布；训练模型从该分布去噪至目标驾驶动作分布
+      alternatives:
+      - 使用基于当前行驶状态外推的单一轨迹作为先验（Table 8消融实验验证效果较差，无法覆盖转弯和避障等挑战性场景）
+      - 沿用大规模固定词汇表离散化方法（如VADv2的8192锚点，计算代价高且在词汇表边界场景失效）
+    - id: E2
+      type: experiment
+      title: TransfuserTD：验证截断扩散策略相比标准扩散策略的提升效果
+      support_level: explicit
+      source_refs:
       - Sec 4.4
-      result: 去噪步数大幅减少，规划质量和模式多样性均显著优于原始扩散策略，推理速度显著提升；证明截断扩散策略的有效性，为进一步设计专用解码器奠定基础
-    - id: Q2
-      type: question
-      title: 如何设计与条件场景上下文高效交互的专用扩散解码器？
+      - Table 2
+      result: 去噪步骤从20步降至2步，规划质量和模式多样性均显著提升，证明锚定高斯分布提供了合理起点；但此时仍使用UNet解码器，参数量偏大且与场景交互受限
+    - id: DE2
+      type: dead_end
+      title: 以当前行驶状态外推的单条轨迹作为唯一先验起点
+      support_level: explicit
+      source_refs:
+      - Appendix B
+      - Table 8
+      hypothesis: 基于当前车辆状态外推的单条轨迹可作为合理先验，引导扩散过程覆盖潜在动作空间
+      failure_mode: 单一外推轨迹无法覆盖多样化驾驶动作空间，在需要避障和转向的挑战性场景中显著失效，规划性能大幅下降
+      lesson: 多模式K-Means锚点的分布表达能力远优于单一状态外推先验，多样化聚类中心能有效预设驾驶行为的多种模式，是覆盖潜在动作空间的关键
+  - id: Q3
+    type: question
+    title: 如何设计高效的扩散解码器取代UNet并增强与条件场景上下文的层次化交互？
+    support_level: explicit
+    source_refs:
+    - Sec 3.4
+    description: TransfuserTD中的UNet解码器参数量大且仅通过自车查询与场景交互，缺乏对BEV特征和感知模块输出（智能体/地图查询）的充分利用，需要专为驾驶任务设计的轻量高效解码器。
+    children:
+    - id: D2
+      type: decision
+      title: 设计基于Transformer的级联扩散解码器：稀疏可变形注意力结合级联精炼机制
       support_level: explicit
       source_refs:
       - Sec 3.4
-      - Tab. 3
-      description: UNet解码器缺乏对BEV/PV特征及感知模块感知查询的细粒度交叉注意力，限制轨迹重建质量；需要专为驾驶设计、参数高效且支持级联迭代精化的解码架构
-      children:
-      - id: D2
-        type: decision
-        title: 采用级联Transformer扩散解码器替代UNet，融合多源条件信息
-        support_level: explicit
-        source_refs:
-        - Sec 3.4
-        - Tab. 3
-        choice: 设计含可变形空间交叉注意力（与BEV/PV特征交互）、智能体/地图查询交叉注意力、Timestep调制层和FFN的Transformer解码器层，并以级联方式堆叠实现迭代轨迹精化；参数在不同去噪时间步间共享
-        alternatives:
-        - 沿用UNet条件解码器（Tab. 3 ID-1，参数量更大但规划质量更低）
-        - 仅使用ego-query交互无空间注意力（Tab. 3 ID-2，性能大幅下降）
-        - 仅使用空间注意力不加级联机制（Tab. 3 ID-5，性能次优）
-        children:
-        - id: E3
-          type: experiment
-          title: DiffusionDrive完整系统在NAVSIM与nuScenes上的综合验证
-          support_level: explicit
-          source_refs:
-          - Tab. 1
-          - Tab. 2
-          - Tab. 7
-          - Sec 4.3
-          - Sec 4.7
-          result: 在NAVSIM navtest上以相同ResNet-34骨干达到最优PDMS，模式多样性显著提升；以45 FPS满足实时约束，参数量低于TransfuserDP；在nuScenes上L2误差和碰撞率均优于或持平SparseDrive；CARLA泛化实验验证锚点来源可跨数据集迁移
+      choice: 采用稀疏可变形交叉注意力与BEV/PV特征交互，再与感知模块的智能体/地图查询进行交叉注意力，配合Timestep Modulation层和FFN；堆叠2个级联层并在不同去噪步骤间共享参数以降低推理时延
+      alternatives:
+      - 保留UNet解码器架构（参数量约102M，与场景上下文交互方式受限，且在步骤间不共享参数）
+    - id: E3
+      type: experiment
+      title: 消融实验：逐步验证扩散解码器各设计组件的独立贡献
+      support_level: explicit
+      source_refs:
+      - Sec 4.5
+      - Table 3
+      result: 空间交叉注意力是规划质量的关键组件；智能体/地图注意力提供额外增益；级联机制进一步提升性能；完整解码器以约60M参数显著超越102M参数的UNet基线
+    - id: E4
+      type: experiment
+      title: 消融实验：不同推理去噪步数对规划质量的影响
+      support_level: explicit
+      source_refs:
+      - Sec 4.5
+      - Table 4
+      result: 仅1步去噪已可达到较好规划质量，2步进一步改善，3步性能基本持平2步，验证了锚定高斯分布提供合理初始起点的假设
+    - id: E5
+      type: experiment
+      title: 消融实验：级联解码器阶段数对性能与参数量的影响
+      support_level: explicit
+      source_refs:
+      - Sec 4.5
+      - Table 5
+      result: 增加级联阶段可提升规划质量，但在4阶段时性能趋于饱和且参数量明显增加，2阶段为效率与质量的最佳平衡点
+    - id: P1
+      type: pivot
+      title: 从大词汇表离散采样范式转向少锚点引导的截断生成式扩散策略
+      support_level: explicit
+      source_refs:
+      - Sec 1
+      - Sec 2
+      from: 以VADv2为代表的方法：使用大规模固定锚点词汇表（如8192个）离散化动作空间，再基于预测得分从词汇表中采样轨迹
+      to: DiffusionDrive：仅用20个K-Means聚类锚点引导截断扩散过程，借助生成模型的连续分布表达能力覆盖动作空间，无词汇表边界限制
+      trigger: 大词汇表离散化在词汇表外场景中根本性失效，且大量锚点带来显著计算负担；扩散模型的生成能力可以更少锚点实现更好的多模式动作空间覆盖

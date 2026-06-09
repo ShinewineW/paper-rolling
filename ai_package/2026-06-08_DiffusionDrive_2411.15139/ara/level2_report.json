@@ -4,88 +4,88 @@
   "prerequisite": "Level 1 passed",
   "overall": {
     "grade": "Strong Accept",
-    "mean_score": 4.83,
+    "mean_score": 5,
     "passes_seal2": true
   },
   "dimensions": {
     "D1_evidence_relevance": {
       "score": 5,
       "strengths": [
-        "Every claim is backed by type-appropriate evidence (e.g., causal claims supported by ablation studies like E3 and E8; improvement claims supported by strong baseline comparisons in E1 and E7).",
-        "The mapping between claims and experiments is explicit, logically sound, and perfectly aligned with the claim tags (causal, improvement, descriptive)."
+        "证据与主张的映射极其精准，类型完全匹配（如因果主张C1/C3/C5对应消融与演进实验，泛化主张C6对应跨域CARLA实验，改进主张对应强基线对比）。",
+        "每个主张都引用了直接支撑其核心机制的实验，没有使用无关或弱相关的证据来凑数。"
       ],
       "weaknesses": [
-        "The evidence index (evidence/README.md) omits the actual table markdown files for E5 (Cascade stages) and E6 (Inference sampling), although the experimental setups are detailed in experiments.md."
+        "无明显弱点，证据链条非常坚实。"
       ],
       "suggestions": [
-        "Ensure all experiments listed in experiments.md have corresponding evidence files indexed in evidence/README.md for complete traceability."
+        "保持这种高标准的类型感知证据映射，未来可考虑为描述性主张（如C2）增加更多 Corner Case 的定性证据（如特定复杂场景的可视化）。"
       ]
     },
     "D2_falsifiability": {
       "score": 5,
       "strengths": [
-        "Falsification criteria are highly specific, actionable, and directly tied to quantitative metrics (e.g., PDMS > 88.1, D score ~11%, FPS thresholds).",
-        "Criteria explicitly define the exact conditions under which a claim would fail, avoiding vague or post-hoc rationalizations."
+        "所有证伪标准都具体、可操作、非平凡，且明确指出了对比基线、控制变量和具体指标。",
+        "证伪条件不仅关注最终性能（如PDMS），还关注机制有效性（如模态多样性得分D、推理速度、参数下降等）。"
       ],
       "weaknesses": [
-        "None significant; the criteria are exceptionally well-formulated and scope-matched."
+        "部分证伪标准中使用了“显著差异”、“相近”等定性词汇，缺乏明确的统计学或数值阈值。"
       ],
       "suggestions": [
-        "For C7, consider specifying a quantitative threshold for 'significant impact' when varying N_infer to make the falsification criterion even more rigorous."
+        "在证伪标准中进一步量化阈值（例如：将“无显著差异”明确为“PDMS差异 < 0.5 或多样性得分D差异 < 5%”），以消除判定时的模糊性。"
       ]
     },
     "D3_scope_calibration": {
       "score": 5,
       "strengths": [
-        "Assumptions and boundary conditions are explicitly documented in concepts.md and problem.md (e.g., acknowledging OOD limitations of K-Means anchors and training set dependency).",
-        "Claims carefully distinguish between closed-loop (NAVSIM) and open-loop (nuScenes) evaluations without overgeneralizing the method's capabilities."
+        "主张的边界条件非常清晰，概念定义（concepts.md）中明确指出了指标的局限性（如PDMS基于top-1不衡量多模态，D分数不直接衡量安全性）。",
+        "假设（Assumptions）部分诚实地列出了模型依赖的前提（如20个锚点足以覆盖典型模式），没有过度宣称模型的通用性。"
       ],
       "weaknesses": [
-        "The exact quantitative definition of 'extreme maneuvers' where the 20 anchors might fail is left somewhat qualitative in the boundary conditions."
+        "C4（nuScenes开环）与C1/C2（NAVSIM闭环）在评估范式上存在本质差异，主张中未显式强调开环指标在反映真实自动驾驶闭环能力时的局限性。"
       ],
       "suggestions": [
-        "Define specific kinematic thresholds (e.g., lateral acceleration > X m/s^2 or steering angle rate) in the boundary conditions to precisely delineate the operational design domain (ODD) limits of the anchor prior."
+        "在C4的解释或Scope中补充一句关于开环评估（L2/Collision）与闭环评估（PDMS）在反映真实规划能力差异的免责声明或边界说明。"
       ]
     },
     "D4_argument_coherence": {
       "score": 5,
       "strengths": [
-        "The narrative arc from observations (mode collapse, latency) to gaps, insights (anchored Gaussian), and solutions is seamless and logically tight.",
-        "The exploration tree perfectly mirrors the problem specification, showing how dead-ends (vanilla diffusion, large vocabularies) directly motivated the core design choices."
+        "从观察（单模态/大词汇表/普通DDIM的缺陷）到差距（模式坍塌/推理慢），再到洞察（锚定高斯先验）和解决方案的逻辑弧线极其连贯。",
+        "探索树（exploration_tree.yaml）完美补充了论证过程，展示了从问题到死胡同再到最终决策的完整思考路径。"
       ],
       "weaknesses": [
-        "None; the logical flow from problem identification to architectural design is exemplary."
+        "无明显弱点，各层（逻辑层、物理层、探索层）讲述的故事高度一致。"
       ],
       "suggestions": [
-        "Consider adding a brief synthesis in the conclusion linking the nuScenes open-loop results back to the closed-loop NAVSIM insights to fully close the narrative loop."
+        "可以在Problem Specification的Insight部分，简要补充为什么选择K-Means聚类而不是其他分布拟合方法（如GMM）来构建锚点，使逻辑链条更无懈可击。"
       ]
     },
     "D5_exploration_integrity": {
       "score": 5,
       "strengths": [
-        "The exploration tree includes genuine dead-ends (DE1, DE2) with concrete failure modes (e.g., Transfuser_DP D=11%, FPS=7) rather than strawman arguments.",
-        "Decision nodes (D1, D2) explicitly list rejected alternatives and justify choices using empirical data from the ablation studies (e.g., ID-2 in Table 3 dropping to 55.1 PDMS)."
+        "探索树包含了真实的死胡同（DE1: 标准DDIM 20步导致模式坍塌和速度慢；DE2: 单轨迹外推先验无法覆盖多样化空间）。",
+        "这些负面结果和死胡同都在正文实验中得到了验证（Table 2验证DE1，Table 8验证DE2），证明是研究过程中的真实探索而非事后诸葛亮。"
       ],
       "weaknesses": [
-        "None; the inclusion of negative results and explicit failure modes demonstrates high research integrity."
+        "探索树中缺少关于“锚点数量选择（为什么最终定为20个）”的早期探索或消融节点。"
       ],
       "suggestions": [
-        "Include a brief discussion in the exploration tree on whether any other clustering methods (e.g., GMM, DBSCAN) were explored for the anchors before settling on K-Means."
+        "在探索树中增加一个关于“锚点数量N_anchor的权衡探索”节点（如对比10、20、50个锚点的聚类效果与计算开销），以丰富决策树。"
       ]
     },
     "D6_methodological_rigor": {
-      "score": 4,
+      "score": 5,
       "strengths": [
-        "Comprehensive baseline comparisons across two distinct benchmarks (NAVSIM and nuScenes) covering both closed-loop and open-loop settings.",
-        "Extensive ablation studies covering architectural components, hyperparameters (steps, cascade stages), and inference configurations."
+        "基线极其全面，涵盖了NAVSIM和nuScenes上的SOTA方法（包括使用8192锚点和额外后处理的强力竞争者）。",
+        "消融实验覆盖了模型的每一个关键组件（解码器设计、去噪步数、级联阶段、采样数量、先验类型），实验设置细节（硬件、优化器、Batch size等）非常丰富。"
       ],
       "weaknesses": [
-        "Lacks statistical variance reporting (e.g., standard deviation over multiple seeds) for the main metrics, which limits the ability to verify statistical significance.",
-        "Evidence index is incomplete regarding the physical table files for E5 and E6."
+        "除CARLA实验(Table 9)外，其他表格未报告标准差或方差（可能受限于NAVSIM官方评测机制）。",
+        "Table 4中3步去噪的EP分数(92.2)显著高于2步(82.2)，但最终PDMS均为88.1，数值增长比例似乎存在不一致或截断机制未说明。"
       ],
       "suggestions": [
-        "Report mean and standard deviation for key metrics (PDMS, L2, CR) across at least 3 random seeds to establish statistical significance.",
-        "Add the missing table files for E5 and E6 to the evidence directory and update the README index."
+        "对于本地可重复的消融实验（如Table 3-6），建议报告多次运行的均值和标准差以增强统计严谨性。",
+        "核对Table 4中EP与PDMS的数值一致性，或在Caption中补充说明PDMS计算中EP分数的权重/截断机制。"
       ]
     }
   },
@@ -93,22 +93,22 @@
     {
       "dimension": "D6_methodological_rigor",
       "severity": "minor",
-      "observation": "Evidence index (evidence/README.md) is missing the actual table files for E5 (Cascade stages ablation) and E6 (Inference sampling ablation), breaking full traceability."
+      "observation": "Table 4（去噪步数消融）中，3步去噪的EP分数（92.2）较2步（82.2）有巨大提升，但最终PDMS均为88.1。建议核对原始数据，或在表格下方补充说明PDMS合成公式中EP的权重或上限截断机制，以免引起读者对指标计算一致性的质疑。"
     },
     {
       "dimension": "D6_methodological_rigor",
-      "severity": "minor",
-      "observation": "Statistical reporting lacks variance/standard deviation across multiple runs for the main metrics, which limits strict statistical significance verification despite strong absolute numbers."
+      "severity": "suggestion",
+      "observation": "除Table 9（CARLA本地评测）报告了标准差外，其他表格（尤其是本地可复现的消融实验Table 3-6）均未报告方差。建议在条件允许的情况下补充多次随机种子运行的标准差，以证明性能提升的统计显著性。"
     },
     {
-      "dimension": "D3_scope_calibration",
+      "dimension": "D2_falsifiability",
       "severity": "suggestion",
-      "observation": "While boundary conditions for OOD scenarios are well stated, explicitly defining quantitative kinematic thresholds for 'extreme maneuvers' would further strengthen scope calibration."
+      "observation": "部分证伪标准（如C1、C5）中使用了“无显著差异”、“相近”等定性词汇。建议将其量化为具体的数值阈值（如“PDMS差异 < 0.5”），使证伪条件在独立测试时具有绝对的客观判定标准。"
     },
     {
       "dimension": "D5_exploration_integrity",
       "severity": "suggestion",
-      "observation": "The exploration tree could be enriched by briefly documenting if alternative clustering algorithms (e.g., GMM) were evaluated for anchor generation before selecting K-Means."
+      "observation": "探索树（exploration_tree.yaml）非常详实地记录了架构和先验类型的死胡同，但缺少关于超参数（如锚点数量N_anchor=20）选择过程的探索节点。补充该节点可使研究DAG更加完整。"
     }
   ]
 }

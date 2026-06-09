@@ -9,4 +9,8 @@
 
 | Innovation | Location (`file:line`) |
 |---|---|
-| 2411.15139 | README.md:14 |
+| 截断扩散策略(Truncated Diffusion Policy) | _not found_ |
+| 锚定高斯分布(Anchored Gaussian Distribution) | _not found_ |
+| 级联扩散解码器(Cascade Diffusion Decoder) | _not found_ |
+| 时间步调制层(Timestep Modulation Layer) | _not found_ |
+| 模式多样性评分D(Mode Diversity Score) | _not found_ |
