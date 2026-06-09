@@ -10,11 +10,16 @@
 # G2 number-fidelity skeptic passes per paper. ODD values give a clean majority
 # (1 = single pass; 3 = best-of-three). Each pass is one skeptic LLM call over
 # the full source text, so this is the biggest G2 cost lever.
-skeptic_votes: 1
+skeptic_votes: 3
 
 # How many times a blocked gate re-emits the offending branch before the paper
 # is quarantined. 1 = no retry (fail fast); 2 = one re-emit attempt.
-max_gate_rounds: 1
+max_gate_rounds: 2
+
+# Independent G2 number-gate blind-retry budget: how many times a G2 hard-block
+# re-runs the analyzer (fresh sampling, no rubric injection) before quarantine.
+# Separate from max_gate_rounds (the content-gate re-emit budget). (ADR-0006)
+g2_blind_retry_rounds: 2
 
 data_fidelity:
   # tolerant = a few unverified numbers are FLAGGED (written to the pack's
