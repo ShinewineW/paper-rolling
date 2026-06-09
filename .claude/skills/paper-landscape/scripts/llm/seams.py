@@ -29,7 +29,7 @@ from scripts.llm.providers import StrictProvider
 from scripts.llm.writer import curate_figures, write_human_sections
 from scripts.output.figures import extract_figures, is_architecture_caption
 
-# Per-seam provider routing (config/llm.yaml; default = claude -p). Loaded once.
+# Per-seam provider routing (config/llm.yaml; required, no default provider). Loaded once.
 # Transport (claude -p / opencode / any OpenAI-compatible API) is chosen PER SEAM
 # here, so the analyzer can stay on Claude while the writer/audit run on a cheaper
 # backend — without the engine knowing or caring.
@@ -117,7 +117,7 @@ def resolve_analysis(md_path: Path, candidate: dict) -> dict:
     Instead of one monolithic long-output call (slow + fragile — it stalled 4/4 on
     opencode), the bundle is split into 5 chunks run CONCURRENTLY (scripts/llm/
     analyzer.py), each emitting only its own keys. Routed to the `analyzer`
-    provider (config/llm.yaml; default claude -p). Cross-referenced keys (claims /
+    provider (config/llm.yaml; explicitly routed). Cross-referenced keys (claims /
     experiments / evidence / related_work) share one chunk so C#/E# ids resolve.
     """
     provider = _provider_for("analyzer")
@@ -335,8 +335,8 @@ def expand_llm(prompt: str) -> list[str]:
 def write_report(ara_dir: Path, *, md_path: Path | None = None, outdir: Path | None = None) -> dict:
     """Human-chain writer seam: gated ARA (+ source MD) -> report material.
 
-    Routed to the ``writer`` provider in config/llm.yaml (default claude -p;
-    typically a cheaper backend like deepseek). Returns:
+    Routed to the ``writer`` provider in config/llm.yaml (explicitly routed;
+    typically a cheaper backend like deepseek/qwen). Returns:
         {"sections": {section_id: markdown},
          "figures":  [{"ref","caption","zh"}, ...]}  # ORIGINAL paper figures + 中文导览
     branch1 stitches + grounds + lint-gates the sections and embeds EVERY figure

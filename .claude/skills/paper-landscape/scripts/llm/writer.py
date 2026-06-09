@@ -5,9 +5,8 @@ The "two chains from one source" model: the ARA (ai_package) is the dense,
 structured, AI-facing distillation; THIS module is the human-facing chain — a
 section-by-section writer that reads the (already G2/G3-gated) ARA + frozen MD and
 produces flowing, illustrative Chinese prose. It is provider-agnostic: the caller
-passes an ``LLMProvider`` (default claude -p; routed to a cheaper backend per
-config/llm.yaml), so the human chain can run on, e.g., deepseek while the analyzer
-stays on Claude.
+passes an ``LLMProvider`` (explicitly routed per config/llm.yaml — no default), so
+the human chain can run on, e.g., deepseek/qwen while the analyzer stays on Claude.
 
 Grounding discipline (so the report passes the three-layer anchor lint, 吸收-D1):
 sections keep EXACT performance numbers OUT of prose sentences (they live in the
