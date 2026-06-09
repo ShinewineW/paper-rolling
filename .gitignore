@@ -49,3 +49,8 @@ _ledger/.lock
 
 # /loop scheduler lock (transient session state, not a product)
 .claude/scheduled_tasks.lock
+
+# Machine-local Claude Code config (per-machine; not shared products).
+# NOTE: .claude/settings.json IS tracked on purpose (shared project permissions).
+.claude/settings.local.json
+.mcp.json
