@@ -579,6 +579,43 @@ def test_spoke_forced_candidate_still_g2_blocked(tmp_path, fake_http, fake_cli):
     assert result.ai_package_path is None
 
 
+def test_g2_blind_retry_recalls_analyzer(tmp_path, fake_http, fake_cli):
+    """审计 E / ADR-0006:数字门盲重试 = 重调 analyzer(fresh 采样),不注入 verdict。
+    第一轮 analyzer 吐一个源文里没有的证据数字 → 诚实 skeptic 在 strict 模式 hard-block;
+    第二轮吐干净 bundle → 放行。断言 resolve_analysis 被重调(计数=2)且重试未注入 prior_failure。"""
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
+    seen_prior: list = []
+
+    def flaky_analyzer(md_path, candidate, *, prior_failure=None):
+        seen_prior.append(prior_failure)
+        bundle = copy.deepcopy(_ANALYSIS)
+        if len(seen_prior) == 1:
+            # Round 1: a fabricated evidence number absent from _SOURCE_MD → the
+            # honest skeptic flags it → G2 strict hard-block.
+            bundle["evidence_tables"][0]["rows"].append(["Bogus", "888.88", "777.77"])
+        return bundle
+
+    spoke = make_spoke(
+        workspace=tmp_path,
+        http=fake_http,
+        run_cli=fake_cli,
+        resolve_analysis=flaky_analyzer,
+        skeptic_votes=_honest_skeptic,
+        rigor_scores=_good_rigor,
+        entailment_judge=_entailed,
+        ledger=_ledger(tmp_path),
+        n_skeptics=3,
+        g2_blind_retry_rounds=1,
+    )
+
+    result = spoke(dict(_CANDIDATE))
+
+    assert result.status == "done"  # the fresh round-2 sampling passed G2
+    assert len(seen_prior) == 2  # analyzer was RE-CALLED (fresh sampling), not re-rendered
+    assert seen_prior == [None, None]  # blind retry: NO verdict/feedback injected
+
+
 # --- STRUCTURAL GATE (Seal-1) ----------------------------------------------
 
 

@@ -158,7 +158,12 @@ def make_spoke(
 
         # 4. The analyzer seam is passed as a parameter (no module-global
         #    mutation) so concurrent spokes never share one analyzer.
-        def _attempt() -> ProduceResult:
+        def _attempt(
+            *, prior_failure_branch1: str | None = None, prior_failure_analyzer: str | None = None
+        ) -> ProduceResult:
+            # prior_failure_analyzer routes to stage_branch2 (re-sample the analyzer);
+            # prior_failure_branch1 routes to stage_branch1 (rewrite the report). The
+            # branch-level G3 dispatch that supplies these arrives in Task 4.4.
             return produce_outputs(
                 ing.md_path,
                 candidate,
@@ -169,6 +174,8 @@ def make_spoke(
                 write_report=write_report,
                 cancel=cancel,
                 repo_resolver=repo_resolver,
+                prior_failure_analyzer=prior_failure_analyzer,
+                prior_failure_branch1=prior_failure_branch1,
             )
 
         # Scene helpers (audit F): a gate hard-block preserves the staged products
@@ -203,38 +210,50 @@ def make_spoke(
                 attempted_tier=str(ing.tier),
             )
 
-        # 5. branch2 -> Seal-1 -> G2 -> branch1. Any gate hard-block aborts before
-        #    promotion (OT-5) and is preserved as a self-contained scene.
-        try:
-            produced = _attempt()
-        except StructuralSealFailed as exc:
-            # Seal-1 structural validation failed → root in branch2; revival re-runs
-            # the whole branch2 chain. staged_dir holds the staged ai/ (no person/).
-            return _pre_promote_scene(
-                failed_gate="结构门",
-                findings=[{"target": "ara", "observation": e} for e in exc.errors],
-                staged_dir=exc.staged_dir,
-                reason="branch2 Seal-1 structural hard-fail: " + "; ".join(exc.errors[:3]),
-            )
-        except ProduceGateBlocked as exc:
-            # G2 data-fidelity hard block: staged ai/ only (branch1 not yet built).
-            return _pre_promote_scene(
-                failed_gate="数字门",
-                findings=[f.as_dict() for f in exc.verdict.hard_findings],
-                staged_dir=exc.staged_dir,
-                reason="G2 data-fidelity hard-block: "
-                + "; ".join(f.observation for f in exc.verdict.hard_findings[:3]),
-            )
-        except AnchorGateError as exc:
-            # branch1's three-layer anchor lint hard-failed (an empirical claim could
-            # not be grounded in the MD), in staging BEFORE promotion (OT-5). Preserve
-            # as a scene instead of crashing the unattended /loop tick (中枢-D2).
-            return _pre_promote_scene(
-                failed_gate="锚点门",
-                findings=[{"target": "report.md", "observation": str(exc)}],
-                staged_dir=getattr(exc, "staged_dir", None),
-                reason=f"branch1 three-layer anchor hard-gate: {exc}",
-            )
+        # 5. branch2 -> Seal-1 -> G2 -> branch1, with a G2 blind-retry budget. A
+        #    number-gate hard block re-runs the analyzer (fresh sampling, NO verdict
+        #    injection — ADR-0006) up to g2_blind_retry_rounds times; each intermediate
+        #    block's staging is cleaned and the FINAL one becomes the 数字门 scene.
+        #    (A bounded loop, not run_with_budget: the budget runner's gate->verdict
+        #    contract can't both clean each intermediate staging AND preserve the last
+        #    one for the scene — it has no notion of "final round". Behavior is
+        #    identical: blind retry, no feedback, exhausted -> scene, no note.)
+        produced: ProduceResult | None = None
+        for g2_round in range(g2_blind_retry_rounds + 1):
+            try:
+                produced = _attempt()
+                break
+            except StructuralSealFailed as exc:
+                # Seal-1 (structural) → root in branch2; not blind-retried (it would
+                # fail identically). Revival re-runs the whole branch2 chain.
+                return _pre_promote_scene(
+                    failed_gate="结构门",
+                    findings=[{"target": "ara", "observation": e} for e in exc.errors],
+                    staged_dir=exc.staged_dir,
+                    reason="branch2 Seal-1 structural hard-fail: " + "; ".join(exc.errors[:3]),
+                )
+            except ProduceGateBlocked as exc:
+                # G2 data-fidelity hard block (staged ai/ only; branch1 not yet built).
+                if g2_round < g2_blind_retry_rounds:
+                    shutil.rmtree(exc.staged_dir, ignore_errors=True)  # clean; retry fresh
+                    continue
+                return _pre_promote_scene(
+                    failed_gate="数字门",
+                    findings=[f.as_dict() for f in exc.verdict.hard_findings],
+                    staged_dir=exc.staged_dir,
+                    reason="G2 data-fidelity hard-block: "
+                    + "; ".join(f.observation for f in exc.verdict.hard_findings[:3]),
+                )
+            except AnchorGateError as exc:
+                # branch1's three-layer anchor lint hard-failed in staging BEFORE
+                # promotion (OT-5). Preserve as a scene instead of crashing the tick.
+                return _pre_promote_scene(
+                    failed_gate="锚点门",
+                    findings=[{"target": "report.md", "observation": str(exc)}],
+                    staged_dir=getattr(exc, "staged_dir", None),
+                    reason=f"branch1 three-layer anchor hard-gate: {exc}",
+                )
+        assert produced is not None  # the loop either broke with a result or returned a scene
 
         # 6. G3 seal (after both branches), bounded. On re-emit, rebuild branches.
         def _g3():

@@ -199,3 +199,27 @@ def test_produce_gate_block_carries_staged_dir(tmp_path, candidate, ledger, md_p
     assert not (tmp_path / "person_vault").exists() or not any(
         (tmp_path / "person_vault").iterdir()
     )
+
+
+def test_branch2_reemit_threads_repo_resolver(tmp_path, candidate, ledger, md_path, analyzer):
+    """审计 R10:branch2 re-emit(prior_failure_analyzer)必须把注入的 repo_resolver
+    透传到 write_branch2,不回退默认(否则丢 T2b/T4 码链解析)。"""
+    calls = []
+
+    def counting_resolver(*a, **k):
+        calls.append((a, k))
+        return []  # no repos resolved (signature-compatible counting fake)
+
+    def analyzer_pf(md, cand, *, prior_failure=None):
+        return analyzer(md, cand)  # reuse the fixture bundle; accept the re-emit kwarg
+
+    produce_outputs(
+        md_path,
+        candidate,
+        ledger,
+        root=tmp_path,
+        resolve_analysis=analyzer_pf,
+        repo_resolver=counting_resolver,
+        prior_failure_analyzer="上一稿 rigor 不足,请更严格核对源文数字",
+    )
+    assert calls, "branch2 re-emit 未调用注入的 repo_resolver(回退默认 = R10 回归)"
