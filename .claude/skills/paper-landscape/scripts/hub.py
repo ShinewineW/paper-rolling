@@ -250,7 +250,7 @@ def _run_spoke_guarded(
     if "error" in box:
         exc = box["error"]
         if isinstance(exc, EngineAbort):
-            # Total LLM-transport outage (primary AND claude-code fallback failed):
+            # LLM-transport failure (routed provider failed, no fallback by design):
             # NOT a per-paper failure — re-raise to abort the whole tick. Never
             # quarantine/continue on this, or we'd emit silently-degraded artifacts.
             raise exc

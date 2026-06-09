@@ -1,13 +1,16 @@
 # config/llm.yaml — per-seam LLM routing + execution mode.
 #
-# OPTIONAL: delete this file to route EVERY seam to the bottom-line default `claude -p`.
+# REQUIRED: this file MUST exist and EVERY seam MUST be explicitly routed. There
+# is NO default to `claude -p` and NO fallback — a missing file, an unrouted seam,
+# or a failing provider is a hard, loud error (EngineAbort). The Claude Code
+# subscription is used ONLY when a seam is deliberately routed to claude-code.
 # The engine itself is provider-agnostic; ALL transport choices live here.
 
 # ----------------------------------------------------------------------------
 # providers: name -> spec. Two provider TYPES (NEITHER is bound to any vendor):
-#   claude_code       : headless `claude -p` (your Claude Code auth; supports
-#                       --effort and grounded Read/Grep). This is the bottom-line
-#                       DEFAULT + the mandatory fallback for every seam.
+#   claude_code       : headless `claude -p` (your Claude Code subscription auth;
+#                       supports --effort and grounded Read/Grep). Models MUST be
+#                       specified explicitly below — there is NO default model.
 #   openai_compatible : ANY OpenAI chat-completions API behind an API TOKEN —
 #                       described purely by {base_url, models, api_key_env}. This
 #                       is the generic "API-token provider"; the instances below
@@ -19,7 +22,7 @@
 # NEVER hard-coded. Each instance carries its own token env.
 # ----------------------------------------------------------------------------
 providers:
-  claude-code:                       # bottom-line default + fallback (must exist)
+  claude-code:                       # only used by seams explicitly routed here (e.g. grounded analyzer)
     type: claude_code
     strong_model: claude-sonnet-4-6
     fast_model: claude-haiku-4-5-20251001
@@ -58,11 +61,11 @@ providers:
 
 # ----------------------------------------------------------------------------
 # seams: which provider + execution mode runs each LLM seam.
-#   value = a provider name (default mode), or {provider, mode}.
+#   value = a provider name (mode defaults), or {provider, mode}.
 #   mode  = inline | grounded(claude-code reads files itself) | agent_team(opt-in).
-# EVERY seam is independently routable; every call falls back to claude-code, and
-# if that bottom line ALSO fails the engine aborts (EngineAbort) — no silent
-# degradation.
+# EVERY seam MUST be explicitly routed (no default provider). On provider failure
+# the engine aborts LOUDLY (EngineAbort) — there is NO fallback, so a bad key /
+# endpoint surfaces instead of silently draining the Claude Code subscription.
 #
 # FUTURE (cross-audit, not yet active): a seam value may become a LIST of
 # providers for high-variance-but-critical seams (analyzer / writer) — each holds

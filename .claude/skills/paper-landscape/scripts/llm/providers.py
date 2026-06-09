@@ -8,9 +8,10 @@ seam to a different backend WITHOUT touching the engine.
 
 Two provider TYPES ship; neither is hard-wired to a vendor:
 
-  - ``claude_code``        — a headless ``claude -p`` subprocess (the default;
-                             uses the caller's Claude Code auth, supports
-                             ``--effort``). This is the ``LLMProvider`` default.
+  - ``claude_code``        — a headless ``claude -p`` subprocess (uses the
+                             caller's Claude Code subscription auth, supports
+                             ``--effort`` and grounded Read/Grep). NOT a default:
+                             a seam reaches it only when explicitly routed here.
   - ``openai_compatible``  — ANY OpenAI-/chat-completions-compatible HTTP API,
                              fully described by config (base_url + model ids +
                              api-key env var). OpenCode (deepseek) is just ONE
@@ -39,7 +40,7 @@ import requests
 
 # EngineAbort lives in the LLM-agnostic core (scripts/paths.py) so the engine/hub
 # can recognize it WITHOUT importing this transport layer; re-exported here since
-# FallbackProvider raises it and seam code imports it from here.
+# StrictProvider raises it and seam code imports it from here.
 from scripts.paths import EngineAbort
 
 # GLOBAL hard cap on concurrent `claude -p` subprocesses (account-level rate-limit
@@ -94,16 +95,21 @@ def _backoff_sleep(attempt: int) -> None:
 
 @dataclass(frozen=True)
 class ClaudeCodeProvider:
-    """Headless ``claude -p`` subprocess provider (default).
+    """Headless ``claude -p`` subprocess provider.
 
     Uses the caller's Claude Code session auth (no API key). Honors ``--effort``.
     Hardened with exponential-backoff retry on transient exit / rate-limit /
     timeout, since a non-zero exit with empty stderr is the rate-limit signature.
+
+    No default models: ``strong_model`` / ``fast_model`` MUST be specified
+    explicitly (in ``config/llm.yaml``). Routing a seam to the Claude Code
+    subscription is always a deliberate choice, never an implicit default —
+    silently defaulting here is what drained the account.
     """
 
-    name: str = "claude-code"
-    strong_model: str = "claude-sonnet-4-6"
-    fast_model: str = "claude-haiku-4-5-20251001"
+    name: str
+    strong_model: str
+    fast_model: str
 
     def _model(self, tier: str) -> str:
         return self.strong_model if tier == "strong" else self.fast_model
@@ -278,26 +284,25 @@ class OpenAICompatibleProvider:
 
 
 @dataclass(frozen=True)
-class FallbackProvider:
-    """A seam's routed provider with a MANDATORY bottom-line fallback.
+class StrictProvider:
+    """A seam's routed provider with NO fallback — fail loud, never degrade.
 
-    Order: try ``primary``; on ``ProviderError`` (retries already exhausted), fall
-    back to ``fallback`` (the engine default = claude-code ``-p``). If the fallback
-    ALSO fails — or the primary IS the fallback and it fails — raise
-    :class:`EngineAbort` to stop the engine. No silent degradation.
+    On ``ProviderError`` (the wrapped provider already exhausted its own retries)
+    this raises :class:`EngineAbort`, which the hub treats as a whole-tick abort
+    that surfaces to the operator. There is deliberately **no** fallback to any
+    other backend or to the Claude Code subscription: a failing/misconfigured
+    provider (bad key, dead endpoint, wrong model) MUST be seen and fixed, not
+    silently papered over by quietly draining the main account.
 
     Single-provider-per-seam today; the periphery is intentionally shaped so a
     future cross-audit can wrap several providers + a judge here instead.
     """
 
-    primary: LLMProvider
-    fallback: LLMProvider
+    provider: LLMProvider
 
     @property
     def name(self) -> str:
-        if self.primary.name == self.fallback.name:
-            return self.primary.name
-        return f"{self.primary.name}->fallback:{self.fallback.name}"
+        return self.provider.name
 
     def complete(
         self,
@@ -309,25 +314,15 @@ class FallbackProvider:
         tools: tuple[str, ...] | None = None,
     ) -> str:
         try:
-            return self.primary.complete(
+            return self.provider.complete(
                 prompt, tier=tier, effort=effort, timeout=timeout, tools=tools
             )
-        except ProviderError as primary_exc:
-            if self.fallback.name == self.primary.name:
-                # The bottom-line provider itself failed → no lower tier to try.
-                raise EngineAbort(
-                    f"bottom-line provider {self.primary.name!r} failed (no distinct "
-                    f"fallback): {primary_exc}"
-                ) from primary_exc
-            try:
-                return self.fallback.complete(
-                    prompt, tier=tier, effort=effort, timeout=timeout, tools=tools
-                )
-            except ProviderError as fb_exc:
-                raise EngineAbort(
-                    f"primary {self.primary.name!r} AND fallback {self.fallback.name!r} "
-                    f"both failed; aborting engine. primary={primary_exc}; fallback={fb_exc}"
-                ) from fb_exc
+        except ProviderError as exc:
+            raise EngineAbort(
+                f"provider {self.provider.name!r} failed and there is NO fallback "
+                f"(by design): fix the provider/key/config — the engine will not "
+                f"silently fall back to another backend. cause: {exc}"
+            ) from exc
 
 
 # --------------------------------------------------------------------------- #
@@ -345,17 +340,25 @@ def build_provider(name: str, spec: dict) -> LLMProvider:
         spec: ``{"type": "claude_code"|"openai_compatible", ...}``. For
             ``openai_compatible``: requires ``base_url``, ``strong_model``,
             ``fast_model``, ``api_key_env``; optional ``send_reasoning_effort``.
-            For ``claude_code``: optional ``strong_model`` / ``fast_model``.
+            For ``claude_code``: requires ``strong_model`` / ``fast_model``
+            (no default — must be specified explicitly).
 
     Raises:
         ProviderError: unknown type or missing required field.
     """
     ptype = spec.get("type")
     if ptype == "claude_code":
+        missing = [k for k in ("strong_model", "fast_model") if not spec.get(k)]
+        if missing:
+            raise ProviderError(
+                f"provider {name!r}: claude_code missing {missing} — models must be "
+                f"specified explicitly (no default; routing to the Claude Code "
+                f"subscription is always a deliberate choice)"
+            )
         return ClaudeCodeProvider(
             name=name,
-            strong_model=spec.get("strong_model", ClaudeCodeProvider.strong_model),
-            fast_model=spec.get("fast_model", ClaudeCodeProvider.fast_model),
+            strong_model=spec["strong_model"],
+            fast_model=spec["fast_model"],
         )
     if ptype == "openai_compatible":
         missing = [

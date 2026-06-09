@@ -63,8 +63,10 @@ FAILURE_STALLED = "stalled"  # spoke exceeded the wall-clock budget or crashed (
 
 
 class EngineAbort(RuntimeError):
-    """FATAL, tick-aborting: a seam's primary provider AND the bottom-line
-    claude-code fallback both failed (raised by scripts/llm FallbackProvider).
+    """FATAL, tick-aborting: a seam's routed LLM provider failed (raised by
+    scripts/llm StrictProvider). There is no fallback by design — a failing or
+    misconfigured provider stops the engine loudly instead of silently degrading
+    to another backend / the Claude Code subscription.
 
     Defined here (a dependency-light, LLM-agnostic module) so the hub can
     recognize it and ABORT the whole tick WITHOUT importing the LLM transport

@@ -7,11 +7,21 @@ from scripts.llm import providers as P
 from scripts.llm.config import load_llm_config
 
 
-def test_build_provider_claude_code_defaults() -> None:
-    prov = P.build_provider("claude-code", {"type": "claude_code"})
+def test_build_provider_claude_code_requires_explicit_models() -> None:
+    # No default models: routing to the Claude Code subscription is a deliberate
+    # choice, so the models must be specified explicitly or build fails.
+    prov = P.build_provider(
+        "claude-code",
+        {"type": "claude_code", "strong_model": "S", "fast_model": "F"},
+    )
     assert isinstance(prov, P.ClaudeCodeProvider)
     assert prov.name == "claude-code"
-    assert prov.strong_model and prov.fast_model
+    assert (prov.strong_model, prov.fast_model) == ("S", "F")
+
+
+def test_build_provider_claude_code_missing_models_raises() -> None:
+    with pytest.raises(P.ProviderError, match="claude_code missing"):
+        P.build_provider("claude-code", {"type": "claude_code"})
 
 
 def test_build_provider_openai_compatible() -> None:
@@ -101,17 +111,20 @@ def test_openai_complete_4xx_fails_fast(monkeypatch: pytest.MonkeyPatch) -> None
         prov.complete("hi")
 
 
-def test_load_default_when_absent(tmp_path: Path) -> None:
-    cfg = load_llm_config(tmp_path)
-    assert set(cfg.providers) == {"claude-code"}
-    assert all(cfg.routing[s] == "claude-code" for s in cfg.routing)
-    assert cfg.for_seam("writer").name == "claude-code"
+def test_load_absent_config_raises(tmp_path: Path) -> None:
+    # No implicit all-claude-code default: a missing config file is a loud error.
+    with pytest.raises(ValueError, match="not found"):
+        load_llm_config(tmp_path)
 
 
-def test_load_routes_writer_to_opencode(tmp_path: Path) -> None:
-    (tmp_path / "config").mkdir()
-    (tmp_path / "config" / "llm.yaml").write_text(
+def _full_seam_yaml(*, analyzer: str = "{ provider: claude-code, mode: grounded }") -> str:
+    """A config routing ALL six seams (every seam must be explicitly routed)."""
+    return (
         "providers:\n"
+        "  claude-code:\n"
+        "    type: claude_code\n"
+        "    strong_model: claude-sonnet-4-6\n"
+        "    fast_model: claude-haiku-4-5\n"
         "  opencode:\n"
         "    type: openai_compatible\n"
         "    base_url: https://opencode.ai/zen/go/v1\n"
@@ -119,27 +132,43 @@ def test_load_routes_writer_to_opencode(tmp_path: Path) -> None:
         "    strong_model: deepseek-v4-pro\n"
         "    fast_model: deepseek-v4-flash\n"
         "seams:\n"
-        "  analyzer: claude-code\n"
-        "  writer: opencode\n",
-        encoding="utf-8",
+        f"  analyzer: {analyzer}\n"
+        "  skeptic: opencode\n"
+        "  rigor: opencode\n"
+        "  entailment: opencode\n"
+        "  expand: opencode\n"
+        "  writer: opencode\n"
     )
+
+
+def test_load_routes_seams_explicitly(tmp_path: Path) -> None:
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "llm.yaml").write_text(_full_seam_yaml(), encoding="utf-8")
     cfg = load_llm_config(tmp_path)
-    assert cfg.for_seam("analyzer").name == "claude-code"  # claude-code auto-injected
+    assert cfg.for_seam("analyzer").name == "claude-code"  # explicit, grounded
     assert cfg.for_seam("writer").name == "opencode"
-    assert cfg.for_seam("skeptic").name == "claude-code"  # unlisted -> default
+    assert cfg.for_seam("skeptic").name == "opencode"
+
+
+def test_load_unrouted_seam_raises(tmp_path: Path) -> None:
+    # Drop the writer routing -> must fail loud (no default routing).
+    yaml_text = _full_seam_yaml().replace("  writer: opencode\n", "")
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "llm.yaml").write_text(yaml_text, encoding="utf-8")
+    with pytest.raises(ValueError, match="seam 'writer' is not routed"):
+        load_llm_config(tmp_path)
 
 
 def test_load_unknown_provider_in_routing_raises(tmp_path: Path) -> None:
+    # All seams routed, but writer points at an undefined provider.
+    yaml_text = _full_seam_yaml().replace("  writer: opencode\n", "  writer: ghost\n")
     (tmp_path / "config").mkdir()
-    (tmp_path / "config" / "llm.yaml").write_text(
-        "providers:\n  claude-code:\n    type: claude_code\nseams:\n  writer: ghost\n",
-        encoding="utf-8",
-    )
+    (tmp_path / "config" / "llm.yaml").write_text(yaml_text, encoding="utf-8")
     with pytest.raises(ValueError, match="undefined provider"):
         load_llm_config(tmp_path)
 
 
-# --- FallbackProvider + EngineAbort (the mandatory failure path) ------------
+# --- StrictProvider + EngineAbort (the loud, no-fallback failure path) ------
 
 
 class _FakeProvider:
@@ -160,54 +189,28 @@ class _FakeProvider:
         return self._result
 
 
-def test_fallback_uses_primary_on_success() -> None:
-    fb = P.FallbackProvider(
-        primary=_FakeProvider("primary", result="P"), fallback=_FakeProvider("claude-code")
-    )
-    assert fb.complete("x") == "P"
-    assert fb.name == "primary->fallback:claude-code"
+def test_strict_passes_through_on_success() -> None:
+    sp = P.StrictProvider(_FakeProvider("opencode", result="P"))
+    assert sp.complete("x") == "P"
+    assert sp.name == "opencode"
 
 
-def test_fallback_to_secondary_on_primary_error() -> None:
-    fb = P.FallbackProvider(
-        primary=_FakeProvider("opencode", fail=True),
-        fallback=_FakeProvider("claude-code", result="FB"),
-    )
-    assert fb.complete("x") == "FB"  # primary failed -> fell back to claude-code
+def test_strict_aborts_loudly_on_failure() -> None:
+    # No fallback: a failing provider raises EngineAbort (which the hub treats as a
+    # whole-tick abort), never silently swapping to another backend.
+    sp = P.StrictProvider(_FakeProvider("opencode", fail=True))
+    with pytest.raises(P.EngineAbort, match="NO fallback"):
+        sp.complete("x")
 
 
-def test_engine_abort_when_both_fail() -> None:
-    fb = P.FallbackProvider(
-        primary=_FakeProvider("opencode", fail=True),
-        fallback=_FakeProvider("claude-code", fail=True),
-    )
-    with pytest.raises(P.EngineAbort, match="both failed"):
-        fb.complete("x")
-
-
-def test_engine_abort_when_bottom_line_is_primary() -> None:
-    # analyzer case: primary IS claude-code (== fallback). Its failure has no lower
-    # tier -> abort, never silently continue.
-    cc = _FakeProvider("claude-code", fail=True)
-    fb = P.FallbackProvider(primary=cc, fallback=cc)
-    with pytest.raises(P.EngineAbort, match="no distinct"):
-        fb.complete("x")
-
-
-def test_resolve_wraps_seam_with_claude_fallback(tmp_path: Path) -> None:
+def test_resolve_wraps_seam_in_strict_provider(tmp_path: Path) -> None:
     (tmp_path / "config").mkdir()
-    (tmp_path / "config" / "llm.yaml").write_text(
-        "providers:\n"
-        "  opencode:\n    type: openai_compatible\n    base_url: https://x/v1\n"
-        "    api_key_env: X\n    strong_model: s\n    fast_model: f\n"
-        "seams:\n  writer: opencode\n",
-        encoding="utf-8",
-    )
+    (tmp_path / "config" / "llm.yaml").write_text(_full_seam_yaml(), encoding="utf-8")
     cfg = load_llm_config(tmp_path)
-    fb = cfg.resolve("writer")
-    assert isinstance(fb, P.FallbackProvider)
-    assert fb.primary.name == "opencode"
-    assert fb.fallback.name == "claude-code"  # always the bottom-line default
+    sp = cfg.resolve("writer")
+    assert isinstance(sp, P.StrictProvider)
+    assert sp.name == "opencode"  # the explicitly-routed provider, no fallback field
+    assert not hasattr(sp, "fallback")
 
 
 def test_claude_p_global_concurrency_cap_defaults_to_5():

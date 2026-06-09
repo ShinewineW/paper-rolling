@@ -93,9 +93,9 @@ scripts/          the engine code (packages below)
 
 | Module | Purpose |
 |--------|---------|
-| `providers.py` | `LLMProvider` protocol: `ClaudeCodeProvider` (claude -p) + `OpenAICompatibleProvider` (any OpenAI-compat API) + `FallbackProvider` (primary → mandatory claude-code fallback → EngineAbort). |
-| `config.py` | `LLMConfig` from `config/llm.yaml`: loads per-seam provider routing + execution modes (inline / grounded / agent_team). |
-| `seams.py` | `build_seams()` factory: constructs the 6 LLM seams (analyzer, skeptic, rigor, entailment, expand, writer) with provider routing + FallbackProvider wrapping. |
+| `providers.py` | `LLMProvider` protocol: `ClaudeCodeProvider` (claude -p, explicit models — no default) + `OpenAICompatibleProvider` (any OpenAI-compat API) + `StrictProvider` (routed provider → on failure raises `EngineAbort`, **no fallback** — a bad key/endpoint fails loud, never silently drains the Claude Code subscription). |
+| `config.py` | `LLMConfig` from `config/llm.yaml` (**required**; every seam must be explicitly routed — no default provider): loads per-seam provider routing + execution modes (inline / grounded / agent_team). |
+| `seams.py` | `build_seams()` factory: constructs the 6 LLM seams (analyzer, skeptic, rigor, entailment, expand, writer) with provider routing + `StrictProvider` (no-fallback) wrapping. |
 | `analyzer.py` | `analyze_chunked(...)` — grounded analyzer (chunks large MD, parallel analyst calls, formula-fidelity discipline). |
 | `writer.py` | `write_human_sections(...)` + `curate_figures(...)` — human-chain LLM writer (vivid Chinese prose + selective figure curation: mandatory arch + top-N results). |
 | `jsonparse.py` | `extract_json(...)` — tolerant JSON extraction (handles code fences, LaTeX escapes, leading prose). |

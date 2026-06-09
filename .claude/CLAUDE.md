@@ -89,13 +89,17 @@ skeptic); **G3** = seal (anchor + equation fidelity + entailment + 6-dim rigor).
 ## LLM provider routing
 
 `config/llm.yaml` routes each of the 6 seams to a provider. Two provider types
-(neither vendor-bound): `claude_code` (headless `claude -p`, the bottom-line
-default + mandatory fallback) and `openai_compatible` (any OpenAI-compat API by
-`{base_url, models, api_key_env}`). Every seam is wrapped in `FallbackProvider`
-(primary → claude-code fallback → `EngineAbort` if both fail), so a missing API
-key degrades gracefully rather than crashing. The active config routes 5 seams to
-the `opencode` provider, which reads `OPENCODE_API_KEY` from `.env` (gitignored).
-Delete `config/llm.yaml` to route everything to `claude -p`.
+(neither vendor-bound): `claude_code` (headless `claude -p`; models must be
+specified explicitly — **no default model**) and `openai_compatible` (any
+OpenAI-compat API by `{base_url, models, api_key_env}`). Every seam is wrapped in
+`StrictProvider`: on provider failure it raises `EngineAbort` (loud, aborts the
+tick) with **no fallback** — a bad key / dead endpoint / wrong model fails loudly
+instead of silently draining the Claude Code subscription. `config/llm.yaml` is
+**required** and **every seam must be explicitly routed** (a missing file or an
+unrouted seam is a hard error — there is no implicit default to `claude -p`).
+`grounded` mode still requires a `claude_code` provider (local Read/Grep). The
+active config routes the analyzer to `claude-code` (grounded) and the other 5
+seams to an `openai_compatible` provider, keys from `.env` (gitignored).
 
 ## Non-obvious invariants (will bite you otherwise)
 

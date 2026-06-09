@@ -4,8 +4,9 @@
 `run_campaign(...)` injects LLM-backed seams; this module builds the REAL ones on
 top of the provider layer: resolve_analysis / skeptic_votes / rigor_scores /
 entailment_judge / expand_llm / write_report. Each seam picks its transport via
-config/llm.yaml (LLMConfig.resolve -> FallbackProvider), so it is provider-routed
-AND has the mandatory claude-code fallback (EngineAbort if even that fails).
+config/llm.yaml (LLMConfig.resolve -> StrictProvider), so it is provider-routed
+with NO fallback: a failing/misconfigured provider raises EngineAbort (loud) and
+aborts the tick, never silently degrading to the Claude Code subscription.
 
 Ground-truth isolation is preserved: each seam is an independent provider call, so
 audit votes are uncorrelated with the generator. Use ``build_seams()`` to get the
@@ -24,7 +25,7 @@ from scripts.llm.analyzer import REQUIRED_ARA_KEYS as _REQUIRED_ARA_KEYS
 from scripts.llm.analyzer import analyze_chunked
 from scripts.llm.config import LLMConfig, load_llm_config
 from scripts.llm.jsonparse import extract_json as _extract_json
-from scripts.llm.providers import FallbackProvider
+from scripts.llm.providers import StrictProvider
 from scripts.llm.writer import curate_figures, write_human_sections
 from scripts.output.figures import extract_figures, is_architecture_caption
 
@@ -48,12 +49,13 @@ _SEAM_OVERRIDE: dict[str, str] = {}
 
 
 def _provider_for(seam: str):
-    """The runtime provider for a seam, wrapped with the mandatory claude-code
-    fallback (FallbackProvider → EngineAbort if both fail)."""
+    """The runtime provider for a seam, wrapped by StrictProvider: a transport
+    failure raises EngineAbort (loud, aborts the tick). NO fallback — a failing
+    provider is surfaced, never silently swapped for another backend."""
     cfg = _cfg()
     name = _SEAM_OVERRIDE.get(seam)
     if name:
-        return FallbackProvider(primary=cfg.providers[name], fallback=cfg.providers["claude-code"])
+        return StrictProvider(cfg.providers[name])
     return cfg.resolve(seam)
 
 

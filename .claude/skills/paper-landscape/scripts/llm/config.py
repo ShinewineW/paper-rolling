@@ -33,8 +33,8 @@ from pathlib import Path
 import yaml
 
 from scripts.llm.providers import (
-    FallbackProvider,
     LLMProvider,
+    StrictProvider,
     build_provider,
     load_dotenv,
 )
@@ -44,9 +44,11 @@ LLM_CONFIG_REL = Path("config") / "llm.yaml"
 SEAMS = ("analyzer", "skeptic", "rigor", "entailment", "expand", "writer")
 VALID_MODES = ("inline", "grounded", "agent_team")
 
-_DEFAULT_PROVIDER = "claude-code"
-# Per-seam default execution mode (the finalized spec). Only the heavy analyzer
-# defaults to grounded; the rest are inline. agent_team is never a default.
+# Per-seam default execution MODE only (the finalized spec). Only the heavy
+# analyzer defaults to grounded; the rest are inline. agent_team is never a
+# default. NOTE: there is intentionally NO default PROVIDER — every seam must be
+# explicitly routed in config/llm.yaml (silent routing to the Claude Code
+# subscription is what drained the account).
 _DEFAULT_MODES = {
     "analyzer": "grounded",
     "skeptic": "inline",
@@ -66,61 +68,61 @@ class LLMConfig:
     modes: dict[str, str]
 
     def for_seam(self, seam: str) -> LLMProvider:
-        """Return the provider routed to ``seam`` (falls back to the default)."""
-        name = self.routing.get(seam, _DEFAULT_PROVIDER)
-        if name not in self.providers:
-            raise KeyError(
-                f"seam {seam!r} routed to unknown provider {name!r}; "
-                f"defined providers: {sorted(self.providers)}"
-            )
+        """Return the provider explicitly routed to ``seam`` (load_llm_config
+        guarantees every seam is routed to a defined provider)."""
+        name = self.routing[seam]
         return self.providers[name]
 
     def mode_for(self, seam: str) -> str:
         """Return the execution mode for ``seam`` (inline | grounded | agent_team)."""
         return self.modes.get(seam, _DEFAULT_MODES.get(seam, "inline"))
 
-    def resolve(self, seam: str) -> FallbackProvider:
-        """The runtime provider for ``seam``: its routed provider wrapped with the
-        MANDATORY bottom-line fallback to the claude-code default. Seams call this
-        (not for_seam) so every call has the fail-fast fallback path; if both the
-        primary and the claude-code fallback fail, complete() raises EngineAbort.
+    def resolve(self, seam: str) -> StrictProvider:
+        """The runtime provider for ``seam``: its explicitly-routed provider wrapped
+        so a transport failure raises EngineAbort (loud, aborts the tick). There is
+        NO fallback — a failing provider stops the engine instead of silently
+        degrading to another backend or the Claude Code subscription.
         """
-        primary = self.for_seam(seam)
-        fallback = self.providers[_DEFAULT_PROVIDER]
-        return FallbackProvider(primary=primary, fallback=fallback)
+        return StrictProvider(self.for_seam(seam))
 
 
-def _default_config() -> LLMConfig:
-    return LLMConfig(
-        providers={_DEFAULT_PROVIDER: build_provider(_DEFAULT_PROVIDER, {"type": "claude_code"})},
-        routing={s: _DEFAULT_PROVIDER for s in SEAMS},
-        modes=dict(_DEFAULT_MODES),
-    )
+def _seam_entry(value, default_mode: str) -> tuple[str, str]:
+    """Normalize a seam config value (provider string, or {provider, mode}).
 
-
-def _seam_entry(value, default_provider: str, default_mode: str) -> tuple[str, str]:
-    """Normalize a seam config value (string provider, or {provider, mode})."""
-    if value is None:
-        return default_provider, default_mode
+    The provider is REQUIRED — there is no default routing. Only the execution
+    ``mode`` falls back to ``default_mode``.
+    """
     if isinstance(value, str):
         return value, default_mode
     if isinstance(value, dict):
-        return value.get("provider", default_provider), value.get("mode", default_mode)
-    raise ValueError(f"seam entry must be a string or a mapping, got {type(value).__name__}")
+        provider = value.get("provider")
+        if not provider:
+            raise ValueError("seam entry mapping must include 'provider'")
+        return provider, value.get("mode", default_mode)
+    raise ValueError(
+        f"seam entry must be a provider string or a mapping, got {type(value).__name__}"
+    )
 
 
 def load_llm_config(workspace: Path) -> LLMConfig:
-    """Load ``config/llm.yaml`` (or the all-claude-code default if absent).
+    """Load ``config/llm.yaml``. The file is REQUIRED — there is no implicit
+    all-claude-code default. Every seam must be explicitly routed to a provider,
+    so that using the Claude Code subscription is always a deliberate choice.
 
     Raises:
-        ValueError: malformed file, unknown provider type, a seam routed to an
-            undefined provider, or an invalid mode — fail fast.
+        ValueError: missing file, malformed file, unknown provider type, a seam
+            routed to an undefined provider, a seam left unrouted, or an invalid
+            mode — fail fast and loud.
     """
     workspace = Path(workspace)
     load_dotenv(workspace)  # surface API keys from the gitignored .env
     path = workspace / LLM_CONFIG_REL
     if not path.exists():
-        return _default_config()
+        raise ValueError(
+            f"{LLM_CONFIG_REL} not found: every LLM seam must be explicitly routed "
+            f"to a provider (there is NO default to the Claude Code subscription). "
+            f"Create config/llm.yaml routing all seams: {', '.join(SEAMS)}."
+        )
 
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(raw, dict):
@@ -129,7 +131,6 @@ def load_llm_config(workspace: Path) -> LLMConfig:
     prov_specs = raw.get("providers") or {}
     if not isinstance(prov_specs, dict) or not prov_specs:
         raise ValueError(f"{LLM_CONFIG_REL}: 'providers' must be a non-empty mapping")
-    prov_specs.setdefault(_DEFAULT_PROVIDER, {"type": "claude_code"})
     providers = {name: build_provider(name, spec) for name, spec in prov_specs.items()}
 
     seams_cfg = raw.get("seams") or {}
@@ -138,9 +139,13 @@ def load_llm_config(workspace: Path) -> LLMConfig:
     routing: dict[str, str] = {}
     modes: dict[str, str] = {}
     for s in SEAMS:
-        provider, mode = _seam_entry(
-            seams_cfg.get(s), _DEFAULT_PROVIDER, _DEFAULT_MODES.get(s, "inline")
-        )
+        if seams_cfg.get(s) is None:
+            raise ValueError(
+                f"{LLM_CONFIG_REL}: seam {s!r} is not routed to any provider — every "
+                f"seam must be explicitly routed (no default). Defined providers: "
+                f"{sorted(providers)}."
+            )
+        provider, mode = _seam_entry(seams_cfg.get(s), _DEFAULT_MODES.get(s, "inline"))
         if provider not in providers:
             raise ValueError(
                 f"{LLM_CONFIG_REL}: seam {s!r} routed to undefined provider {provider!r}; "

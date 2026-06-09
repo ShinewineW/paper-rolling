@@ -240,7 +240,8 @@ from scripts.adapters import build_http, build_run_cli, build_discover
 # setup gate. is_ad_domain defaults to True (AD whitelists) when not yet locked.
 campaign = load_campaign(Path("."))
 
-# The SIX LLM seams are provider-routed + claude-code-fallback-wrapped; build them
+# The SIX LLM seams are provider-routed + StrictProvider-wrapped (NO fallback — a
+# failing provider raises EngineAbort, never silently uses the Claude Code sub); build them
 # from config/llm.yaml via build_seams() (see references/wiring-the-seams.md). Each
 # is an independent provider call (ground-truth isolation preserved). write_report
 # is the human-chain writer — pass it so branch1 produces the RICH LLM report
