@@ -1,0 +1,117 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何在单一框架中统一动作生成与世界状态预测并实现双向增强
+  description: 传统 VLA 模型将动作仅视为输出，缺乏对动作的深层理解；世界模型能预测未来视觉状态但无法直接输出动作。研究问题是：能否在一个模型中同时实现动作理解/生成与视觉理解/生成，并使两者相互促进？
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3.1
+- id: D1
+  type: decision
+  title: 采用离散自回归架构，以共享词表统一三模态 token
+  choice: 基于 Chameleon 框架，用 VQ-GAN 离散化图像、BPE 处理文本、均匀分 bin 离散化动作，三者共享同一词表，由单一 LLM 进行自回归建模，同时计算动作损失和图像生成损失
+  alternatives:
+  - 独立扩散头方案：如 UVA 中图像与动作分别使用扩散头，各模态不在同一 LLM token 空间中统一
+  - 连续动作回归方案：如 π0 中的流匹配，不将动作离散化为 token，也不与图像 token 共享词表
+  support_level: explicit
+  source_refs:
+  - Sec 3.2
+  - Table 1
+  also_depends_on:
+  - Q1
+- id: Q2
+  type: question
+  title: 自回归生成多步动作块时误差传播问题如何解决
+  description: 预训练 MLLM 主要在图像和文本数据上训练，对动作模态的泛化能力有限。在标准自回归框架中，后续动作 token 依赖前序动作 token，前序预测误差会沿序列持续传播，导致动作块生成质量随块长增加而显著退化。
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3.3
+  also_depends_on:
+  - D1
+- id: D2
+  type: decision
+  title: 引入动作注意力掩码，使每个动作独立地仅依赖文本与视觉输入
+  choice: 修改动作生成部分的注意力掩码：生成当前动作时屏蔽前序动作 token，每个动作只能关注文本和图像 token；世界模型部分保留标准因果掩码不变
+  alternatives:
+  - 保留默认因果注意力掩码：后续动作可看到所有前序动作 token，但误差会在序列中持续累积
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  - Fig. 3
+  also_depends_on:
+  - Q2
+- id: E1
+  type: experiment
+  title: WorldVLA 与独立动作模型及独立世界模型的综合基准对比
+  result: WorldVLA 在 LIBERO 基准上的平均抓取成功率高于同等骨干的独立离散动作模型；在长视频序列的视频生成质量（FVD）上也优于纯世界模型，表明世界模型与动作模型之间存在可测量的双向互增强效果
+  support_level: explicit
+  source_refs:
+  - Table 2
+  - Table 3
+  - Table 4
+  - Sec 4.2
+  also_depends_on:
+  - D1
+  - D2
+- id: E2
+  type: experiment
+  title: 世界模型对动作模型性能影响的消融实验
+  result: 在动作模型训练中引入世界模型数据后，所有 LIBERO 子任务的成功率均有提升；以世界模型权重预训练动作模型同样带来正向收益，说明习得的环境物理动力学表示对精细操控有帮助
+  support_level: explicit
+  source_refs:
+  - Table 3
+  - Table 6
+  - Sec 4.2
+  also_depends_on:
+  - D1
+- id: E3
+  type: experiment
+  title: 历史图像帧数与推理帧率的消融实验
+  result: 增加历史帧数可持续提升成功率，但启用动作分块后双帧与四帧性能已趋近饱和；更多帧会降低推理帧率（FPS），双帧是成功率与计算效率的最优折衷点
+  support_level: explicit
+  source_refs:
+  - Table 5
+  - Sec 4.2
+  also_depends_on:
+  - D1
+- id: DE1
+  type: dead_end
+  title: 标准因果注意力掩码下的多步动作自回归生成
+  hypothesis: 直接沿用标准因果注意力掩码，让后续动作 token 条件于前序所有动作 token，可以有效生成高质量的动作块
+  failure_mode: MLLM 预训练阶段几乎不包含动作数据，动作域泛化能力弱；自回归链中前序预测误差被持续放大，动作块越长、错误积累越严重，抓取成功率随块长增加而显著下降，且在空间任务等子任务中退化尤为突出
+  lesson: 动作与图像/文本在预训练覆盖和模态特性上根本不同，不适合直接复用标准因果注意力；应将各动作预测从序列依赖中解耦，改为仅依赖视觉和文本输入，使每步动作独立生成
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  - Sec 4.2
+  - Fig. 6
+  also_depends_on:
+  - Q2
+- id: DE2
+  type: dead_end
+  title: 无动作条件的视频预测模型替代世界模型辅助动作训练
+  hypothesis: 以任务指令为条件、不以动作为条件来预测下一帧的视频预测模型，同样能为动作模型提供有效的物理先验和视觉理解支持
+  failure_mode: 视频预测缺乏动作约束，同一起始帧对应多种合理后续帧，训练目标存在固有歧义，引入不稳定的训练信号；实验表明视频预测模型仅对部分任务有正向效果，对另一任务反而带来负面影响，整体一致性不如世界模型
+  lesson: 显式动作条件是世界模型能够提升动作生成的关键所在；不含动作约束的视频预测信号不稳定，无法可靠替代以动作为条件的世界模型
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Fig. 7
+  also_depends_on:
+  - Q1
+- id: P1
+  type: pivot
+  title: 从动作模型独立训练转向动作模型与世界模型混合数据联合训练
+  from: 仅使用动作模型数据训练，动作仅作为模型输出目标
+  to: 混合动作模型数据与世界模型数据进行统一自回归训练（损失 = 动作损失 + α × 世界模型损失），动作同时作为世界模型的条件输入和策略模型的预测目标
+  trigger: 世界模型通过学习预测下一状态习得环境物理动力学，这种物理先验对精细操控任务有帮助；同时动作模型增强了视觉理解，反过来又改善了世界模型的视觉生成质量，形成正向循环
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  - Sec 4.2
+  also_depends_on:
+  - Q1
+  - D1

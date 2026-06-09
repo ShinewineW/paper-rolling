@@ -1,0 +1,124 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何构建兼具真实感视频生成与世界动态表示学习能力的自动驾驶世界模型
+  support_level: inferred
+  description: 现有世界模型依赖标注数据、低维表示难以生成高保真样本；现有生成式视频模型缺乏对世界演化动态的有意义表示。如何将可扩展的生成视频模型与世界模型的意义表示能力相结合，并支持多模态条件控制。
+  children:
+  - id: D1
+    type: decision
+    title: 选择将世界建模转化为无监督序列预测（next-token prediction）问题
+    support_level: explicit
+    source_refs:
+    - Sec 2.3
+    - Eq. 1
+    choice: 将视频、文本、动作统一映射为离散token序列，以因果掩码autoregressive transformer预测下一个图像token
+    alternatives:
+    - 直接像素级预测（序列过长、计算不可行）
+    - 基于GAN的视频生成（训练不稳定、多样性不足）
+    - 基于VAE的潜空间建模（输出模糊、先验设计困难）
+    children:
+    - id: Q2
+      type: question
+      title: 如何将高维图像数据压缩为语义丰富的离散token
+      support_level: inferred
+      description: 直接建模原始像素会导致序列过长且高频噪声主导学习过程；需要在压缩率与语义内容保留之间取得平衡，使世界模型输入空间更易于组合与建模。
+      children:
+      - id: E1
+        type: experiment
+        title: DINO知识蒸馏增强图像tokenizer语义性
+        support_level: explicit
+        source_refs:
+        - Sec 2.2
+        - Sec 4.1
+        - Fig. 3
+        result: 加入DINO余弦相似度蒸馏损失（λ_{DINO}=0.1）后，token PCA可视化显示同语义类别（车辆、道路、天空）的token嵌入聚集更加紧密，语义区分度明显高于纯base
+          VQ-GAN token
+    - id: Q3
+      type: question
+      title: 推理时如何选择合适的token采样策略以平衡生成多样性与真实性
+      support_level: inferred
+      description: 自回归生成时每步需从预测logits中采样下一个token，不同策略对生成质量影响显著。
+    - id: Q4
+      type: question
+      title: 如何确保视频解码器的时序一致性并实现从6.25Hz到25Hz的高质量时间超分辨率
+      support_level: inferred
+      description: 世界模型在6.25Hz生成离散token，独立逐帧解码缺乏跨帧信息共享，导致时序不一致；需要设计能够在扩散过程中跨时间建模的解码策略。
+- id: DE1
+  type: dead_end
+  title: argmax贪心采样：生成帧陷入重复循环退化
+  support_level: explicit
+  source_refs:
+  - Sec 5.1
+  - Fig. 6a
+  hypothesis: 始终选择概率最高的token可保证生成质量并避免低概率噪声干扰
+  failure_mode: token perplexity极低，几乎无多样性，预测帧不断重复自身，类似语言模型的文本退化现象
+  lesson: argmax最大化策略在自回归视频token生成中同样会导致退化；必须保留适度的随机性
+  also_depends_on:
+  - Q3
+- id: DE2
+  type: dead_end
+  title: 全分布无截断随机采样：低概率长尾引发分布外崩溃
+  support_level: explicit
+  source_refs:
+  - Sec 5.1
+  - Fig. 6b
+  hypothesis: 从完整预测概率分布中采样可获得最大生成多样性
+  failure_mode: 可信度极低的长尾token被采样到，产生分布外token，使模型偏离训练分布，perplexity出现极高峰值
+  lesson: 视频codebook分布的长尾极不可靠，必须截断采样范围以避免分布外崩溃
+  also_depends_on:
+  - Q3
+- id: D2
+  type: decision
+  title: 选择top-k=50采样策略，其perplexity分布与真实token最接近
+  support_level: explicit
+  source_refs:
+  - Sec 5.1
+  - Fig. 6c
+  choice: 从概率最高的k=50个token中均匀采样，实验观察到该策略产生的perplexity分布与真实图像token最为相似
+  alternatives:
+  - argmax（多样性不足，退化为重复循环，已排除）
+  - 全分布采样（长尾噪声导致分布外崩溃，已排除）
+  - 温度采样（论文未作为主要对比方案）
+  also_depends_on:
+  - DE1
+  - DE2
+- id: P1
+  type: pivot
+  title: 从独立帧解码转向多任务3D扩散视频解码
+  support_level: explicit
+  source_refs:
+  - Sec 2.4
+  - Sec 4.3
+  - Fig. 4
+  from: 对每帧token独立解码至像素空间（逐帧解码缺乏时序信息共享，时序不一致）
+  to: 采用3D U-Net配合分解式时空注意力层，在扩散过程中跨时间建模；单模型联合训练图像生成、视频生成、自回归解码、视频插帧四项任务
+  trigger: 独立帧解码无法在扩散过程中交换跨帧信息，导致视频时序不一致；多任务训练已证明能提升各子任务性能
+  also_depends_on:
+  - Q4
+- id: E2
+  type: experiment
+  title: 多任务联合训练视频扩散解码器
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  - Fig. 4
+  result: 单模型联合训练四项任务（图像生成负责提升单帧质量，视频生成负责提升时序一致性，自回归解码和视频插帧提供时序上采样能力），多任务训练相比单任务训练提升各子任务性能；推理时逆序自回归解码（从序列末尾向前）可进一步减少地平线区域的闪烁
+  also_depends_on:
+  - P1
+- id: Q5
+  type: question
+  title: 将世界建模转化为序列预测后，是否存在类似大语言模型的缩放规律
+  support_level: inferred
+  description: GAIA-1采用与LLM形式相同的next-token预测范式；若世界模型同样遵循幂律缩放，则可用小规模代理模型预测大规模模型性能，并指导计算资源分配。
+- id: E3
+  type: experiment
+  title: 利用代理小模型验证世界模型缩放定律
+  support_level: explicit
+  source_refs:
+  - Sec 6
+  - Fig. 8
+  result: 使用参数量为0.65M至650M（即GAIA-1 6.5B的10,000倍至10倍缩小版）的代理模型，拟合形如 f(x)=c+(x/a)^b 的幂律曲线，能以不足20倍计算量准确预测GAIA-1最终验证集交叉熵；确认自动驾驶世界模型领域同样存在类LLM的幂律缩放规律，且仍有通过扩大数据与计算资源进一步提升的空间
+  also_depends_on:
+  - Q5

@@ -1,0 +1,88 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 传统世界模型训练目标导致潜表示缺乏动作相关结构
+  support_level: explicit
+  source_refs:
+  - Sec I
+  - Sec II.A
+  description: 传统世界模型(如DreamerV2)仅通过像素重建与KL正则化目标训练,潜状态z_t从未被显式优化以包含动作相关结构。下游扩散策略以z_t为输入,但z_t仅对视觉预测有压力,缺乏捕捉环境对智能体行为响应的动因,限制了下游控制性能。
+  children:
+  - id: D1
+    type: decision
+    title: 采用增量式动作正则化而非整体架构重设计
+    support_level: explicit
+    source_refs:
+    - Sec I
+    - Sec III.A
+    choice: 在DreamerV2训练目标中增加逆向动力学辅助损失,保持现有RSSM架构不变,以改善表示质量
+    alternatives:
+    - 重新设计统一的动作-世界模型自回归架构(如WorldVLA等方法),依赖大型基础模型并从根本上重构架构,与现有世界模型不兼容
+    children:
+    - id: Q2
+      type: question
+      title: 逆向动力学头应作用于哪一层特征以避免预测平凡化?
+      support_level: explicit
+      source_refs:
+      - Sec III.A
+      description: 逆向动力学头需要选择输入特征层:编码器嵌入e_t或RSSM联合特征f_t。不同选择影响正则化信号能否真正迫使模型学习状态转移的因果结构,而非简单记忆历史动作。
+      children:
+      - id: Dead1
+        type: dead_end
+        title: 在RSSM联合特征f_t上应用逆向动力学头
+        support_level: explicit
+        source_refs:
+        - Sec III.A
+        hypothesis: 直接在RSSM特征f_t = [h_t; z_t]上预测动作,可利用更丰富的上下文进行动作预测
+        failure_mode: f_t通过GRU接收上一时刻动作a_{t-1}作为输入(Eq.1),使得从f_t预测当前动作a_t变成一个平凡问题——模型可直接从历史动作信息中读出答案,无需学习真正的状态转移因果结构,正则化效果失效
+        lesson: 逆向动力学头必须作用于不包含动作历史的编码器嵌入e_t,才能迫使编码器捕捉真正的状态转移因果结构而非利用捷径
+      - id: D2
+        type: decision
+        title: 在编码器嵌入e_t上应用三层MLP逆向动力学头
+        support_level: explicit
+        source_refs:
+        - Sec III.A
+        - Eq. 6
+        choice: 以相邻时刻编码器嵌入[e_t; e_{t+1}]为输入,通过三层MLP ψ预测动作â_t,作用于不含动作历史的编码器层
+        alternatives:
+        - 在RSSM特征f_t上预测(已排除,见Dead1)
+        - 在解码器中间层或观测重建层上预测
+        children:
+        - id: Pivot1
+          type: pivot
+          title: 从纯观测重建目标到动作-观测联合训练目标
+          support_level: explicit
+          source_refs:
+          - Sec III.A
+          - Eq. 7
+          from: DreamerV2纯观测预测目标:仅优化KL散度与图像重建损失
+          to: WAM联合训练目标 L_WAM = λ_KL·L_KL + λ_img·L_recon + λ_act·L_action,同时预测未来观测与引发状态转移的动作
+          trigger: 发现标准重建目标会丢弃动作相关信息,而对e_t施加逆向动力学正则化可通过「后验→KL→先验」链路将动作感知结构传播至整个潜空间,进而惠及imagined
+            rollout中的策略优化
+          children:
+          - id: E1
+            type: experiment
+            title: WAM与DreamerV2的世界模型生成质量对比
+            support_level: explicit
+            source_refs:
+            - Table I
+            - Sec IV.A
+            result: WAM在PSNR、SSIM、LPIPS、FVD四项指标上均优于DreamerV2基线,且仅用约230K训练步即达到更高生成质量,远少于基线所需的2M步
+          - id: E2
+            type: experiment
+            title: 基于WAM表示的行为克隆策略学习效果对比
+            support_level: explicit
+            source_refs:
+            - Table III
+            - Sec IV.B
+            result: WAM在8个CALVIN操作任务中7个超越DiWA基线,平均成功率显著高于基线;涉及铰接物体精确位置控制的任务(如close_drawer、move_slider_right)提升最为突出;唯一基线略优的任务(turn_on_led)被归因于少量测试样本的评估方差
+            children:
+            - id: E3
+              type: experiment
+              title: WAM特征支撑下的模型基PPO微调性能与样本效率对比
+              support_level: explicit
+              source_refs:
+              - Table IV
+              - Sec IV.B
+              result: 经800轮PPO微调后,WAM在全部8个任务上均超越或持平DiWA,其中两个任务(turn_on_lightbulb、turn_off_led)达到100%成功率;WAM世界模型编码器所需的模拟环境交互步数远少于无世界模型编码器的视觉端对端方案

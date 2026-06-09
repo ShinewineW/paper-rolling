@@ -1,0 +1,146 @@
+{
+  "artifact": "2026-06-08_CosmosWorldFoundationModelPlatformForPhysicalAI_2501.03575",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Accept",
+    "mean_score": 4.33,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 4,
+      "strengths": [
+        "Most claims are supported by type-appropriate experiments (e.g., improvement claims use baseline comparisons, descriptive claims use measurements).",
+        "E4, E5, E6 provide direct head-to-head comparisons for the post-training paradigm.",
+        "E2 and E3 offer geometric and physical metrics that align with the causal/descriptive nature of C3."
+      ],
+      "weaknesses": [
+        "C7 claims high-quality and diverse training clips, but E8 only evaluates shot detection and transcoding speed, not clip diversity or downstream model impact.",
+        "C1's evidence compares with existing baselines (CamCo, VideoLDM) but does not include a 'from scratch on the same domain data' control, leaving the efficiency claim partially unvalidated.",
+        "Some evidence is described only by table captions; actual data distributions or raw numbers are absent from the bundle."
+      ],
+      "suggestions": [
+        "For C7, add an experiment that measures downstream WFM performance or diversity metrics (e.g., semantic coverage) on the extracted clips.",
+        "For C1, include a baseline trained from scratch on equal domain data to solidly demonstrate the data efficiency of the pre-training paradigm."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 4,
+      "strengths": [
+        "Most claims have clear, metric-based falsification criteria (PSNR thresholds, human preference rates, geometric error comparisons).",
+        "Criteria are generally non-trivial and matched to the scope of the claim (e.g., 'significantly worse' or 'comparable')."
+      ],
+      "weaknesses": [
+        "C7's falsification ('data diversity or quality not sufficient to support high-quality WFM pre-training') is circular and not independently testable with the given experiments.",
+        "C1's criterion mentions 'equal amount of domain data' but does not operationalize what 'equal' means, and the experiment does not test this condition directly.",
+        "Some criteria rely on comparisons with baselines that may not be exact implementations of the stated conditions (e.g., 'from scratch')."
+      ],
+      "suggestions": [
+        "For C7, define a concrete surrogate metric (e.g., reconstruction difficulty, coverage of physical scenarios) that is actionable and testable.",
+        "Tighten C1's criterion: specify the domain data size and compare against a model trained from scratch on that exact data, not only prior work."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 4,
+      "strengths": [
+        "Assumptions and boundary conditions are explicitly stated in concepts.md and problem.md.",
+        "The platform's limitations (e.g., imperfect Newtonian physics, no RL evidence) are acknowledged.",
+        "Post-trained models are labeled as '-Sample' to indicate demonstration status, not production-ready systems."
+      ],
+      "weaknesses": [
+        "C1's '显著优于 from-scratch baselines on 各任务' could be read as overclaiming when the baselines are not true from-scratch references.",
+        "C3's '总体感知视觉质量更高' implies a generality beyond the tested datasets (RealEstate10K, PhysX simulation).",
+        "The falsification for C1 introduces a condition (equal data) not bounded by the actual experimental design, creating an expectation mismatch."
+      ],
+      "suggestions": [
+        "Qualify C1 with the specific tasks and state that the efficiency advantage is demonstrated under the tested fine-tuning data sizes.",
+        "Narrow C3 to 'on the evaluated 3D consistency and physical alignment benchmarks' and avoid '总体'."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "The bundle presents a clear arc: Observations -> Gaps -> Insight -> Solution -> Claims -> Evidence.",
+        "All identified gaps (lack of customizable platform, inefficient data pipeline) are mapped to specific claims and experiments.",
+        "The exploration tree links back to the key decisions and their effects on the overall solution."
+      ],
+      "weaknesses": [
+        "The data pipeline quality claim (C7) is somewhat detached from the main narrative of model performance; the connection between E8 and downstream WFM quality is implicit.",
+        "Architecture.md provides a detailed pipeline flow but it is not explicitly referenced in the claim–evidence mapping."
+      ],
+      "suggestions": [
+        "Add a brief narrative or a linking experiment that ties data pipeline metrics (E8) to model quality improvements.",
+        "Include cross-references between architecture.md and the claims/experiments to strengthen the chain."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "The exploration tree contains genuine dead-ends (VAE, VQ-VAE) with documented failure modes and lessons learned.",
+        "Design decisions (e.g., FSQ over VQ, diffusion+AR dual paradigm) are justified with alternatives and trade-offs.",
+        "A pivot (diffusion decoder for AR output) is triggered by observed quality issues, demonstrating responsive iteration."
+      ],
+      "weaknesses": [
+        "The tree is relatively high-level; many fine-grained design choices (tokenizer compression ratios, specific layer counts) do not have explicitly documented alternatives in the tree.",
+        "Some entries (e.g., DE1, DE2) could be seen as canonical knowledge rather than novel exploration, but they are still honestly presented."
+      ],
+      "suggestions": [
+        "Expand the tree to include more granular component decisions and any negative results from preliminary scaling experiments.",
+        "Explicitly note whether any of the dead-ends were discovered during this project or were prior community knowledge."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Experiments include multiple baselines for most tasks (CamCo, VideoLDM, IRASim, etc.).",
+        "Ablation on Medusa head number is performed.",
+        "Metrics are standard and aligned with claims (PSNR, SSIM, FVD, Sampson error, human preference).",
+        "Hardware and high-level setup are described."
+      ],
+      "weaknesses": [
+        "No confidence intervals or statistical significance tests are reported for any quantitative result.",
+        "Ablation coverage is sparse; key components like tokenizer design choices, data filtering stages, and model scaling laws are not ablated.",
+        "The evidence bundle only contains table descriptions; raw data or plots are missing, limiting independent verification of the reported observations.",
+        "Some experiments (e.g., E3) lack baselines, making the relative comparison less rigorous."
+      ],
+      "suggestions": [
+        "Report standard deviations, confidence intervals, or significance tests for all key comparisons.",
+        "Add ablation studies for tokenizer configurations (e.g., with/without wavelet transform, FSQ depth) and data pipeline steps.",
+        "Include actual evidence files (tables with numbers) in the bundle to support reproducibility auditing."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "major",
+      "observation": "C7 (data pipeline quality) is only supported by shot detection F1 and transcoding throughput (E8). The claim asserts the pipeline extracts high-quality, diverse clips sufficient for WFM pre-training, but no experiment directly measures the resulting data diversity or its impact on downstream model performance."
+    },
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "major",
+      "observation": "C1 claims that the pre-training→post-training paradigm is efficient and that post-trained models '显著优于从头训练的专用基线'. The experiments compare against prior task-specific models (e.g., CamCo, VideoLDM) but do not provide a 'from scratch on equal domain data' baseline, which is required to fully substantiate the efficiency claim."
+    },
+    {
+      "dimension": "D2_falsifiability",
+      "severity": "minor",
+      "observation": "C7's falsification criterion ('data diversity or quality not sufficient to support high-quality WFM pre-training') is circular and not independently testable without a predefined diversity/quality metric, making it unfalsifiable as stated."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "minor",
+      "observation": "C1 and C3 use phrasing ('各任务上均显著优于', '总体感知视觉质量更高') that may overgeneralize beyond the specific tasks and datasets tested (camera control, robot manipulation, driving, and specific benchmarks)."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "major",
+      "observation": "Statistical rigor is lacking across experiments: no confidence intervals, error bars, or significance tests are reported, and key ablations (tokenizer components, data filtering stages) are missing. The evidence files are only metadata with no actual numerical data."
+    },
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "suggestion",
+      "observation": "The exploration tree is high-level and omits many intermediate design decisions (e.g., why specific compression ratios, layer counts, or data mixture ratios). Including more granular dead-ends or pivot points would strengthen the integrity narrative."
+    }
+  ]
+}

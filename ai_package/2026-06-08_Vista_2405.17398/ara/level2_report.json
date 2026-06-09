@@ -1,0 +1,119 @@
+{
+  "artifact": "2026-06-08_Vista_2405.17398",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Accept",
+    "mean_score": 4.17,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Every claim is matched with an experiment of appropriate type: causal claims use ablation (C3, C4), improvement claims use baseline comparisons (C1), generalization claims use multiple diverse datasets (C2, C6, C7).",
+        "Experiments are clearly described and directly address the claims' statements."
+      ],
+      "weaknesses": [
+        "Evidence for C3 and C4 is solely qualitative (visual comparison), lacking a confirming quantitative metric to supplement the visual assessment."
+      ],
+      "suggestions": [
+        "Add a quantitative metric (e.g., optical flow accuracy, segmentation consistency) to the ablation studies of dynamic and structure losses to strengthen causal evidence."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 3,
+      "strengths": [
+        "C1, C5, C6, and C7 have clear, quantitative falsification criteria tied to specific metrics and datasets (FID/FVD improvement, trajectory difference, reward–L2-error correlation).",
+        "C2's criterion (win rate ≤50% in replication) is conceptually actionable."
+      ],
+      "weaknesses": [
+        "C3 and C4 falsification rely on 'qualitative visual observation' without a defined quantifiable threshold, making them subjective and difficult to replicate objectively.",
+        "C2's replication requires a full human evaluation, which is expensive and not easily independently testable."
+      ],
+      "suggestions": [
+        "For C3/C4, define an objective threshold (e.g., a minimum increase in FVD or a degradation score by human raters on a standardized scale) to make falsification actionable.",
+        "Provide a scripted, automated version of the human evaluation or release the raw video pairs to lower the barrier for independent verification of C2."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 4,
+      "strengths": [
+        "Claims explicitly mention the datasets (nuScenes, Waymo, OpenDV-YouTube-val, CODA) and metrics used, avoiding vague language.",
+        "Key assumptions (e.g., motion captured by frame differences, sufficiency of three dynamic priors) are listed and discussed.",
+        "Headline claims include specific performance numbers and comparison conditions."
+      ],
+      "weaknesses": [
+        "The 'generalizable' in the title and C7 is validated on a single out-of-distribution dataset (Waymo); the full extent of cross-domain generalization is not bounded.",
+        "C3/C4 claims state improved 'realism' and 'structure' but do not quantify the improvement, leaving the scope of improvement somewhat qualitative."
+      ],
+      "suggestions": [
+        "Add an explicit generalization boundary statement (e.g., 'Validated on urban datasets from North America and Europe; performance on rural or adverse weather domains remains untested').",
+        "Pair qualitative improvement claims (C3/C4) with a quantitative metric to define the scope of enhancement."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "Clear arc: observations (O1–O3) → identified gaps (G1–G3) → overarching insight → solution components (dynamic loss, structure loss, latent replacement) → claims (C1–C7) → experiments (E1–E6).",
+        "Every gap is directly addressed by a specific design component and validated by a dedicated experiment.",
+        "The bundle (logic/*.md) presents a unified, easy-to-follow narrative."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "Exploration tree contains genuine dead-ends (X1: single-frame prior failure; X2: omission of LoRA leads to visual corruptions) with documented references to appendices/figures.",
+        "Decisions are accompanied by alternatives and rationales (e.g., latent replacement vs. channel concatenation, LoRA vs. frozen mapping).",
+        "Pivot from external-perception reward to internal variance-based reward is logically motivated and followed by a confirming experiment (E5)."
+      ],
+      "weaknesses": [
+        "Some nodes are marked 'support_level: inferred', indicating the reconstruction may be partly retrospective rather than entirely contemporaneous."
+      ],
+      "suggestions": [
+        "Annotate the tree with timestamps or lab notebook references where possible to further evidence contemporaneous recording."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 3,
+      "strengths": [
+        "Comprehensive ablation coverage: loss components (E5), dynamic prior frames (E6), action independence constraint (Appendix D.3).",
+        "Baselines include five prior driving world models (DriveGAN, DriveDreamer, WoVoGen, Drive-WM, GenAD).",
+        "Code and model weights are released with a pinned commit, supporting reproducibility at the software level."
+      ],
+      "weaknesses": [
+        "No confidence intervals or statistical significance tests are reported for the primary quantitative metrics (FID, FVD) or for the human evaluation percentages.",
+        "Human evaluation uses 33 participants; while total responses are large, no inter-rater reliability or statistical comparison of proportions is provided.",
+        "Training requires 128 A100 GPUs, making full reproduction extremely resource-intensive."
+      ],
+      "suggestions": [
+        "Report bootstrapped confidence intervals for FID/FVD and use appropriate significance tests (e.g., binomial test for human eval win rates).",
+        "Increase the diversity or number of human raters and report measures such as Fleiss' kappa to quantify agreement."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D2_falsifiability",
+      "severity": "major",
+      "observation": "Falsification criteria for C3 and C4 rely on 'qualitative visual observation' without a quantifiable threshold or independent rubric, making them non-actionable and undermining objective testability."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "major",
+      "observation": "Statistical rigor is insufficient: no confidence intervals for FID/FVD, no significance tests for human evaluation results, leaving headline claims without measured uncertainty."
+    },
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "minor",
+      "observation": "Evidence for causal claims C3 and C4 is purely qualitative; adding a quantitative metric would elevate the evidence from suggestive to confirmatory."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "minor",
+      "observation": "The term 'generalizable' in the title and reward claim is only tested on one out-of-domain dataset; the paper would benefit from an explicit statement of the tested generalization boundary."
+    }
+  ]
+}

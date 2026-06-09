@@ -1,0 +1,91 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: WAM在测试时是否需要显式生成未来视觉观测？
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  description: WAM的增益可能来自两个相互纠缠的来源：(i)训练时的视频预测目标促使模型学习物理先验与动作条件表征；(ii)推理时的显式未来生成为动作预测提供前瞻信息。核心问题是：这两个因素中哪一个才是WAM性能提升的主因？
+  children:
+  - D1
+  - DEAD1
+  - P1
+- id: DEAD1
+  type: dead_end
+  title: 假设：测试时显式未来想象是WAM性能增益的主因
+  support_level: inferred
+  hypothesis: 现有imagine-then-execute WAM通过推理时迭代视频去噪来显式生成未来帧，该能力是其优于标准VLA的核心原因，因此去掉测试时未来生成会导致显著性能下滑
+  failure_mode: 控制变量实验表明，去掉测试时未来生成（Fast-WAM）与保留它（Fast-WAM-Joint、Fast-WAM-IDM）之间的性能差距远小于去掉视频协同训练所带来的性能下降，假设被证伪
+  lesson: 视频协同训练对潜在世界表征的塑造作用，而非测试时的显式未来帧生成，才是WAM相对于VLA增益的主要来源
+- id: D1
+  type: decision
+  title: 设计Fast-WAM：保留训练时视频协同训练，去除推理时未来生成
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Sec 3.2
+  choice: 构建Fast-WAM：训练时联合优化动作损失与视频协同训练损失；推理时仅保留干净的第一帧latent token，经视频DiT单次前向传播产生潜在世界表征后交由动作专家直接生成动作块，完全跳过未来视频去噪
+  alternatives:
+  - Fast-WAM-Joint：视频token与动作token在共享模型内联合去噪，保留推理时未来生成（对应Figure 1A范式）
+  - Fast-WAM-IDM：先生成未来视频帧，再据此预测动作，保留推理时未来生成（对应Figure 1B范式）
+  - Fast-WAM无视频协同训练变体：去除视频建模目标，仅训练动作预测，作为训练目标贡献的直接对照组
+  children:
+  - E1
+  - E2
+  - E3
+  - E4
+- id: E1
+  type: experiment
+  title: LIBERO仿真基准：Fast-WAM与各变体及基线的整体对比
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Sec 4.3.1
+  - Table 2
+  result: Fast-WAM在LIBERO四个子套件上的平均成功率与两种imagine-then-execute变体相当，均显著高于去掉视频协同训练的消融变体；无需具身预训练即可与使用预训练的强基线相媲美
+- id: E2
+  type: experiment
+  title: RoboTwin 2.0基准：Fast-WAM与各变体及基线的整体对比
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Sec 4.3.1
+  - Sec 4.3.2
+  - Table 1
+  result: Fast-WAM在超50个双臂操作任务上的平均成功率与imagine-then-execute变体高度相当，无需具身预训练即可超越多个使用预训练的基线；去掉视频协同训练带来的下降幅度远大于三个保留视频协同训练变体之间的差距
+- id: E3
+  type: experiment
+  title: 消融实验：去除视频协同训练对LIBERO与RoboTwin性能的影响
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  - Sec 4.3.2
+  - Table 1
+  - Table 2
+  result: 在LIBERO和RoboTwin上，去掉视频协同训练后性能均显著下降；其降幅明显大于Fast-WAM与imagine-then-execute变体之间的差距，验证视频协同训练是WAM增益的决定性因素
+  also_depends_on:
+  - D1
+- id: E4
+  type: experiment
+  title: 真实世界毛巾折叠任务：性能与推理效率联合评估
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Sec 4.3.3
+  - Figure 4
+  result: Fast-WAM在长时程真实操作任务上取得强劲性能，推理延迟远低于imagine-then-execute变体；去掉视频协同训练后成功率急剧下降且完成时间显著延长，再次印证视频协同训练的主导作用
+  also_depends_on:
+  - D1
+- id: P1
+  type: pivot
+  title: 从imagine-then-execute范式转向直接策略接口
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Sec 3.2
+  - Figure 1
+  from: 大多数WAM采用imagine-then-execute范式：先通过迭代视频去噪显式生成未来视觉帧，再据此预测动作，推理延迟高、计算开销大
+  to: Fast-WAM在推理时完全去除未来视频生成分支，仅保留干净第一帧的latent token经视频DiT单次前向传播，再由动作专家直接生成动作块，测试时接口与标准VLA策略相同
+  trigger: 视频协同训练在训练期间已将物理意义的运动与交互结构编码进潜在世界表征；推理时无需再显式合成未来帧，即可为动作生成提供充分的世界先验，从而在不损失性能的前提下大幅降低推理延迟

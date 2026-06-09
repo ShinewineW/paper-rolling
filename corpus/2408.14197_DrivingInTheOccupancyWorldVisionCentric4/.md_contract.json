@@ -1,0 +1,8 @@
+{
+  "source_pdf_sha256": "74514c20aac112dfabc955b47b25afefbc848dedffd2cc51a06ca55288cec65b",
+  "converter": "mineru",
+  "converter_version": "2.0.0",
+  "md_sha256": "7d324677c6b9bda3a641a582618a607e3d68fd11fde0af0bba56d7a1cadb04b1",
+  "image_count": 32,
+  "equation_block_count": 12
+}

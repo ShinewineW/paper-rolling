@@ -1,0 +1,98 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何将扩散模型引入端到端自动驾驶规划以实现多模态、实时轨迹生成？
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  description: 端到端自动驾驶需同时满足多模态轨迹规划（覆盖不同驾驶意图）和实时推理约束，扩散模型具备多模态分布建模能力，但将其直接应用于驾驶场景面临模式崩溃和推理开销两大挑战
+  children:
+  - id: E1
+    type: experiment
+    title: 将Transfuser改造为原始扩散策略基线（TransfuserDP）验证可行性
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    - Tab. 2
+    result: 规划质量略有提升，但出现严重模式崩溃现象（不同随机噪声收敛到相近轨迹），且推理开销大幅增加，不满足实时要求
+    children:
+    - id: DE1
+      type: dead_end
+      title: 原始扩散策略在驾驶场景下的模式崩溃与计算瓶颈
+      support_level: explicit
+      source_refs:
+      - Sec 3.2
+      - Fig. 2
+      - Tab. 2
+      hypothesis: 从随机高斯噪声出发经多步去噪可在驾驶场景中生成多样的多模态轨迹
+      failure_mode: 不同随机噪声收敛到相近轨迹（模式崩溃），定量模式多样性得分D极低；多步去噪导致推理延迟大幅增加，无法满足实时驾驶需求
+      lesson: 纯随机高斯初始化在动态开放交通场景下无法有效覆盖多模态动作空间；必须引入驾驶先验知识引导去噪起点，同时需截断去噪步数以降低开销
+  - id: DE2
+    type: dead_end
+    title: 大词表固定锚点离散化方法（如8192个锚点词表）的根本局限
+    support_level: explicit
+    source_refs:
+    - Sec 1
+    - Tab. 1
+    hypothesis: 用大量固定锚点轨迹离散化动作空间可覆盖多样驾驶行为并实现多模态规划
+    failure_mode: 词表外场景（out-of-vocabulary scenarios）无法有效处理；维护大量锚点带来显著计算负担；规划性能上限受锚点数量与质量的根本约束
+    lesson: 固定词表范式难以泛化到分布外驾驶场景，且不适合实时应用；需要一种不依赖大词表、表达能力更强的多模态规划方案
+  - id: D1
+    type: decision
+    title: 采用截断扩散策略替代原始扩散策略作为核心生成机制
+    support_level: explicit
+    source_refs:
+    - Sec 3.3
+    - Fig. 3
+    choice: 将扩散起始点从随机高斯噪声替换为以少量K-Means锚点为中心的锚定高斯分布，并在训练与推理两端截断扩散步数；利用扩散模型的多模态表达能力，仅需少量锚点即可覆盖潜在动作空间
+    alternatives:
+    - 继续使用原始扩散策略（因模式崩溃和延迟问题已排除，见DE1）
+    - 大词表固定锚点离散化（因词表外泛化性差已排除，见DE2）
+    - 单模态确定性MLP回归（无法建模多模态不确定性，已排除）
+    also_depends_on:
+    - DE1
+    - DE2
+    children:
+    - id: E2
+      type: experiment
+      title: 截断扩散策略基础验证（TransfuserTD消融实验）
+      support_level: explicit
+      source_refs:
+      - Tab. 2
+      - Sec 4.4
+      result: 去噪步数大幅减少，规划质量和模式多样性均显著优于原始扩散策略，推理速度显著提升；证明截断扩散策略的有效性，为进一步设计专用解码器奠定基础
+    - id: Q2
+      type: question
+      title: 如何设计与条件场景上下文高效交互的专用扩散解码器？
+      support_level: explicit
+      source_refs:
+      - Sec 3.4
+      - Tab. 3
+      description: UNet解码器缺乏对BEV/PV特征及感知模块感知查询的细粒度交叉注意力，限制轨迹重建质量；需要专为驾驶设计、参数高效且支持级联迭代精化的解码架构
+      children:
+      - id: D2
+        type: decision
+        title: 采用级联Transformer扩散解码器替代UNet，融合多源条件信息
+        support_level: explicit
+        source_refs:
+        - Sec 3.4
+        - Tab. 3
+        choice: 设计含可变形空间交叉注意力（与BEV/PV特征交互）、智能体/地图查询交叉注意力、Timestep调制层和FFN的Transformer解码器层，并以级联方式堆叠实现迭代轨迹精化；参数在不同去噪时间步间共享
+        alternatives:
+        - 沿用UNet条件解码器（Tab. 3 ID-1，参数量更大但规划质量更低）
+        - 仅使用ego-query交互无空间注意力（Tab. 3 ID-2，性能大幅下降）
+        - 仅使用空间注意力不加级联机制（Tab. 3 ID-5，性能次优）
+        children:
+        - id: E3
+          type: experiment
+          title: DiffusionDrive完整系统在NAVSIM与nuScenes上的综合验证
+          support_level: explicit
+          source_refs:
+          - Tab. 1
+          - Tab. 2
+          - Tab. 7
+          - Sec 4.3
+          - Sec 4.7
+          result: 在NAVSIM navtest上以相同ResNet-34骨干达到最优PDMS，模式多样性显著提升；以45 FPS满足实时约束，参数量低于TransfuserDP；在nuScenes上L2误差和碰撞率均优于或持平SparseDrive；CARLA泛化实验验证锚点来源可跨数据集迁移

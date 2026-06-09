@@ -1,0 +1,131 @@
+{
+  "artifact": "2026-06-08_EnhancingPolicyLearningWithWorldActionModel_2603.28955",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Accept",
+    "mean_score": 4.17,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 4,
+      "strengths": [
+        "Claims C1–C4 are improvement claims and are supported by appropriate baseline comparisons (DreamerV2, DiWA) that directly measure the claimed quantities (PSNR/SSIM/LPIPS/FVD, task success rates).",
+        "Evidence E1–E3 is tightly aligned with the corresponding claims, and the experiments are clearly documented."
+      ],
+      "weaknesses": [
+        "Claim C5 is tagged as causal/descriptive but is supported only indirectly by E1 and E3. No ablation experiment (e.g., removing KL, moving the inverse dynamics head to f_t) is provided to isolate the cascading mechanism.",
+        "The causal link between the inverse dynamics objective and improved prior quality relies on analytical reasoning rather than direct empirical validation."
+      ],
+      "suggestions": [
+        "Add an ablation experiment that explicitly tests the cascade—e.g., training a variant with the inverse dynamics head on f_t or without the KL term—to provide type-appropriate (causal) evidence for C5."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 4,
+      "strengths": [
+        "Falsification criteria for C1, C2, C3 are specific, metric-based, and independently testable (direct comparisons on the same validation set/task suite).",
+        "Criteria acknowledge numerical discrepancies and specify the authoritative table (Table III/IV), increasing clarity.",
+        "C5's criterion is mechanistically actionable: change the head placement or remove KL, and the cascade should break."
+      ],
+      "weaknesses": [
+        "C4's falsification criterion includes a 'same training steps' condition that does not directly test the claim as stated (which compares different step budgets). This introduces a slight mismatch between claim scope and falsification condition.",
+        "The criteria do not explicitly define tolerance thresholds for metric differences (e.g., how much lower PSNR constitutes falsification)."
+      ],
+      "suggestions": [
+        "Refine C4's criterion to state: 'If WAM trained for ~230K steps does not outperform DreamerV2 trained for ~2M steps on the same tasks, or if the step count ratio is materially misreported, the claim fails.'",
+        "Add a minimum effect size or statistical significance threshold to make falsification more precise."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Every claim is precisely scoped to the CALVIN benchmark, specific experimental conditions (50-step open-loop, 800 PPO rounds, specific policy architecture), and the exact training step budgets.",
+        "Assumptions are explicitly listed (e.g., cascade propagation equivalence, head placement on e_t, reward classifier accuracy) and boundaries are clearly stated (e.g., hyperparameters tuned for CALVIN, not claimed to generalize).",
+        "The paper openly notes discrepancies between text and table values and resolves them, avoiding overclaiming."
+      ],
+      "weaknesses": [
+        "No significant over- or under-claiming detected. The qualitative nature of the cascade propagation is appropriately hedged."
+      ],
+      "suggestions": [
+        "Continue to explicitly state domain-transfer limitations in the main claims, as done in the concepts boundary conditions."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "The manuscript exhibits a clear argument arc: observations (world models lack action signal) → gap (representations fail to capture action-relevant structure) → insight (inverse dynamics on encoder embeds action structure, cascades via KL) → solution (WAM with joint loss) → claims and experiments.",
+        "All identified gaps are addressed by the proposed method, and the exploration tree logically connects decisions, dead-ends, and experiments.",
+        "The story told by problem.md, claims.md, concepts.md, and evidence/ is internally consistent."
+      ],
+      "weaknesses": [
+        "No significant incoherence; the assumption that the cascade fully transmits action information is acknowledged as an analytical inference rather than a proven fact."
+      ],
+      "suggestions": [
+        "To further strengthen coherence, explicitly elevate the cascade assumption to a testable sub-claim (e.g., by measuring action predictability from prior samples) and provide supporting evidence."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 4,
+      "strengths": [
+        "The exploration tree records a concrete decision process: starting from the gap, considering a full architecture redesign vs incremental regularization, and drilling into the layer choice for the inverse dynamics head.",
+        "A genuine dead-end (applying the head on f_t) is documented with a clear failure mode (trivial solution because GRU already receives a_{t-1}), which motivated the final design.",
+        "The tree includes explicit alternatives and a pivot point, aligning well with the final narrative."
+      ],
+      "weaknesses": [
+        "The dead-end is based on a logical argument rather than an empirically tested negative result. No actual training run with the head on f_t is reported, reducing the 'genuine negative' strength.",
+        "The tree is relatively shallow; additional dead-ends (e.g., alternative regularization formulations, different head architectures) are not explored."
+      ],
+      "suggestions": [
+        "If computationally feasible, include an empirical negative result for the f_t head to transform the logical dead-end into a concrete one.",
+        "Document any other explored but discarded ideas (e.g., different action prediction losses, alternative cascade paths) to enrich the exploration tree."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 3,
+      "strengths": [
+        "The study includes relevant baselines (DreamerV2 for generation quality, DiWA for downstream policy tasks) and holds policy architecture and hyperparameters constant when comparing representations.",
+        "Experimental procedures are clearly described, and the metrics directly align with the claims.",
+        "Reproducibility is supported by code references and detailed experimental setup."
+      ],
+      "weaknesses": [
+        "No ablation experiments are reported to isolate the contribution of the inverse dynamics head (e.g., comparing WAM with and without L_action, varying λ_act, or testing head placement on f_t). This limits the causal strength of the findings.",
+        "Statistical reporting is minimal: success rates are given as point estimates without confidence intervals, standard errors, or multiple random seeds, making it difficult to assess the reliability of the improvements.",
+        "The training efficiency claim (C4) relies on a single pair of step counts; a learning curve or sweep over training budgets would provide stronger evidence."
+      ],
+      "suggestions": [
+        "Conduct ablation studies: (i) remove the action loss, (ii) place the head on f_t, (iii) vary λ_act, to establish the causal role of each component.",
+        "Report mean and 95% CI over at least three random seeds for the success rate experiments.",
+        "Provide learning curves for world model training (e.g., generation quality vs steps) and downstream policy performance as a function of world model training steps."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "major",
+      "observation": "Claim C5 (action-aware cascading effect) is causal in nature but is supported only indirectly by E1 and E3. No ablation experiment isolates the cascade (e.g., removing KL or moving the head to f_t), so the evidence is not type-appropriate for a causal claim."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "major",
+      "observation": "The study lacks ablation experiments for key design choices (head placement, action loss weight, KL term). Without ablations, the causal contribution of the inverse dynamics regularization is not rigorously established."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "Statistical reporting for task success rates does not include confidence intervals or multiple random seeds, which limits the assessment of result reliability and significance."
+    },
+    {
+      "dimension": "D2_falsifiability",
+      "severity": "minor",
+      "observation": "The falsification criterion for C4 introduces a 'same training steps' condition that does not perfectly match the claim's stated condition (WAM trained for fewer steps outperforms baseline). This creates a slight mismatch."
+    },
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "minor",
+      "observation": "The dead-end regarding head placement on f_t is based on a logical reasoning argument rather than an empirically verified negative result, somewhat reducing the 'genuine negatives' strength."
+    }
+  ]
+}

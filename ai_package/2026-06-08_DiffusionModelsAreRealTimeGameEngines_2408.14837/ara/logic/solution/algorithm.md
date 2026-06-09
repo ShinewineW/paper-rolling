@@ -1,0 +1,3 @@
+论文显式给出的训练损失为 velocity-parameterization 扩散损失(公式 1):
+$$\mathcal{L} = \mathbb{E}_{t,\epsilon,T}\left[||v(\epsilon,x_0,t) - v_{\theta'}(x_t,t,\{\phi(o_{i<n})\},\{A_{emb}(a_{i<n})\})||_2^2\right]$$
+其中 $T=\{o_{i\le n},a_{i\le n}\}\sim\mathcal{T}_{agent}$,$t\sim\mathcal{U}(0,1)$,$\epsilon\sim\mathcal{N}(0,\mathbf{I})$,$x_t=\sqrt{\bar{\alpha}_t}x_0+\sqrt{1-\bar{\alpha}_t}\epsilon$,$x_0=\phi(o_n)$,$v(\epsilon,x_0,t)=\sqrt{\bar{\alpha}_t}\epsilon-\sqrt{1-\bar{\alpha}_t}x_0$,$v_{\theta'}$ 为模型的 v-prediction 输出,噪声计划 $\bar{\alpha}_t$ 为线性。训练目标与推理期的 CFG 加权(w=1.5)严格分离:CFG 仅在推理时对历史帧条件施加,不属于训练损失。解码器微调使用独立的像素级 MSE 损失,与 U-Net 训练完全分开进行。

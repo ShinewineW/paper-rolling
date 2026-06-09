@@ -1,0 +1,117 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 神经模型能否在现有硬件上实时仿真复杂游戏并保持高视觉质量？
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  description: 论文核心研究问题：能否用神经网络以实时帧率（≥20 FPS）在单 TPU 上交互式仿真 DOOM，同时保持高视觉质量并维持跨分钟级长轨迹的稳定性
+  children:
+  - id: D1
+    type: decision
+    title: 以预训练扩散模型（Stable Diffusion v1.4）为核心生成架构
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    - Sec 6
+    choice: 对 Stable Diffusion v1.4 进行微调，替换文本交叉注意力为动作嵌入序列，历史帧通过 latent 通道拼接引入，从而将图像生成模型适配为下一帧预测器
+    alternatives:
+    - 基于 LSTM 与卷积解码器的对抗训练模型（如 GameGAN，Kim et al. 2020）
+    - 基于 VQ-VAE 与 Transformer 的离散自回归视频模型（如 VideoGPT，Yan et al. 2021）
+    - 基于 VAE + RNN 的隐空间世界模型（如 Ha & Schmidhuber, 2018）
+    children:
+    - id: pivot1
+      type: pivot
+      title: 将文本到图像扩散模型适配为动作条件游戏帧预测模型
+      support_level: explicit
+      source_refs:
+      - Sec 3.2
+      - Fig 3
+      from: Stable Diffusion v1.4：以文本为条件的静态图像生成模型
+      to: GameNGen：以历史帧序列与动作序列为条件、自回归预测下一帧的交互世界仿真模型
+      trigger: 需要将预训练扩散模型改造为实时、自回归、动作条件仿真器；文本交叉注意力替换为动作嵌入，历史帧通过 latent 通道拼接引入，噪声增强解决自回归稳定性，解码器微调改善
+        HUD 等细节保真度
+  - id: Q2
+    type: question
+    title: 如何在规模化条件下收集覆盖多样化游戏场景的训练轨迹？
+    support_level: explicit
+    source_refs:
+    - Sec 3.1
+    description: 目标是支持人类玩家与仿真交互，训练数据需覆盖游戏各区域与动作组合；人工采集成本过高，需要自动化方案
+    children:
+    - id: D2
+      type: decision
+      title: 使用 PPO 智能体采集数据，记录含初期随机阶段在内的全程训练轨迹
+      support_level: explicit
+      source_refs:
+      - Sec 3.1
+      - Sec 4.1
+      - Sec 5.2.3
+      choice: 训练 PPO 智能体并记录整个训练过程中的所有轨迹（含技能由低到高的渐进数据），以 70M 条样本作为生成模型训练集；设计简单奖励函数引导智能体覆盖多样场景
+      alternatives:
+      - 纯随机策略生成数据（探索能力有限，中等难度区域质量明显下降）
+      - 人类游玩数据（规模受限，无法在大规模条件下采集）
+  - id: Q3
+    type: question
+    title: 自回归生成中如何防止误差累积导致画质快速退化？
+    support_level: explicit
+    source_refs:
+    - Sec 1
+    - Sec 3.2.1
+    - Fig 4
+    description: 训练采用 teacher-forcing（条件为真实历史帧），推理条件为自身预测帧，形成 domain shift，误差随步数快速积累，短期内画质即严重退化
+    children:
+    - id: E1
+      type: experiment
+      title: 噪声增强消融：有无上下文帧高斯噪声增强的自回归质量对比
+      support_level: explicit
+      source_refs:
+      - Sec 3.2.1
+      - Sec 5.2.2
+      - Fig 7
+      result: 无噪声增强时 LPIPS 在数十帧后迅速上升、PSNR 快速下降，出现明显漂移；加入噪声增强后自回归质量在 64 帧内保持稳定，即使推理时不额外添加噪声训练时的增强也带来显著改善
+  - id: Q4
+    type: question
+    title: 如何在保持视觉质量的前提下实现单 TPU 实时推理（目标 20 FPS）？
+    support_level: explicit
+    source_refs:
+    - Sec 3.3.2
+    - Appendix A.6
+    description: 扩散模型通常需要数十步去噪才能生成高质量图像，少步采样是否可在游戏仿真域保持足够质量？单步去噪理论上可达 50 FPS，但质量是否可接受？
+    children:
+    - id: dead_end1
+      type: dead_end
+      title: 单步 DDIM 采样（无蒸馏）质量不足以直接用于实时仿真
+      support_level: explicit
+      source_refs:
+      - Sec 3.3.2
+      - Table 1
+      - Appendix A.6
+      hypothesis: 将去噪步数降至 1 步可在保持可接受质量的前提下将帧率提升至 50 FPS
+      failure_mode: 单步无蒸馏模型 PSNR 远低于 4 步及以上版本，质量下降幅度不可接受（见 Table 1）
+      lesson: 即使在受约束的游戏图像空间中，无蒸馏单步采样仍无法维持足够质量；知识蒸馏可显著弥补差距（见 Table 1 中 D 行）但仍有小幅质量损失，因此主方案放弃单步路线
+    - id: D3
+      type: decision
+      title: 推理采用 4 步 DDIM，以 20 FPS 运行作为主方案
+      support_level: explicit
+      source_refs:
+      - Sec 3.3.2
+      - Table 1
+      choice: 4 步 DDIM（总推理耗时 50ms，即 20 FPS）在质量与速度间取得最佳平衡；1 步蒸馏版（50 FPS）作为备选因小幅质量损失未作为主方案发布
+      alternatives:
+      - 1 步无蒸馏（50 FPS，质量明显下降，不可接受）
+      - 1 步蒸馏（50 FPS，质量接近但略低于 4 步）
+      - 8 步以上（质量无明显提升，速度更慢）
+      also_depends_on:
+      - dead_end1
+  - id: E2
+    type: experiment
+    title: 上下文长度消融：不同历史帧数（1 至 64）对生成质量的影响
+    support_level: explicit
+    source_refs:
+    - Sec 5.2.1
+    - Table 2
+    result: 上下文帧数从 1 增加到 64 时质量持续提升，但收益在十余帧后迅速趋于饱和；64 帧相比 16 帧仅有微小改善，说明当前 U-Net 架构难以有效利用超过约
+      3 秒的历史信息，更长上下文需要架构或训练方案的改变

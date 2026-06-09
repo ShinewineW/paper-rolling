@@ -1,0 +1,105 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 仅凭视觉压缩表征能否驱动RL智能体完成连续控制任务？
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Sec 3.3
+  description: 若用VAE将观察帧压缩为低维潜在向量z，单独以z作为控制器输入能否达到CarRacing-v0解决标准
+  children:
+  - id: E1
+    type: experiment
+    title: CarRacing仅V模型消融实验
+    support_level: explicit
+    source_refs:
+    - Sec 3.3
+    - Table 1
+    result: 驾驶行为不稳定、在急弯处偏离赛道，得分低于解决任务阈值，与已有深度RL基线相当
+  - id: D1
+    type: decision
+    title: 将MDN-RNN隐藏状态h与z共同输入控制器
+    support_level: explicit
+    source_refs:
+    - Sec 2.3
+    - Sec 3.3
+    choice: 控制器同时接收当前潜在向量 $z_t$ 和MDN-RNN隐藏状态 $h_t$ 作为输入，即 $a_t = W_c [z_t\ h_t] +
+      b_c$
+    alternatives:
+    - 仅使用 $z_t$（V模型单独）
+    - 使用 $z_t$ 加全连接隐藏层（V模型加隐藏层变体）
+    children:
+    - id: E2
+      type: experiment
+      title: CarRacing完整世界模型(V+M+C)性能测试
+      support_level: explicit
+      source_refs:
+      - Sec 3.3
+      - Table 1
+      result: 驾驶更稳定，能有效应对急弯，得分达到解决任务阈值，超越所有已报告基线
+- id: Q2
+  type: question
+  title: 能否完全在世界模型的幻梦潜在空间中训练RL智能体并成功迁移回真实环境？
+  support_level: explicit
+  source_refs:
+  - Sec 4.1
+  description: 若世界模型足够精确，用其替代真实环境，智能体仅在潜在空间梦境中训练，再将策略迁移回实际环境
+  children:
+  - id: D2
+    type: decision
+    title: 选择MDN-RNN而非确定性LSTM作为梦境环境的动态模型
+    support_level: explicit
+    source_refs:
+    - Sec 4.5
+    choice: 使用MDN-RNN将环境动态建模为混合高斯概率分布，并通过温度参数τ引入可调随机性
+    alternatives:
+    - 确定性LSTM（等价于τ趋近于0的MDN-RNN）
+    - 贝叶斯神经网络动态模型（如PILCO中的GP）
+    children:
+    - id: DE1
+      type: dead_end
+      title: 低温度τ≈0.1导致模式崩溃，策略无法迁移到真实环境
+      support_level: explicit
+      source_refs:
+      - Sec 4.5
+      - Table 2
+      hypothesis: 低温度（接近确定性）的MDN-RNN可以为控制器提供清晰稳定的训练信号，有助于学习有效策略
+      failure_mode: τ=0.1时混合高斯发生模式崩溃，幻梦环境中怪物始终不射出火球；控制器学到「自动扑灭火球」等对抗性策略，迁移至真实环境时得分极低（193±58），甚至不及随机策略
+      lesson: 世界模型的概率性与多模态随机性是防止控制器利用模型缺陷的关键；完全确定性的动态模型会被控制器充分利用，导致学到的策略无法在真实环境中泛化
+    - id: E3
+      type: experiment
+      title: 不同τ值下VizDoom梦境训练与真实环境迁移效果对比
+      support_level: explicit
+      source_refs:
+      - Sec 4.5
+      - Table 2
+      result: 适中的τ（1.15）在真实环境中获得最高迁移得分；τ过低导致策略迁移失败；τ过高则梦境训练难度超过智能体学习能力，表现下降
+    - id: E4
+      type: experiment
+      title: VizDoom完整梦境训练流程与真实环境策略迁移验证
+      support_level: explicit
+      source_refs:
+      - Sec 4.3
+      - Sec 4.4
+      - Appendix A.5
+      result: 梦境中训练的策略迁移至真实VizDoom环境后，表现优于梦境得分，并超越gym排行榜最优成绩
+- id: P1
+  type: pivot
+  title: 世界模型角色从特征提取器扩展为完整的虚拟训练环境
+  support_level: explicit
+  source_refs:
+  - Sec 3.4
+  - Sec 4.1
+  from: 将世界模型(V+M)的表征作为控制器的输入特征，在真实环境中用进化策略优化控制器
+  to: 将世界模型包装为完整OpenAI Gym接口，控制器完全在潜在空间梦境中训练，无需接触真实环境
+  trigger: CarRacing实验表明世界模型可生成可视化的幻梦驾驶场景（Sec 3.4），促使探索用梦境替代真实环境完成完整训练的可行性
+- id: Q3
+  type: question
+  title: 如何防止控制器利用世界模型缺陷学到对抗性策略？
+  support_level: explicit
+  source_refs:
+  - Sec 4.5
+  description: 智能体可访问世界模型的全部隐藏状态，有充分动机发现使模型产生不真实轨迹的对抗性利用方式；需要机制约束此类行为
+  also_depends_on:
+  - DE1

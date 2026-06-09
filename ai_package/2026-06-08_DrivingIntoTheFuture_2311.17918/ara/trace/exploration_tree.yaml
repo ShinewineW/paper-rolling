@@ -1,0 +1,116 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何构建兼容现有端到端规划模型的驾驶世界模型？
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Abstract
+  description: 端到端自动驾驶规划器在OOD场景下泛化能力不足，需要一种能在高分辨率像素空间预测多视角未来帧、并可接入现有规划框架的世界模型
+  children:
+  - id: D1
+    type: decision
+    title: 世界模型状态空间选择：向量化表示 vs. 像素空间
+    support_level: explicit
+    source_refs:
+    - Sec 1
+    choice: 采用高分辨率像素空间建模，捕获真实世界细粒度和非可矢量化事件
+    alternatives:
+    - 向量化状态空间建模(依赖感知模型输出，需额外向量标注)
+    children:
+    - id: DEAD1
+      type: dead_end
+      title: 向量化状态空间建模驾驶世界模型
+      support_level: explicit
+      source_refs:
+      - Sec 1
+      hypothesis: 向量化状态空间足以表示驾驶场景关键信息，可用于世界模型状态预测
+      failure_mode: 无法表示细粒度或非可矢量化事件(如水渍、路面损坏)；依赖感知模型输出引入状态估计噪声；需要额外向量标注成本
+      lesson: 真实驾驶世界模型需在高分辨率像素空间建模，以捕获完整场景信息并避免感知噪声污染
+    - id: E1
+      type: experiment
+      title: 多视角视频生成质量与可控性评估(与先前方法对比)
+      support_level: explicit
+      source_refs:
+      - Sec 5.2
+      - Table 1a
+      - Table 1b
+      result: 在FID、FVD生成质量指标和mAPobj、mAPmap、mIoU可控性指标上均优于先前多视角图像生成及单视角视频生成方法
+      also_depends_on:
+      - D2
+      - D3
+  - id: D2
+    type: decision
+    title: 多视角一致性建模方案：纯联合建模 vs. 因子化分解生成
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    choice: 采用视角分解因子化生成——将视角划分为参考视角和缝合视角，缝合视角以相邻参考视角为条件条件化生成
+    alternatives:
+    - 纯联合多视角注意力建模(所有视角在同一扩散过程中同时生成)
+    children:
+    - id: DEAD2
+      type: dead_end
+      title: 纯联合多视角注意力无法保证重叠区域严格一致
+      support_level: explicit
+      source_refs:
+      - Sec 3.2
+      - Sec 5.3
+      - Table 2c
+      hypothesis: 多视角自注意力机制能通过共享特征使所有视角达到高度像素级一致性
+      failure_mode: 联合建模下KPM指标较低，视角重叠区域缺乏严格像素级一致性，仅能保证整体风格相似
+      lesson: 多视角严格一致性需通过显式条件化(以相邻参考视角为条件生成缝合视角)来保证，而非仅靠共享注意力
+    - id: E2
+      type: experiment
+      title: 因子化生成 vs. 联合建模的多视角一致性消融实验
+      support_level: explicit
+      source_refs:
+      - Sec 5.3
+      - Table 2c
+      result: 因子化生成在KPM指标上相较联合建模获得显著提升，同时保持相近的FID图像质量和FVD视频质量
+  - id: D3
+    type: decision
+    title: 异构条件整合策略：专用接口 vs. 统一条件接口
+    support_level: explicit
+    source_refs:
+    - Sec 3.3
+    choice: 采用统一条件接口——将图像、布局、文本、动作等异构条件统一映射至d维特征空间后拼接，通过跨注意力注入UNet
+    alternatives:
+    - 为图像、文本、动作、布局等每类条件分别开发专用编码与注入接口
+  - id: Q2
+    type: question
+    title: 世界模型如何应用于提升端到端规划安全性？
+    support_level: explicit
+    source_refs:
+    - Sec 4
+    - Sec 5.4
+    description: 端到端规划器在OOD场景(如自车侧向偏离车道中心0.5米)下性能显著下降，需探索世界模型在规划决策闭环中的实际应用
+    children:
+    - id: PIVOT1
+      type: pivot
+      title: 从多视角视频生成到规划安全增强的应用转化
+      support_level: explicit
+      source_refs:
+      - Sec 4
+      - Sec 1
+      from: 多视角视频生成世界模型
+      to: 基于图像奖励的端到端规划安全增强及OOD数据增广
+      trigger: 世界模型能够预见不同驾驶动作下的多种未来场景，为规划器提供基于图像感知的奖励信号，且可仿真OOD场景生成训练数据以强化规划器鲁棒性
+    - id: E3
+      type: experiment
+      title: 基于树的轨迹规划与图像奖励函数设计验证
+      support_level: explicit
+      source_refs:
+      - Sec 5.4
+      - Table 3
+      - Table 4
+      result: 树式规划器通过图像奖励函数从多候选轨迹中选出最优决策，整体性能接近使用GT驾驶命令的基线，显著优于随机命令选择；地图奖励与目标奖励联合使用优于各单项奖励
+    - id: E4
+      type: experiment
+      title: 利用世界模型仿真OOD场景数据微调规划器
+      support_level: explicit
+      source_refs:
+      - Sec 5.4
+      - Table 5
+      result: 使用世界模型生成的OOD场景(自车侧向偏移0.5米)数据微调规划器后，在OOD条件下的L2误差和碰撞率相较未微调版本显著改善，接近正常场景水平

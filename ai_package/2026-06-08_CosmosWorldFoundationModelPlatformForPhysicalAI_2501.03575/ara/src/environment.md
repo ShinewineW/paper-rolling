@@ -1,0 +1,6 @@
+# Environment
+- **Python**: PyTorch (Paszke et al., 2019)
+- **Framework**: PyTorch（训练/推理主框架）+ TensorRT-LLM（VILA 标注推理加速，FP8 量化达 10× 吞吐提升）+ AnyScale Ray（分布式数据流水线编排）+ TransformerEngine P2P（Context Parallelism 通信原语）+ RAPIDS GPU 加速 k-means（语义去重）+ torch.compile max-autotune（自回归推理加速）
+- **Hardware**: 预训练：10,000 × NVIDIA H100 80GB HBM3，训练周期约三个月；数据处理：NVIDIA L40S（含 NVDEC+NVENC，转码吞吐比 H100 高约 17%）；分词器推理评测：单 NVIDIA A100 80GB
+- **Key dependencies**: h264_nvenc / PyNvideoCodec（视频转码，PyNvideoCodec 替代 ffmpeg 后吞吐提升约 3.6×）, TransNetV2（镜头检测，最终选用方案）, InternVideo2（视频语义嵌入，用于文本过滤和语义去重）, VILA 13B（视频标注，FP8 TensorRT-LLM 引擎，batch=16 时吞吐 1.96 clips/s）, T5-XXL（文本编码，扩散与自回归 WFM 均使用）, Mistral-NeMo-12B-Instruct（Text2World Prompt Upsampler 基座）, Pixtral-12B（Video2World Prompt Upsampler，零样本工程）, Aegis-AI-Content-Safety-LlamaGuard-LLM-Defensive-1.0（pre-Guard，13 类安全风险分类）, RetinaFace（post-Guard 人脸检测，>20×20 像素区域像素化）, SigLIP（post-Guard 内容安全分类嵌入）, SuperPoint + LightGlue（3D 一致性评测关键点检测与匹配）, GLOMAP（相机控制后训练数据位姿标注）, PhysX + Isaac Sim / Omniverse（物理对齐评测数据生成，8 类物理场景）, YOLOv11x（自动驾驶生成视频目标检测与追踪一致性评测）, SAMURAI（物理对齐评测实例掩码传播）, 3D Gaussian Splatting / Nerfstudio（3D 一致性视图合成评测）, VGG-19（分词器感知损失特征提取）
+- **Random seeds**: 物理对齐评测中对每个场景使用 4 个随机种子取均值（Sec. 5.3.2）；Medusa 消融在 50 个未见测试视频上评测（Sec. 5.2.4）

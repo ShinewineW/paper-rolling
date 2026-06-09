@@ -1,0 +1,117 @@
+{
+  "artifact": "2026-06-08_DiffusionModelsAreRealTimeGameEngines_2408.14837",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Accept",
+    "mean_score": 4.17,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 4,
+      "strengths": [
+        "All major claims are covered by dedicated experiments with appropriate metrics (PSNR, LPIPS, FVD, human accuracy).",
+        "Causal claims (C2, C5) are supported by ablation/comparative studies that directly manipulate the hypothesized causal factor.",
+        "Evidence types are well‑matched to claim types (ablation for causal, sampling for descriptive, etc.)."
+      ],
+      "weaknesses": [
+        "Claim C4 (decoder fine‑tuning improves visual detail) lacks a dedicated quantitative ablation in the provided evidence bundle; the supporting experiment E1 only reports the full model with fine‑tuning, while the direct comparison is relegated to a qualitative appendix figure.",
+        "The link between E1 and C4 is indirect; the reader cannot judge the magnitude of improvement from the main evidence alone."
+      ],
+      "suggestions": [
+        "Include a table or figure in the main evidence that contrasts metrics (PSNR/LPIPS) with and without decoder fine‑tuning, or promote the appendix ablation to a numbered experiment."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 4,
+      "strengths": [
+        "Most falsification criteria are specific, actionable, and matched to the claim scope (e.g., 64‑frame stability test for C2, sampling‑step comparison for C3).",
+        "Criteria reference concrete measurable quantities (FPS, PSNR, LPIPS, human accuracy versus random baseline)."
+      ],
+      "weaknesses": [
+        "Some criteria use qualitative expressions ('显著质量退化', '可见差异', '显著质量差距') without quantitative thresholds, leaving room for interpretation.",
+        "The criterion for C1 combines real‑time speed and visual quality but does not specify how much degradation is '显著'."
+      ],
+      "suggestions": [
+        "Define quantitative bounds for each falsifiable condition (e.g., PSNR drop > 2 dB over 64 frames, LPIPS increase > 0.05, human accuracy outside 40–60% CI)."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 4,
+      "strengths": [
+        "Internal claims are carefully scoped to DOOM on a single TPU‑v5 at 20 FPS, and assumptions (RL agent data, Stable Diffusion pre‑training, implicit state encoding) are explicitly stated.",
+        "Boundary conditions in the concepts section detail limitations (context window, heuristic state persistence, no explicit memory)."
+      ],
+      "weaknesses": [
+        "The paper title 'Diffusion Models Are Real‑Time Game Engines' implies a broader scope than the evidence (only DOOM) supports, creating a mild mismatch between headline framing and actual demonstrated generalization.",
+        "The generalization to other games or hardware is not explicitly bounded in the claims; the reader may over‑extrapolate."
+      ],
+      "suggestions": [
+        "Add a sentence in the abstract or conclusions explicitly stating that the current evidence is limited to DOOM and outlining the expected conditions for transfer to other games."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "The narrative follows a clear arc: observations of domain shift and speed barriers → gaps in long‑trajectory stability and real‑time diffusion inference → insight of noise augmentation → solution architecture → claims and evidence.",
+        "Every identified gap (autoregressive drift, inference speed) is addressed by a specific, motivated technique (noise augmentation, few‑step DDIM with distillation explored as a branch).",
+        "Experiments map directly to claims, and the exploration tree shows a logical progression from questions to decisions to validation."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "The exploration tree documents a genuine dead‑end (single‑step DDIM without distillation) with an explicitly stated hypothesis, failure mode, and lesson learned.",
+        "Decision nodes list real alternatives (GameGAN, random policy, human data) together with the rationale for rejection.",
+        "The dead‑end is backed by concrete evidence (Table 1) showing the quality drop, and the subsequent pivot to 4‑step DDIM is logically motivated."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D6_methodological_rigor": {
+      "score": 3,
+      "strengths": [
+        "Several informative ablations are present: context length (E5), noise augmentation (E6), DDIM steps (E4), and data source comparison (E7).",
+        "Metric choices align with claims (PSNR/LPIPS for image fidelity, FVD for video distribution, human evaluation for perceptual fidelity).",
+        "The use of public environments (VizDoom) and pretrained backbones (Stable Diffusion v1.4) supports reproducibility."
+      ],
+      "weaknesses": [
+        "There is no quantitative comparison against prior neural game simulation methods (World Models, GameGAN) on shared metrics; only qualitative Figure 2 is referenced.",
+        "No statistical significance tests or confidence intervals are reported for any experiment, making it hard to assess the reliability of observed differences.",
+        "The decoder fine‑tuning (C4) has no dedicated ablation; its claimed benefit is not quantitatively isolated in the main evidence.",
+        "Some ablation studies (E5, E6) are run for only 200k training steps versus the full 700k, which may not reflect the final model's behavior."
+      ],
+      "suggestions": [
+        "Include quantitative baselines against World Models, GameGAN, etc. on PSNR, LPIPS, and FVD using the same VizDoom setting.",
+        "Report error bars or confidence intervals for all key metrics (e.g., over multiple seeds or trajectory subsets).",
+        "Add a dedicated ablation for decoder fine‑tuning with numerical results in the main paper/evidence bundle.",
+        "Where possible, run ablations at the same total training budget as the final model to avoid confounding training steps with the experimental variable."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "minor",
+      "observation": "Claim C4 (decoder fine‑tuning) is supported only by a qualitative appendix figure and full‑model metrics in E1; no quantitative ablation is provided in the evidence bundle to isolate the effect of fine‑tuning."
+    },
+    {
+      "dimension": "D2_falsifiability",
+      "severity": "minor",
+      "observation": "Several falsification criteria (for C1, C3, C4) rely on qualitative descriptors like '显著退化' or '可见差异' without precise quantitative thresholds, reducing actionable testability."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "minor",
+      "observation": "The title 'Diffusion Models Are Real‑Time Game Engines' suggests a generality not yet demonstrated, whereas all evidence is confined to a single game (DOOM) on a specific accelerator (TPU‑v5)."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "major",
+      "observation": "No quantitative baselines against prior game simulation methods (World Models, GameGAN) are provided; statistical significance is not reported; and a key claim (decoder fine‑tuning) lacks a corresponding ablation, weakening the evidence for superiority and reliability."
+    }
+  ]
+}

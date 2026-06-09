@@ -1,0 +1,114 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何用单一固定超参数配置让RL算法跨150+多样化领域取得最优性能?
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Introduction节
+  description: 不同领域(连续/离散动作、视觉/低维输入、稠密/稀疏奖励、2D/3D世界)对信号幅度、探索策略和表示能力的需求差异极大;现有专门化算法通常需要针对每个领域单独调参,这构成了RL推广应用的核心瓶颈
+  children:
+  - id: D1
+    type: decision
+    title: 采用RSSM世界模型方法(DreamerV3),而非无模型RL
+    support_level: explicit
+    source_refs:
+    - Abstract
+    - Section Learning algorithm
+    choice: 学习环境动态的RSSM世界模型,通过任务无关重建损失学习表示,并在想象轨迹中训练行为者-评论家;世界模型的无监督目标使表示不完全依赖稀疏任务奖励
+    alternatives:
+    - 无模型RL(如PPO/SAC)仅依赖任务奖励梯度
+    - MuZero式在线树搜索规划(实现复杂且未公开)
+    - Gato式多任务行为克隆(需要专家数据)
+    children:
+    - id: Q2
+      type: question
+      title: 如何解决不同领域中观测/奖励/回报幅度巨大差异导致的训练不稳定?
+      support_level: explicit
+      source_refs:
+      - Section Robust predictions
+      description: 不同环境的奖励和观测幅度可相差数个量级;过大目标导致梯度爆炸,过小目标学习缓慢;基于运行统计的归一化引入非平稳性;这是世界模型跨域稳定训练的核心挑战
+      children:
+      - id: DE1
+        type: dead_end
+        title: 用标准平方损失直接回归任意幅度目标
+        support_level: explicit
+        source_refs:
+        - Section Robust predictions
+        hypothesis: 标准均方误差损失能直接处理所有幅度的预测目标
+        failure_mode: 预测大幅度目标时梯度过大导致训练发散;绝对损失或Huber损失在极端值处使学习停滞
+        lesson: 跨域通用预测需要一种能双向压缩极端值同时保留符号的变换,而非依赖运行统计归一化(后者引入非平稳性)
+      - id: D2
+        type: decision
+        title: 引入symlog变换与symexp twohot分布损失处理任意幅度目标
+        support_level: explicit
+        source_refs:
+        - Section Robust predictions
+        - 式(8)
+        - 式(9)
+        - 式(10)
+        - 式(11)
+        choice: 向量观测和解码目标应用symlog变换;奖励预测器和评论家采用指数间隔bin上的softmax分布配合twohot目标,使梯度尺度与目标量级解耦
+        alternatives:
+        - 基于运行统计的目标归一化(引入非平稳性)
+        - 截断极端目标值(丢失信息)
+        - PopArt式自适应网络权重调整
+        children:
+        - id: Q3
+          type: question
+          title: 如何在稀疏和密集奖励下都能稳定行为者的探索熵正则化?
+          support_level: explicit
+          source_refs:
+          - Section Actor learning
+          description: 熵正则化强度应随奖励可达性自适应调整:稀疏奖励下应更多探索,密集奖励下应更多利用;同时不应受奖励任意缩放影响;用固定η跨域需要一种合适的回报归一化机制
+          children:
+          - id: DE2
+            type: dead_end
+            title: 采用优势均值方差归一化(PPO风格)处理稀疏奖励
+            support_level: explicit
+            source_refs:
+            - Section Actor learning
+            hypothesis: 对优势值做均值方差归一化可使熵正则化在所有环境中保持一致的相对强度
+            failure_mode: 稀疏奖励环境中回报标准差接近零,归一化将极小噪声放大至与熵梯度同量级,噪声梯度压过熵正则化项导致探索停滞
+            lesson: 归一化方案需保留对回报是否可达的信息;仅消除绝对幅度差异不足以稳定稀疏奖励场景下的探索
+          - id: D3
+            type: decision
+            title: 采用百分位数区间(5th~95th)返回值归一化,设分母下限L=1
+            support_level: explicit
+            source_refs:
+            - Section Actor learning
+            - 式(6)
+            - 式(7)
+            choice: 用回报批次5th~95th百分位区间的EMA估计作为归一化分母S;当S<L=1时不缩小回报(保留稀疏奖励信号不放大噪声)
+            alternatives:
+            - 优势归一化(均值方差,稀疏奖励下失败)
+            - 奖励/回报按标准差归一化(稀疏奖励下标准差近零)
+            - SAC/MPO式约束熵优化(探索慢且收敛偏低)
+            children:
+            - id: E1
+              type: experiment
+              title: Minecraft零样本钻石收集实验(100M步)
+              support_level: explicit
+              source_refs:
+              - Results节 Minecraft部分
+              - Table 5
+              - Figure 5
+              result: DreamerV3成为首个无需人类数据或领域特定课程即可从零开始在Minecraft获得钻石的算法;100M步内所有训练智能体均发现钻石,远超所有基线算法
+            - id: E2
+              type: experiment
+              title: 跨14任务鲁棒性技术消融实验
+              support_level: explicit
+              source_refs:
+              - Results节 Ablations部分
+              - Figure 6a
+              result: 所有单项鲁棒性技术均对平均性能有贡献,其中KL目标贡献最显著,其次为返回值归一化和symexp twohot损失;每项技术通常仅对部分子任务产生影响
+        - id: E3
+          type: experiment
+          title: 模型规模(12M~400M)与重放比率扩展性实验
+          support_level: explicit
+          source_refs:
+          - Results节 Scaling properties部分
+          - Figure 6c
+          - Figure 6d
+          result: 性能随模型规模和重放比率单调提升,更大模型同时实现更高任务性能与更低数据需求量;所有超参数在不同规模下保持固定,展现可预期的扩展规律

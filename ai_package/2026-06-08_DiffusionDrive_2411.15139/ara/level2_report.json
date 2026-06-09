@@ -1,0 +1,110 @@
+{
+  "artifact": "2026-06-08_DiffusionDrive_2411.15139",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.5,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 4,
+      "strengths": [
+        "Each claim is linked to specific experiments; the experiment designs match the claim types (e.g., improvement claims use baseline comparisons, causal claims use ablations).",
+        "The evidence index clearly maps tables to claims, and the described experiments directly measure the appropriate metrics for each assertion."
+      ],
+      "weaknesses": [
+        "Claim C1 states that the truncated diffusion strategy alone raises mode diversity D from 11% to 74% and FPS from 7 to 45, but its primary evidence (E2) measures these on the full DiffusionDrive system which includes the cascade decoder. The isolated contribution of truncated diffusion is not separately reported for diversity."
+      ],
+      "suggestions": [
+        "Rephrase C1 to attribute the gains to the combined system, or add an explicit measurement of diversity for Transfuser_TD (truncated diffusion only) to precisely support the claim."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "All seven claims include falsification criteria that specify configurations, metrics, and thresholds. The criteria are independently testable using the described experiments and public datasets (NAVSIM, nuScenes).",
+        "They are non-trivial and directly address the core assertions, making it possible to disprove each claim with counter-evidence."
+      ],
+      "weaknesses": [
+        "A few criteria use qualitative thresholds (e.g., '实时阈值', '显著高于', '无明显下降') without precise quantitative definitions or statistical tests."
+      ],
+      "suggestions": [
+        "Provide explicit numeric thresholds (e.g., FPS < 30 for 'not real-time') and define statistical significance levels to fully operationalize the criteria."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 4,
+      "strengths": [
+        "The problem specification explicitly lists key assumptions, and the concepts document defines boundary conditions for each novel component (e.g., anchor coverage limits, OOD scenarios, inference saturation).",
+        "Claims are generally restricted to the evaluated datasets, and cross-dataset generalization is appropriately labeled as partial support."
+      ],
+      "weaknesses": [
+        "Claim C1 slightly over-claims by attributing the 74% diversity and 45 FPS to the truncated diffusion strategy alone, without clarifying the role of the cascade decoder, misaligning scope with evidence.",
+        "The assumption that 20 K-Means anchors suffice for major driving modes is stated but not directly stress-tested (e.g., by varying anchor count)."
+      ],
+      "suggestions": [
+        "Soften the wording of claim C1 or isolate the effect of truncated diffusion in the main text. Add an ablation on the number of anchors to probe the assumption's validity."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "The narrative arc is exceptionally clear: observations (mode collapse, high latency, vocabulary limits) lead to identified gaps, which motivate a key insight (embedding driving priors into diffusion), realized through truncated diffusion and a cascade decoder.",
+        "The exploration tree, problem specification, and claims consistently reflect this arc without contradictions, and every identified gap is addressed by the proposed solution."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "The exploration tree explicitly documents two concrete dead-ends (vanilla diffusion and large vocabulary) with clear hypotheses, failure modes, and lessons learned.",
+        "Decision nodes are linked to these dead-ends and list alternatives, and the negative results (e.g., mode collapse in Transfuser_DP) are reported quantitatively and genuinely inform the final design."
+      ],
+      "weaknesses": [
+        "The large vocabulary dead-end is primarily an analysis of prior work rather than a first-hand failed experiment by the authors; while valid, it is slightly less empirically grounded."
+      ],
+      "suggestions": [
+        "If practical, include a small-scale experiment that demonstrates the vocabulary out-of-distribution failure to strengthen the empirical foundation of that dead-end."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "The evaluation includes a comprehensive set of competitive baselines (UniAD, VADv2, Hydra-MDP, etc.) and thorough ablation studies (decoder components, denoising steps, cascade stages, sampling count, prior type).",
+        "Metrics are well aligned with claims, training details and hardware are specified, and a code repository with commit SHA is provided for reproducibility."
+      ],
+      "weaknesses": [
+        "No statistical variability measures (e.g., standard deviation, confidence intervals) are reported; results are single-point estimates.",
+        "Some hyperparameters (e.g., K-Means clustering details, loss weight λ) are not fully specified in the bundle."
+      ],
+      "suggestions": [
+        "Report results over multiple seeds with error bars. Include the missing hyperparameters and clustering configuration in the artifact to ensure full reproducibility."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "minor",
+      "observation": "Claim C1 attributes the 74% diversity and 45 FPS solely to the truncated diffusion strategy, but its supporting experiment E2 includes the cascade decoder. The isolated effect of truncated diffusion on diversity is not separately evidenced."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "The experimental results are presented as point estimates without standard deviations, confidence intervals, or multi-seed evaluation, reducing the ability to assess statistical significance."
+    },
+    {
+      "dimension": "D2_falsifiability",
+      "severity": "suggestion",
+      "observation": "Several falsification criteria contain qualitative thresholds (e.g., '实时阈值', '显著高于') that are not quantitatively specified, which slightly weakens independent testability."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "Key hyperparameters such as K-Means clustering configuration and the loss weight λ are not provided in the bundle, potentially affecting reproducibility."
+    }
+  ]
+}

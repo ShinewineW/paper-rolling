@@ -1,0 +1,108 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何系统性克服现有驾驶世界模型在跨域泛化、预测保真度、多模态动作可控性三方面的局限?
+  support_level: inferred
+  description: 现有驾驶世界模型受限于数据规模和地理覆盖范围，以低帧率和低分辨率运行导致关键细节丢失，且仅支持单一控制模态而与主流规划算法输出不兼容。论文从系统性诊断出发，提出Vista统一解决这三类局限。
+  children:
+  - id: D1
+    type: decision
+    title: '历史帧动态先验注入方式: 潜变量替换 vs 通道拼接'
+    support_level: explicit
+    source_refs:
+    - Sec 3.1
+    choice: '采用潜变量替换 (latent replacement): 将条件帧的干净潜变量直接替换对应位置的噪声潜变量，输入构造为 m·z + (1-m)·n；并为条件帧和预测帧分别分配独立的时间步嵌入'
+    alternatives:
+    - '通道拼接 (channel-wise concatenation): 将条件帧潜变量拼接到输入通道维度作为额外输入'
+    children:
+    - id: X1
+      type: dead_end
+      title: 假设仅依靠单帧条件足以预测时序一致的长期驾驶动态
+      support_level: inferred
+      hypothesis: 仅以当前帧(位置信息)为条件，扩散模型即可生成动态合理的长期连续预测
+      failure_mode: 缺乏速度和加速度先验时，模型对未来运动趋势存在严重歧义，长期自回归预测中出现不合理动态，例如超车行为在下一预测步骤中突然消失
+      lesson: 一致的未来预测至少需要位置、速度、加速度三阶动态先验(对应三帧条件)；先验阶数越高，预测轨迹与真值差异越小
+    - id: E1
+      type: experiment
+      title: 不同阶数动态先验(1/2/3条件帧)对预测一致性影响的定量消融
+      support_level: explicit
+      source_refs:
+      - Table 3
+      - Fig 11
+      result: 条件帧数量从1增加到3，预测视频与真值的平均轨迹差异在nuScenes和Waymo上均持续下降；三帧条件在各动作类别下均优于更少先验帧的设置
+  - id: Q2
+    type: question
+    title: 如何为驾驶视频预测设计专用损失函数以应对动态区域稀疏和高分辨率结构退化两类挑战?
+    support_level: inferred
+    description: 驾驶视频中远景单调区域主导画面，前景运动实例面积占比小但随机性高；标准扩散损失对所有区域均匀监督，无法有效学习动态关键区域。同时，高分辨率预测中运动物体的结构细节(边缘和纹理)易发生严重退化。
+    children:
+    - id: E2
+      type: experiment
+      title: 动态增强损失 L_dynamics 效果消融实验
+      support_level: explicit
+      source_refs:
+      - Sec 3.1
+      - Fig 12
+      result: 加入L_dynamics后模型能生成更真实的前景动态，例如前车按正常速度行驶，以及自车转弯时场景按几何规律变化；去除该损失则前车保持静止等不合理行为复现
+    - id: E3
+      type: experiment
+      title: 结构保留损失 L_structure 效果消融实验
+      support_level: explicit
+      source_refs:
+      - Sec 3.1
+      - Fig 12
+      result: 加入L_structure后，高分辨率预测中移动物体轮廓保持清晰；去除该损失则物体边缘在运动过程中迅速模糊或断裂
+  - id: Q3
+    type: question
+    title: 如何在不损害已有高保真预测能力的前提下，高效融入多模态异构动作可控性?
+    support_level: inferred
+    description: 多种动作格式(角度/速度/轨迹/命令/目标点)彼此异构且不可互换；直接在高分辨率下全量微调代价高昂且可能破坏预训练保真度；训练效率是关键约束。
+    children:
+    - id: D2
+      type: decision
+      title: '动作条件注入机制选择: 交叉注意力+LoRA vs 加性嵌入 vs 仅映射层'
+      support_level: explicit
+      source_refs:
+      - Sec 3.2
+      choice: 将动作Fourier嵌入通过UNet交叉注意力层注入，同时冻结预训练权重并在所有注意力块中添加LoRA适配器(秩16)；采用先320×576低分辨率预训练(120K步)再576×1024高分辨率微调(10K步)的两阶段高效学习策略
+      alternatives:
+      - '加性嵌入 (additive embeddings): 将动作嵌入直接叠加到特征上'
+      - 仅训练新增映射层而不引入LoRA适配器
+      children:
+      - id: X2
+        type: dead_end
+        title: 假设冻结UNet并仅训练新增映射层即可在不损失质量的前提下实现动作控制
+        support_level: explicit
+        source_refs:
+        - Appendix D.5
+        - Fig 16
+        hypothesis: 预训练UNet权重完全冻结，仅训练新增的动作映射层投影即可实现可控性且保持预训练分布
+        failure_mode: 不使用LoRA时训练结果出现明显视觉损坏 (visual corruptions)，在跨数据集(Waymo)推理时尤为显著
+        lesson: LoRA适配器是在保留预训练高保真能力的同时有效学习动作控制的必要组件；仅映射层微调无法使UNet产生足够的自适应能力
+      - id: E4
+        type: experiment
+        title: 动作独立性约束(每次训练样本仅激活一种动作模式)有效性验证
+        support_level: explicit
+        source_refs:
+        - Appendix D.3
+        - Table 5
+        result: 加入动作独立性约束后，各动作类别的子集FVD指标均有改善；该约束避免训练代价浪费在动作组合上，在相同迭代步数内最大化各独立动作模式的学习效率
+- id: P1
+  type: pivot
+  title: '奖励函数设计转向: 从依赖外部感知模型到利用Vista自身条件方差'
+  support_level: inferred
+  also_depends_on:
+  - Q1
+  from: 依赖外部感知检测器(如BEVFormer、MapTR)对生成视频进行感知推理后估计奖励，奖励来源于外部模型输出
+  to: 利用Vista对同一条件-动作对进行M轮去噪的条件方差作为奖励信号，奖励定义为条件方差取负并指数化，无需任何外部模型
+  trigger: 外部检测器依赖特定数据集开发，限制奖励函数跨域泛化；Vista已内化数百万人类驾驶记录，其预测不确定性可作为跨域可泛化的奖励代理，且计算代价不高于依赖检测器的方案
+  children:
+  - id: E5
+    type: experiment
+    title: 奖励函数在未见过的Waymo数据集上的泛化性及与L2误差相关性验证
+    support_level: explicit
+    source_refs:
+    - Sec 4.3
+    - Fig 10
+    result: 在从未用于训练的Waymo验证集(1500个样本)上，随着轨迹扰动L2误差增大，平均奖励单调递减；真值命令的平均奖励高于随机命令，证明奖励函数可作为无需参考真值动作的可泛化评估指标

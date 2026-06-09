@@ -1,0 +1,122 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何构建通用且可定制的物理世界基础模型（WFM）平台？
+  description: Physical AI 开发者需要一个端到端平台，涵盖海量视频数据策划、高效视频分词、大规模预训练与领域后训练各环节，使世界模型能安全模拟物理世界，并支持机器人操控、自动驾驶、相机导航等下游任务，同时解决
+    Physical AI 训练数据匮乏问题。
+  support_level: explicit
+  source_refs:
+  - Sec. 1
+  - Sec. 2
+- id: D1
+  type: decision
+  title: 采用「预训练→后训练」两阶段范式构建专用 WFM
+  choice: 先以大规模多样视频预训练通用 WFM 获得物理世界通用知识，再针对特定 Physical AI 场景用专用数据集进行后训练微调；后训练数据量可远小于预训练，从而高效构建专用世界模型
+  alternatives:
+  - 完全端到端针对下游任务从头训练（数据需求巨大，难以泛化）
+  - 仅依靠预训练模型零样本应用于下游任务（特定领域泛化不足）
+  support_level: explicit
+  source_refs:
+  - Sec. 1
+  - Fig. 2
+  - Sec. 2.2
+- id: D2
+  type: decision
+  title: 同时探索扩散与自回归两种可扩展 WFM 范式
+  choice: 并行构建基于 DiT 的扩散 WFM（使用连续 token，适合高画质生成）与基于 GPT 的自回归 WFM（使用离散 token，适合实时推理与
+    LLM 加速技术复用），分别针对各自优势场景
+  alternatives:
+  - 仅使用扩散模型（生成画质高但推理较慢，难以利用 LLM 推理优化）
+  - 仅使用自回归模型（可复用 LLM 加速技术但当前画质低于扩散模型）
+  support_level: explicit
+  source_refs:
+  - Sec. 5
+  - Tab. 10
+  - Sec. 9
+  also_depends_on:
+  - D1
+- id: DE1
+  type: dead_end
+  title: 使用 VAE（含 KL 先验损失）作为连续视频分词器
+  hypothesis: VAE 通过 KL 正则化可学习更平滑的连续潜空间，有助于扩散模型在其中稳定训练
+  failure_mode: VAE 需要额外的 KL 先验损失（以及若用 VQ-VAE 则需 commitment loss），增加训练复杂性；论文实验表明普通
+    AE 公式（仅 L1 + 感知损失 + 光流损失 + Gram 矩阵损失）无需辅助潜空间损失亦可获得优异效果
+  lesson: 对视频连续分词器使用普通 AE 公式即可，无需引入 VAE KL 先验损失的额外复杂性；只在最终输出上施加重建监督即可取得高质量分词效果
+  support_level: explicit
+  source_refs:
+  - Sec. 4.2
+- id: DE2
+  type: dead_end
+  title: 使用 VQ-VAE（含 commitment loss）进行离散量化
+  hypothesis: 向量量化（VQ）是离散视觉分词的成熟方案，commitment loss 可防止编码器偏离码本，适合自回归模型的整数 token 需求
+  failure_mode: VQ 训练需要 commitment loss 且存在码本崩溃风险，增加超参数调优负担；有限标量量化（FSQ）通过直接量化 6 维标量到层级
+    (8,8,8,5,5,5) 实现稳定离散化，无需任何辅助损失
+  lesson: FSQ 是 VQ 的有效替代：无 commitment loss 且无码本崩溃问题，词表大小由量化层级积 (64,000) 固定，训练更简洁稳定
+  support_level: explicit
+  source_refs:
+  - Sec. 4.1
+  - Sec. 4.2
+- id: D3
+  type: decision
+  title: 扩散 WFM 采用 FSDP+CP 并行化方案（不引入 TP/SP）
+  choice: 使用全分片数据并行（FSDP，14B 分片因子 64）结合上下文并行（CP，CP_SIZE=8）处理 56,320 token 长上下文，不引入张量并行（TP）以保持架构简洁并达到与
+    TP/SP 方案相当的 MFU
+  alternatives:
+  - 引入 TP+SP（HunyuanVideo / MovieGen 做法，通信拓扑更复杂）
+  - 仅使用数据并行（单卡 80 GB 内存不足以容纳 14B 高分辨率训练）
+  support_level: explicit
+  source_refs:
+  - Sec. 5.1.4
+  also_depends_on:
+  - D2
+- id: E1
+  type: experiment
+  title: 扩散 WFM 与自回归 WFM 在 3D 一致性上的对比评测
+  result: 扩散 WFM（7B-Text2World）在相机位姿估计成功率、Sampson 误差及视图合成 PSNR/SSIM/LPIPS 指标上均显著优于自回归
+    WFM（4B），整体 3D 一致性接近真实视频参考水平；自回归 WFM 画质相对较低但具备实时推理优化潜力
+  support_level: explicit
+  source_refs:
+  - Sec. 5.3.1
+  - Tab. 19
+  also_depends_on:
+  - D2
+- id: E2
+  type: experiment
+  title: Medusa 推测解码头数消融：对自回归 WFM 推理的加速研究
+  result: 9 个 Medusa 头取得最优 token 吞吐量与前向传播次数的平衡；4B 和 5B 模型均获得显著 token 吞吐量提升与前向次数大幅减少；过多
+    Medusa 头（12 个）反而使总 token 吞吐量有所下降；低分辨率适配（320×512）结合 Medusa 进一步实现 10 FPS 实时视频生成
+  support_level: explicit
+  source_refs:
+  - Sec. 5.2.4
+  - Tab. 15
+  - Tab. 17
+  also_depends_on:
+  - D2
+- id: P1
+  type: pivot
+  title: 自回归 WFM 输出从离散直接解码转向扩散解码器增强
+  from: 自回归 WFM 使用离散分词器（DV8×16×16）直接解码输出视频，激进压缩导致明显模糊和可见伪影
+  to: 引入扩散解码器（Cosmos-Predict1-7B-Decoder-DV8×16×16ToCV8×8×8-720p），将离散 token 先映射至连续
+    token 空间，再经连续解码器还原高质量视频；扩散解码器通过去噪过程恢复细节同时保留内容语义
+  trigger: DV8×16×16 离散分词器的激进压缩在自回归模型输出中产生明显模糊，扩散解码器通过以离散 token 为条件输入进行扩散去噪，有效弥补画质损失
+  support_level: explicit
+  source_refs:
+  - Sec. 5.2.5
+  - Fig. 15
+  - Fig. 18
+  also_depends_on:
+  - D2
+  - E1
+- id: E3
+  type: experiment
+  title: 后训练相机控制：Plücker 嵌入融合相机位姿条件评测
+  result: Cosmos-Predict1-7B-Video2World-Sample-CameraCond 在相机轨迹对齐误差、FID 和 FVD 等所有指标上均显著优于
+    CamCo 基线，位姿估计成功率接近翻倍，证明预训练 WFM 大幅降低域迁移难度；在训练集（DL3DV-10K）与测试集（RealEstate10K）存在明显分布差异的情况下仍保持强泛化能力
+  support_level: explicit
+  source_refs:
+  - Sec. 6.1
+  - Tab. 22
+  also_depends_on:
+  - D1
+  - D2
