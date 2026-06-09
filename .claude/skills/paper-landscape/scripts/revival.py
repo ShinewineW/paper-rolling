@@ -321,6 +321,10 @@ def _revive_one(
             )
 
         # 复核一律对 staging 跑、promote 只在通过后(审计 R2 Finding 3:严禁先 promote 再复核)。
+        # 注:run_g3 收 content_list_path 原值(非上面 write_scene 用的 None-容忍 `cl`)——
+        # check_equation_fidelity 需要一个**具体**路径,而 spoke 写出的现场恒有 content_list.json
+        # (tier-1 合成 / tier-2 emit,write_scene 快照入现场)。仅 hand-built/损坏现场可能缺它,
+        # 那种 FileNotFoundError 由 revive_all 的 per-scene except 兜成 error、现场完好(CR MED-1)。
         verdict = run_g3(
             staging / "person",
             staging / "ai",
@@ -369,6 +373,9 @@ def _revive_one(
         return RevivalResult(
             key=scene_dir.name, ledger_key=ledger_key, status="done", failed_gate=failed_gate
         )
+    # 注(CR LOW-1):promote 抛的 SpokeCancelled 不在此捕获——它故意逃逸到 revive_all 的
+    # per-scene `except Exception` 兜成 error;promote 内部已 revert vault、copy-not-move 保证
+    # 现场完好,与显式处理等价。下面三门是「重跑仍挂下游门」→ append 现场(deferred 不变)。
     except StructuralSealFailed as exc:
         return _append_failed(
             "结构门", [{"target": "ara", "observation": e} for e in exc.errors], exc.staged_dir
