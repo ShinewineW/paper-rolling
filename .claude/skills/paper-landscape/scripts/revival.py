@@ -56,6 +56,13 @@ def _classify_roots(findings: list[dict]) -> set[str]:
             roots.add("branch1")
         elif t.endswith("level2_report.json") or "claims.md" in t.split(":")[0]:
             roots.add("branch2")
+        elif t == "ara":
+            # 结构门(Seal-1)失败的 finding target 是字面量 "ara"(spoke 写场时所记)。
+            # 结构门是 branch2 根:复活时重跑整条 branch2(重调一次 analyzer,带结构错误
+            # 反馈) —— spoke.py 注释明示 "Revival re-runs the whole branch2 chain"。
+            # 必须早于下面的 ingest 兜底,否则结构门现场会被误判为 ingest 根 → manual,
+            # 连一次复活重摇都拿不到。
+            roots.add("branch2")
         else:
             roots.add("ingest")
     return roots

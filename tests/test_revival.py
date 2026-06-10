@@ -199,6 +199,49 @@ def test_revive_mixed_ingest_final_gate_is_manual(tmp_path):
     assert led.entries()[-1]["status"] == "deferred"  # ledger 未动
 
 
+# 结构门(Seal-1)失败的 finding target 是字面量 "ara"(真实 analyzer 吐非法结构时触发)。
+_STRUCTURAL_FINDING = [
+    {
+        "target": "ara",
+        "observation": "E4: also_depends_on must be a list of node ids, got string 'D2'",
+        "severity": "hard",
+    }
+]
+
+
+def test_revive_structural_gate_scene_reruns_branch2_and_promotes(tmp_path):
+    # 结构门(target="ara")是 branch2 根:复活必须重跑一次 branch2(重调 analyzer),
+    # 而不是短路成 manual。回归真实 E2E 发现的 _classify_roots 误判 bug。
+    led = Ledger(tmp_path)
+    scene, lk = _seed_scene(tmp_path, led, failed_gate="结构门", findings=_STRUCTURAL_FINDING)
+    calls = []
+
+    def counting_resolve(*a, **k):
+        calls.append(1)
+        return _resolve_analysis(*a, **k)
+
+    seams = _seams(rigor_scores=_good_rigor)
+    seams["resolve_analysis"] = counting_resolve
+    with led.acquire():
+        res = revive_all(workspace=tmp_path, ledger=led, seams=seams)
+    assert calls, "结构门复活必须重调 analyzer(branch2 重摇),不能短路成 manual"
+    assert res[0].status == "done"
+    assert not scene.exists()
+    assert led.entries()[-1]["status"] == "done"
+
+
+def test_revive_structural_gate_scene_still_bad_stays_failed(tmp_path):
+    # 重摇后仍过不了门 → 留在 _failed 等人工(LLM 不稳定的取舍:给一次机会即止),
+    # 关键是状态为 failed(确实尝试过一次)而非 manual(尝试前就短路)。
+    led = Ledger(tmp_path)
+    scene, lk = _seed_scene(tmp_path, led, failed_gate="结构门", findings=_STRUCTURAL_FINDING)
+    with led.acquire():
+        res = revive_all(workspace=tmp_path, ledger=led, seams=_seams(rigor_scores=_low_rigor))
+    assert res[0].status == "failed"  # 不是 manual:确实重摇了一次
+    assert (scene / "scene.json").exists()  # 现场保留,等人工
+    assert lk in led.skip_set()  # 仍 deferred(无 TTL)
+
+
 def test_load_scenes_recovers_crash_between_renames(tmp_path):
     base = tmp_path / "_failed"
     base.mkdir()
