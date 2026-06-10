@@ -36,6 +36,7 @@
 ### guides/ — 操作指南
 - [`guides/EXTENDING.md`](guides/EXTENDING.md) — 如何在 paper 垂域内扩展引擎(新增 source / tier / gate / branch / 跨论文步骤)。
 - [`guides/ROADMAP.md`](guides/ROADMAP.md) — 能力 / 可信度路线图(planned·in-progress·done 状态,持续更新)。
+- [`guides/mineru-setup.md`](guides/mineru-setup.md) — Tier-2 mineru 环境修复(socksio + ModelScope 直连下模型);"装了≠能跑"的排查与 preflight deep-smoke 验证。
 
 ### guides/codemaps/ — 代码地图(系统架构 / 代码感知)
 - [`guides/codemaps/INDEX.md`](guides/codemaps/INDEX.md) — 代码地图总索引(2026-06-08 LLM 管线集成)。
