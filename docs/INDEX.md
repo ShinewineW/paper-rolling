@@ -36,6 +36,7 @@
 ### guides/ — 操作指南
 - [`guides/EXTENDING.md`](guides/EXTENDING.md) — 如何在 paper 垂域内扩展引擎(新增 source / tier / gate / branch / 跨论文步骤)。
 - [`guides/ROADMAP.md`](guides/ROADMAP.md) — 能力 / 可信度路线图(planned·in-progress·done 状态,持续更新)。
+- [`guides/mineru-setup.md`](guides/mineru-setup.md) — Tier-2 mineru 环境修复(socksio + ModelScope 直连下模型);"装了≠能跑"的排查与 preflight deep-smoke 验证。
 
 ### guides/codemaps/ — 代码地图(系统架构 / 代码感知)
 - [`guides/codemaps/INDEX.md`](guides/codemaps/INDEX.md) — 代码地图总索引(2026-06-08 LLM 管线集成)。
@@ -46,10 +47,10 @@
 - [`guides/codemaps/output-branches.md`](guides/codemaps/output-branches.md) — 双链原子产出、LLM 人链、图形策展。
 
 ### spec/ — 设计文档
-- [`spec/2026-06-09-失败现场与复活赛-impl.md`](spec/2026-06-09-失败现场与复活赛-impl.md) — 失败现场保全 + 外科手术重试 + 批次复活赛实施计划(依据 ADR-0006~0009)。
 - [`spec/2026-06-09-code-ref-repo-resolution-impl.md`](spec/2026-06-09-code-ref-repo-resolution-impl.md) — code_ref 官方仓定位级联(T1 grep+T2a PwC离线+T2b HF-live+T4 websearch)+ clone 验证闸门 + 三态语义实施计划(P0)。
 
 ### spec/archive/ — 设计文档(归档)
+- [`spec/archive/2026-06-09-失败现场与复活赛-impl.md`](spec/archive/2026-06-09-失败现场与复活赛-impl.md) — 失败现场保全 + branch 级重试 + 批次复活赛实施计划(依据 ADR-0006~0009;已落地归档)。
 - [`spec/archive/2026-06-07-人链重做-双链对等.md`](spec/archive/2026-06-07-人链重做-双链对等.md) — 人链重做:双链对等设计(已落地归档)。
 
 ### reports/ — 报告

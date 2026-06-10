@@ -1,0 +1,13 @@
+{
+  "_doc": "Golden invariants for the MinerU preflight deep-smoke. Regenerate when mineru version changes (run mineru on smoke.pdf, update counts). Comparison is structural (ML output), not byte-exact.",
+  "fixture": "smoke.pdf",
+  "fixture_sha256": "8cb2e5ea65a03fb855b036dcc0cd10b08c3e5052b800ae9dd623022930aa9c1a",
+  "mineru_version_seen": "3.2.3",
+  "expect": {
+    "equation_blocks": 1,
+    "image_blocks": 1,
+    "text_blocks_min": 1,
+    "image_files_min": 1,
+    "md_chars_min": 300
+  }
+}

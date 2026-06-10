@@ -58,6 +58,7 @@ def test_run_with_budget_signature_is_stable_for_hub() -> None:
         "failed_dir",
         "key",
         "paper_meta",
+        "write_quarantine_note",
     ]
 
 

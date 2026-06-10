@@ -37,13 +37,12 @@ skip later:
 PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.preflight
 ```
 
-It checks the runtime deps + `pandoc` (Tier-1 ingest) + `mineru` (Tier-2 ingest)
-and **exits non-zero** if any is missing, naming the install command. **If it
-exits non-zero, STOP**: report exactly what is missing and how to install it; do
-**not** proceed to the Hard Gate or ingest until the user has installed it and the
-preflight is all-green. Gate every run on it — `… -m scripts.preflight && <run the
-tick>` — so a missing tool cannot silently degrade ingest. (The four LLM seams are
-agent-provided and the HF token ships in source, so they are not preflighted.)
+It runs **three layers** and **exits non-zero** if anything is unhealthy, naming each fix:
+- **presence** — runtime deps + `pandoc`/`mineru` on PATH (stdlib-only, so it reports even when deps are missing);
+- **LLM config** — `config/llm.yaml` routing is complete, each routed provider's `api_key_env` is set, and every routed *API* provider answers a trivial **liveness** prompt (key + endpoint actually work). `claude-code` is **presence-only — never probed**: a gratuitous `claude -p` risks IP-based account suspension, and the real analyzer workload exercises it anyway;
+- **deep smoke** — `pandoc` and `mineru` actually convert a tiny bundled fixture and `mineru`'s products match a committed golden. The mineru smoke is **cached** (keyed on mineru version + fixture): first run pays ~75s (model load), later runs are instant. Flags: `--no-probe` (skip liveness), `--no-deep` (skip smoke), `--force-smoke` (ignore cache).
+
+The deep smoke exists because "installed" ≠ "works": `mineru` can be on PATH yet crash at first real use (missing `socksio` under a SOCKS proxy, or model download blocked) — the smoke catches that **before** any token is burned. **If it exits non-zero, STOP**: report what is unhealthy and the fix; do **not** proceed to the Hard Gate or ingest until it is all-green. Gate every run on it — `… -m scripts.preflight && <run the tick>`. mineru's environment (socksio + a reachable model mirror) is a known footgun — see `docs/guides/mineru-setup.md`.
 
 ## Entry: the campaign Hard Gate (HITL, once per campaign) — MUST
 

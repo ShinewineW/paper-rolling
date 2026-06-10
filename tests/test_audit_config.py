@@ -57,3 +57,9 @@ def test_audit_config_validates_ranges() -> None:
         AuditConfig(max_gate_rounds=0)
     with pytest.raises(ValueError, match="ratio"):
         AuditConfig(data_fidelity_max_unconfirmed_ratio=1.5)
+
+
+def test_g2_blind_retry_rounds_default_and_yaml(tmp_path: Path) -> None:
+    assert load_audit_config(tmp_path).g2_blind_retry_rounds == 1
+    _write(tmp_path, "g2_blind_retry_rounds: 2\n")
+    assert load_audit_config(tmp_path).g2_blind_retry_rounds == 2

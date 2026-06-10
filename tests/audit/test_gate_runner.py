@@ -30,7 +30,7 @@ def test_run_with_budget_passes_first_round(tmp_path: Path) -> None:
     outcome = run_with_budget(
         _passing,
         max_rounds=3,
-        on_reemit=reemits.append,
+        on_reemit=lambda i, v: reemits.append(i),
         failed_dir=tmp_path / "_failed",
         key="2026-06-05_T_170603762",
         paper_meta={"arxiv_id": "1706.03762", "title": "Transformer", "source_url": "u"},
@@ -52,7 +52,7 @@ def test_run_with_budget_reemits_then_passes(tmp_path: Path) -> None:
     outcome = run_with_budget(
         gate,
         max_rounds=3,
-        on_reemit=reemits.append,
+        on_reemit=lambda i, v: reemits.append(i),
         failed_dir=tmp_path / "_failed",
         key="k",
         paper_meta={"arxiv_id": "x", "title": "t", "source_url": "u"},
@@ -68,7 +68,7 @@ def test_run_with_budget_escalates_after_max_rounds(tmp_path: Path) -> None:
     outcome = run_with_budget(
         _blocking,
         max_rounds=3,
-        on_reemit=reemits.append,
+        on_reemit=lambda i, v: reemits.append(i),
         failed_dir=failed_dir,
         key="2026-06-05_BadPaper_999",
         paper_meta={
@@ -105,9 +105,48 @@ def test_run_with_budget_does_not_loop_forever(tmp_path: Path) -> None:
     run_with_budget(
         gate,
         max_rounds=5,
-        on_reemit=lambda _r: None,
+        on_reemit=lambda _i, _v: None,
         failed_dir=tmp_path / "_failed",
         key="k",
         paper_meta={"arxiv_id": "x", "title": "t", "source_url": "u"},
     )
     assert calls["n"] == 5
+
+
+def test_on_reemit_receives_verdict(tmp_path: Path) -> None:
+    """on_reemit now gets (round_index, verdict) so the spoke can dispatch by the
+    blocking verdict's Finding.target (branch-level re-emit, Task 4.4)."""
+    seen: list[GateVerdict] = []
+    calls = {"n": 0}
+
+    def gate() -> GateVerdict:
+        calls["n"] += 1
+        return _blocking() if calls["n"] == 1 else _passing()
+
+    outcome = run_with_budget(
+        gate,
+        max_rounds=2,
+        on_reemit=lambda i, v: seen.append(v),
+        failed_dir=tmp_path / "_failed",
+        key="k",
+        paper_meta={},
+    )
+    assert outcome.passed
+    assert seen and seen[0].hard_findings[0].target == "report.md"
+
+
+def test_run_with_budget_can_skip_quarantine_note(tmp_path: Path) -> None:
+    """write_quarantine_note=False: callers that preserve their own scene must not
+    also get a _failed/<key>.md note (audit R1 Finding 4 / R5 Finding 2)."""
+    failed_dir = tmp_path / "_failed"
+    outcome = run_with_budget(
+        _blocking,
+        max_rounds=2,
+        on_reemit=lambda _i, _v: None,
+        failed_dir=failed_dir,
+        key="k",
+        paper_meta={},
+        write_quarantine_note=False,
+    )
+    assert outcome.escalated and outcome.failed_path is None
+    assert not (failed_dir / "k.md").exists()

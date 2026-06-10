@@ -28,7 +28,12 @@ from typing import Protocol
 
 from scripts.campaign import gate_needed, load_campaign
 from scripts.landscapes import LandscapeResult, generate_landscapes
-from scripts.paths import FAILURE_STALLED, VAULT_BRANCH_PATH_FIELDS, EngineAbort
+from scripts.paths import (
+    FAILURE_AUDIT_BLOCK,
+    FAILURE_STALLED,
+    VAULT_BRANCH_PATH_FIELDS,
+    EngineAbort,
+)
 
 FAILED_REL = Path("_failed")
 
@@ -326,7 +331,18 @@ def run_tick(
                 person_vault_path=result.person_vault_path,
                 ai_package_path=result.ai_package_path,
             )
+        elif result.failure_class == FAILURE_AUDIT_BLOCK:
+            # audit 失败 → deferred(无 TTL)+ 现场(spoke 已写 _failed/<key>/),进 skip_set,
+            # 静等显式复活;不再写 _failed/<key>.md 纸条(现场即记录,避免同 key 纸条+目录并存)。
+            ledger.record(
+                candidate["key"],
+                status="deferred",
+                failure_class=result.failure_class,
+                retry_after=None,
+            )
+            failed += 1
         else:
+            # 下载/转换等失败:无现场,保留小纸条供人工 triage。
             ledger.record(candidate["key"], status="failed", failure_class=result.failure_class)
             _quarantine(workspace, candidate, result)
             failed += 1

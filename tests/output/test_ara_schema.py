@@ -114,3 +114,20 @@ def test_missing_dead_end_is_error() -> None:
 def test_validate_ara_tree_detects_missing_paper_md(tmp_path) -> None:
     errors = validate_ara_tree(tmp_path)
     assert any("PAPER.md" in e for e in errors)
+
+
+def test_also_depends_on_string_reports_truthful_error() -> None:
+    yaml_text = """
+tree:
+  - id: N1
+    type: decision
+    title: root
+    support_level: inferred
+    also_depends_on: "D1"
+"""
+    errors = validate_exploration_tree(yaml_text)
+    joined = " ".join(errors)
+    assert "also_depends_on must be a list" in joined
+    assert '"D1"' in joined or "'D1'" in joined
+    assert "unknown node 'D'" not in joined
+    assert "unknown node '1'" not in joined

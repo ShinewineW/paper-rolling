@@ -335,3 +335,11 @@ def test_cli_invalidate_unknown_key_errors(tmp_path):
     led.record_status("k1", status="done", md_sha256="abc")
     rc = store.main(["does-not-exist", "--topic-dir", str(tmp_path)])
     assert rc == 2
+
+
+def test_audit_deferred_no_ttl_enters_skip_set(tmp_path):
+    # ADR-0007: an audit hard-block records deferred with NO retry_after → it must
+    # skip UNCONDITIONALLY (wait for explicit batch revival, not a /loop auto-retry).
+    led = Ledger(tmp_path)
+    led.record("k1", status="deferred", failure_class="audit_block", retry_after=None)
+    assert "k1" in led.skip_set()

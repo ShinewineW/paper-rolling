@@ -67,3 +67,36 @@ class MdContract:
 def write_contract(contract: MdContract, path: Path) -> None:
     """Serialize a contract to JSON at `path` (2-space indent, stable key order)."""
     path.write_text(json.dumps(contract.to_dict(), indent=2, ensure_ascii=False) + "\n")
+
+
+def corpus_readiness_problems(md_path: Path) -> list[str]:
+    """Mechanical completeness check of a corpus entry against its `.md_contract.json`.
+
+    Returns a list of human-readable gaps; empty == ready. A fresh `ingest()` writes
+    MD + images/ + contract atomically, so it is always ready; this catches the REUSE
+    path (revival) on a checkout where the gitignored `corpus/**/images/` were never
+    pulled — so we bail to manual (re-ingest) BEFORE burning any LLM token instead of
+    failing at the terminal branch1 figure gate after analyzer + G2 + writer ran.
+
+    No contract → returns [] (nothing to verify against; that is a different concern).
+    """
+    md_path = Path(md_path)
+    if not md_path.is_file():
+        return [f"MD missing: {md_path}"]
+    contract_path = md_path.parent / ".md_contract.json"
+    if not contract_path.is_file():
+        return []
+    c = json.loads(contract_path.read_text(encoding="utf-8"))
+    problems: list[str] = []
+    want_sha = c.get("md_sha256")
+    if want_sha and sha256_file(md_path) != want_sha:
+        problems.append("md_sha256 drift (MD corrupted/truncated vs contract)")
+    want_imgs = int(c.get("image_count") or 0)
+    if want_imgs > 0:
+        images_dir = md_path.parent / "images"
+        have = sum(1 for p in images_dir.iterdir() if p.is_file()) if images_dir.is_dir() else 0
+        if have < want_imgs:
+            problems.append(
+                f"images incomplete: contract={want_imgs} present={have} (re-ingest needed)"
+            )
+    return problems

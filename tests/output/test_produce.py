@@ -168,3 +168,58 @@ def test_produce_uses_passed_resolve_analysis_not_a_global(
 
     produce_outputs(md_path, candidate, ledger, root=tmp_path, resolve_analysis=spy)
     assert calls == [(md_path, candidate)]
+
+
+def test_produce_gate_block_carries_staged_dir(tmp_path, candidate, ledger, md_path, analyzer):
+    """审计 F / R1 Finding 2:G2 hard-block 时异常须携带 staged 父目录(含 ai/ara),供 spoke
+    保全失败现场,不再被 finally 无条件删。既有成功/取消路径仍照常清理 staging。"""
+    from scripts.output.produce import ProduceGateBlocked
+
+    def blocking_gate(_ai_entry):
+        class _Verdict:
+            blocked = True
+            findings = ()
+
+        return _Verdict()
+
+    with pytest.raises(ProduceGateBlocked) as ei:
+        produce_outputs(
+            md_path,
+            candidate,
+            ledger,
+            root=tmp_path,
+            resolve_analysis=analyzer,
+            g2_gate=blocking_gate,
+        )
+    staged = ei.value.staged_dir
+    assert staged is not None and staged.exists()
+    assert (staged / "ai" / "ara").is_dir()  # branch2 产物完好,未被 finally 删
+    # 未晋升:两 vault 空。
+    assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
+    assert not (tmp_path / "person_vault").exists() or not any(
+        (tmp_path / "person_vault").iterdir()
+    )
+
+
+def test_branch2_reemit_threads_repo_resolver(tmp_path, candidate, ledger, md_path, analyzer):
+    """审计 R10:branch2 re-emit(prior_failure_analyzer)必须把注入的 repo_resolver
+    透传到 write_branch2,不回退默认(否则丢 T2b/T4 码链解析)。"""
+    calls = []
+
+    def counting_resolver(*a, **k):
+        calls.append((a, k))
+        return []  # no repos resolved (signature-compatible counting fake)
+
+    def analyzer_pf(md, cand, *, prior_failure=None):
+        return analyzer(md, cand)  # reuse the fixture bundle; accept the re-emit kwarg
+
+    produce_outputs(
+        md_path,
+        candidate,
+        ledger,
+        root=tmp_path,
+        resolve_analysis=analyzer_pf,
+        repo_resolver=counting_resolver,
+        prior_failure_analyzer="上一稿 rigor 不足,请更严格核对源文数字",
+    )
+    assert calls, "branch2 re-emit 未调用注入的 repo_resolver(回退默认 = R10 回归)"

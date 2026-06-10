@@ -63,3 +63,7 @@ _ledger/.lock
 
 # git worktree 检出(根目录 .worktrees/,惯例位置)
 /.worktrees/
+
+# 失败现场=本地诊断 scratch，不是产物（ADR-0007）。保留 .gitkeep 占位。
+/_failed/*
+!/_failed/.gitkeep

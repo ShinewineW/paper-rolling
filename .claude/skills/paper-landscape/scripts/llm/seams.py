@@ -111,7 +111,7 @@ def _ask_json(
 # --------------------------------------------------------------------------- #
 
 
-def resolve_analysis(md_path: Path, candidate: dict) -> dict:
+def resolve_analysis(md_path: Path, candidate: dict, *, prior_failure: str | None = None) -> dict:
     """Analyzer seam: frozen paper MD -> ARA bundle, via CHUNKED PARALLEL extraction.
 
     Instead of one monolithic long-output call (slow + fragile — it stalled 4/4 on
@@ -130,7 +130,13 @@ def resolve_analysis(md_path: Path, candidate: dict) -> dict:
     aid = candidate.get("arxiv_id", "")
     _log(f"analyzer[{provider.name}]: {aid} chunked-parallel mode={mode}")
     bundle = analyze_chunked(
-        Path(md_path), candidate, provider, grounded=(mode == "grounded"), timeout=1500.0, log=_log
+        Path(md_path),
+        candidate,
+        provider,
+        grounded=(mode == "grounded"),
+        timeout=1500.0,
+        log=_log,
+        prior_failure=prior_failure,
     )
 
     missing = [k for k in _REQUIRED_ARA_KEYS if k not in bundle]
@@ -332,7 +338,13 @@ def expand_llm(prompt: str) -> list[str]:
 # --------------------------------------------------------------------------- #
 
 
-def write_report(ara_dir: Path, *, md_path: Path | None = None, outdir: Path | None = None) -> dict:
+def write_report(
+    ara_dir: Path,
+    *,
+    md_path: Path | None = None,
+    outdir: Path | None = None,
+    prior_failure: str | None = None,
+) -> dict:
     """Human-chain writer seam: gated ARA (+ source MD) -> report material.
 
     Routed to the ``writer`` provider in config/llm.yaml (explicitly routed;
@@ -344,7 +356,9 @@ def write_report(ara_dir: Path, *, md_path: Path | None = None, outdir: Path | N
     """
     provider = _provider_for("writer")
     _log(f"write_report: writer provider = {provider.name}")
-    sections = write_human_sections(Path(ara_dir), provider, outdir=outdir, log=_log)
+    sections = write_human_sections(
+        Path(ara_dir), provider, outdir=outdir, log=_log, prior_failure=prior_failure
+    )
     figs = extract_figures(Path(md_path)) if md_path else []
     if figs:
         _log(f"write_report: curating {len(figs)} original figures (selective)")

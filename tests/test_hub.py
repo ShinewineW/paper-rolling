@@ -15,7 +15,14 @@ class FakeLedger:
         return set(self._skip)
 
     def record(
-        self, key, *, status, failure_class=None, person_vault_path=None, ai_package_path=None
+        self,
+        key,
+        *,
+        status,
+        failure_class=None,
+        person_vault_path=None,
+        ai_package_path=None,
+        retry_after=None,
     ) -> None:
         self.records.append(
             {
@@ -24,6 +31,7 @@ class FakeLedger:
                 "failure_class": failure_class,
                 "person_vault_path": person_vault_path,
                 "ai_package_path": ai_package_path,
+                "retry_after": retry_after,
             }
         )
         # 'done' keys join the skip-set so a subsequent tick won't reprocess.
@@ -596,3 +604,42 @@ def test_watchdog_recover_isolates_a_crashing_refire(tmp_path: Path):
         watchdog=wd,
     )
     assert res.exhausted is True  # p0 never truly done; tick completed without crashing
+
+
+def test_audit_block_failure_recorded_deferred_without_note(tmp_path: Path):
+    """Chunk 3.5 wiring (CR MED-2): an audit-block spoke failure records `deferred`
+    (retry_after=None → enters skip_set, waits for revival) and does NOT write a
+    _failed/<key>.md note — the spoke already wrote a self-contained scene. Download/
+    convert failures still record `failed` + a note."""
+    from scripts.paths import FAILURE_AUDIT_BLOCK
+
+    ledger = FakeLedger()
+    pool = [_candidate("p0")]
+
+    def spoke(cand: dict) -> SpokeResult:
+        return SpokeResult(
+            status="failed",
+            person_vault_path=None,
+            ai_package_path=None,
+            failure_class=FAILURE_AUDIT_BLOCK,
+            failure_reason="G3 seal hard-block exhausted budget",
+            source_url=cand["source_url"],
+            attempted_tier="tier2",
+        )
+
+    run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=1,
+        ledger=ledger,
+        discover=lambda topic, n_target: pool,
+        spoke=spoke,
+        max_concurrent=1,
+    )
+
+    rows = [r for r in ledger.records if r["key"] == "p0"]
+    assert rows, "expected a ledger row for the audit-blocked paper"
+    assert rows[-1]["status"] == "deferred"
+    assert rows[-1]["retry_after"] is None  # no TTL → permanent skip until revival
+    # audit_block does NOT write a _failed/<key>.md note (the scene is the record).
+    assert not list((tmp_path / "_failed").glob("p0*.md"))

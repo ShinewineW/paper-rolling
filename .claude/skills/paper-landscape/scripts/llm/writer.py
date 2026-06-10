@@ -151,14 +151,20 @@ def _read_sources(ara_dir: Path, rel_files: tuple[str, ...]) -> str:
     return "\n\n".join(chunks)
 
 
-def _section_prompt(title: str, focus: str, sources: str) -> str:
+def _section_prompt(title: str, focus: str, sources: str, prior_failure: str | None = None) -> str:
     inject = _injection()
     inject_block = f"{inject}\n\n" if inject else ""
+    revision_block = (
+        f"【上一稿被门控拦下,请据此整体修订(不删内容,按指引改写)】\n{prior_failure}\n\n"
+        if prior_failure
+        else ""
+    )
     return (
         "你是一位资深的中文技术深度科普作者,正在撰写一篇论文'给人读'的深度解读报告中的一节。\n\n"
         f"{inject_block}"
         "下面是已经过事实校验的结构化事实源(你的事实基础):\n"
         f"{sources}\n\n"
+        f"{revision_block}"
         f"【本节任务】{focus}\n\n"
         f"{_CONSTRAINTS}\n\n"
         f'现在写这一节,以 "## {title}" 开头。'
@@ -173,6 +179,7 @@ def write_human_sections(
     max_workers: int = 6,
     timeout: float = 600.0,
     log=lambda _m: None,
+    prior_failure: str | None = None,
 ) -> dict[str, str]:
     """Write every human-report section via ``provider``; return {id: markdown}.
 
@@ -187,7 +194,9 @@ def write_human_sections(
     def _one(spec) -> tuple[str, str]:
         sid, title, rel_files, focus = spec
         log(f"writer[{provider.name}]: {sid}")
-        prompt = _section_prompt(title, focus, _read_sources(ara_dir, rel_files))
+        prompt = _section_prompt(
+            title, focus, _read_sources(ara_dir, rel_files), prior_failure=prior_failure
+        )
         md = provider.complete(prompt, tier="strong", timeout=timeout).strip()
         if outdir is not None:
             (outdir / f"{sid}.md").write_text(md, encoding="utf-8")

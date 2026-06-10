@@ -19,13 +19,13 @@ import shutil
 import tempfile
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
 from scripts.output.ara_schema import validate_ara_tree
 from scripts.output.branch1_llm import write_branch1_llm
-from scripts.output.branch1_report import write_branch1
+from scripts.output.branch1_report import AnchorGateError, write_branch1
 from scripts.output.branch2_ara import write_branch2
 from scripts.output.naming import find_existing_entries, vault_key
 
@@ -37,18 +37,38 @@ class ProduceResult:
     key: str
     person_path: Path
     ai_path: Path
+    # The branch2 analyzer bundle that produced this run, surfaced so a branch1-only
+    # G3 re-emit can reuse the branch2 SSOT without re-sampling the analyzer (ADR-0009).
+    analysis: dict | None = None
 
 
 class ProduceGateBlocked(Exception):
     """G2 hard-blocked the staged branch2 BEFORE branch1/promotion (OT-5 holds).
 
-    Carries the blocking verdict so the spoke can record the reason; nothing has
-    reached either real vault when this is raised.
+    Carries the blocking verdict so the spoke can record the reason, and the
+    staged dir (parent of `ai/`) so the spoke can preserve the failure scene
+    instead of letting `finally` delete the staged branch2 products (audit F).
     """
 
-    def __init__(self, verdict: Any) -> None:
+    def __init__(self, verdict: Any, *, staged_dir: Path | None = None) -> None:
         self.verdict = verdict
+        self.staged_dir = staged_dir
         super().__init__("branch2 hard-blocked by the G2 data-fidelity gate")
+
+
+class StructuralSealFailed(Exception):
+    """branch2 failed the Seal-1 structural validator BEFORE branch1/promotion.
+
+    Replaces the former bare ValueError (audit F / R1 Finding 1): carries the
+    structural errors + the staged dir (parent of `ai/`) so the spoke can
+    preserve the failure scene rather than let `finally` delete it. The failure
+    root is branch2 → revival re-runs the whole branch2 chain.
+    """
+
+    def __init__(self, errors: list[str], *, staged_dir: Path | None = None) -> None:
+        self.errors = errors
+        self.staged_dir = staged_dir
+        super().__init__(f"branch2 failed Seal-1: {'; '.join(errors[:5])}")
 
 
 class SpokeCancelled(Exception):
@@ -102,17 +122,136 @@ def _write_audit_flags(ara_dir: Path, verdict: Any) -> None:
         paper_md.write_text(paper_md.read_text(encoding="utf-8") + banner, encoding="utf-8")
 
 
+def stage_branch2(
+    staging: Path,
+    candidate: Any,
+    md_path: Path,
+    *,
+    resolve_analysis: Callable[..., dict],
+    repo_resolver: Callable | None = None,
+    prior_failure: str | None = None,
+    analysis: dict | None = None,
+) -> tuple[Path, dict]:
+    """Stage branch2 (ARA) into ``staging/ai/ara`` and run Seal-1; return (stage_ai, analysis).
+
+    The 'fresh' for a G2 blind retry / branch2 re-emit comes from RE-CALLING
+    resolve_analysis (a new analyzer sampling), not from re-rendering a cached
+    bundle (audit E). ``repo_resolver`` MUST thread through to write_branch2 or a
+    re-emit silently loses code-link resolution (audit R10 — T2b/T4).
+
+    Pass a pre-computed ``analysis`` to REUSE the branch2 SSOT (a branch1-only G3
+    re-emit re-renders from it — no analyzer re-sample, ADR-0009).
+
+    Raises:
+        StructuralSealFailed: the staged ARA failed Seal-1 (carries ``staging``).
+    """
+    stage_ai = staging / "ai" / "ara"
+    if analysis is None:
+        # audit R5 Finding 1: only pass prior_failure when set — an older analyzer
+        # fake takes (md_path, candidate) only and would TypeError on an extra kwarg.
+        extra = {"prior_failure": prior_failure} if prior_failure is not None else {}
+        analysis = resolve_analysis(md_path, candidate, **extra)
+    write_branch2(stage_ai, candidate, analysis, md_path=md_path, repo_resolver=repo_resolver)
+    ara_errors = validate_ara_tree(stage_ai)
+    if ara_errors:
+        raise StructuralSealFailed(ara_errors, staged_dir=staging)
+    return stage_ai, analysis
+
+
+def stage_branch1(
+    staging: Path,
+    candidate: Any,
+    stage_ai: Path,
+    md_path: Path,
+    write_report: Callable[..., dict] | None,
+    analysis: dict,
+    key: str,
+    *,
+    prior_failure: str | None = None,
+) -> None:
+    """Stage branch1 (human report) into ``staging/person``, self-gating on the
+    three-layer anchor lint.
+
+    The deterministic ``write_branch1`` fallback (write_report=None) is preserved
+    (audit R4 Finding 2 — test_produce monkeypatches it). AnchorGateError carries
+    ``staging`` so callers that bypass produce_outputs (G3 branch1 re-emit, revival)
+    still get a self-contained scene (audit R4 Finding 1).
+
+    Raises:
+        AnchorGateError: the report failed the three-layer anchor gate.
+    """
+    stage_person = staging / "person"
+    try:
+        if write_report is not None:
+            # audit R5 Finding 1: conditional kwarg keeps older write_report fakes working.
+            extra = {"prior_failure": prior_failure} if prior_failure is not None else {}
+            write_branch1_llm(
+                stage_person, candidate, stage_ai, md_path, write_report, key=key, **extra
+            )
+        else:
+            write_branch1(stage_person, candidate, stage_ai, md_path, analysis, key=key)
+    except AnchorGateError as exc:
+        exc.staged_dir = staging
+        raise
+
+
+def promote(
+    staging: Path,
+    key: str,
+    *,
+    candidate: Any,
+    ledger: Any,
+    person_vault: Path,
+    ai_package: Path,
+    cancel: threading.Event | None = None,
+) -> ProduceResult:
+    """Atomically promote staged products into both vaults (OT-2 overwrite, OT-5
+    both-or-neither). cancel re-checks REVERT a promotion abandoned mid-commit
+    (Codex R18/R19/R20). Returns the ProduceResult (shared key + both final paths)."""
+    person_dest = person_vault / key
+    ai_dest = ai_package / key
+    person_vault.mkdir(parents=True, exist_ok=True)
+    ai_package.mkdir(parents=True, exist_ok=True)
+    for prior in find_existing_entries(person_vault, candidate["arxiv_id"], candidate["doi"]):
+        shutil.rmtree(prior, ignore_errors=True)
+    for prior in find_existing_entries(ai_package, candidate["arxiv_id"], candidate["doi"]):
+        shutil.rmtree(prior, ignore_errors=True)
+    if person_dest.exists():
+        shutil.rmtree(person_dest)
+    if ai_dest.exists():
+        shutil.rmtree(ai_dest)
+    shutil.move(str(staging / "person"), str(person_dest))
+    shutil.move(str(staging / "ai"), str(ai_dest))
+
+    # B2 / Codex R18+R19+R20: REVERT on a cancel landing in either durable-step
+    # window (the moves, then the code-ref note). store.consistency_check prunes any
+    # orphan vault dir (no `done` row) at the next tick start, so it self-heals.
+    if cancel is not None and cancel.is_set():
+        shutil.rmtree(person_dest, ignore_errors=True)
+        shutil.rmtree(ai_dest, ignore_errors=True)
+        raise SpokeCancelled("spoke cancelled during vault promotion (stall budget exceeded)")
+    ledger.record_code_ref(key, str(ai_dest / "ara" / "src/code_ref.md"))
+    if cancel is not None and cancel.is_set():
+        shutil.rmtree(person_dest, ignore_errors=True)
+        shutil.rmtree(ai_dest, ignore_errors=True)
+        raise SpokeCancelled("spoke cancelled after vault promotion (stall budget exceeded)")
+    return ProduceResult(key=key, person_path=person_dest, ai_path=ai_dest)
+
+
 def produce_outputs(
     md_path: Path,
     candidate: Any,
     ledger: Any,
     root: Path | None = None,
     *,
-    resolve_analysis: Callable[[Path, Any], dict],
+    resolve_analysis: Callable[..., dict],
     g2_gate: Callable[[Path], Any] | None = None,
     write_report: Callable[..., dict] | None = None,
     cancel: threading.Event | None = None,
     repo_resolver: Callable | None = None,
+    reuse_analysis: dict | None = None,
+    prior_failure_analyzer: str | None = None,
+    prior_failure_branch1: str | None = None,
 ) -> ProduceResult:
     """Produce branch2 + branch1 atomically into the two top-level vaults.
 
@@ -141,6 +280,8 @@ def produce_outputs(
 
     Raises:
         ProduceGateBlocked: G2 hard-blocked the staged branch2 (nothing promoted).
+        StructuralSealFailed: branch2 failed the Seal-1 structural validator.
+        AnchorGateError: branch1's three-layer anchor lint hard-failed.
         Exception: Any other failure aborts BEFORE either vault is touched (OT-5).
     """
     root = (root or Path.cwd()).resolve()
@@ -153,104 +294,66 @@ def produce_outputs(
         arxiv_id=candidate["arxiv_id"],
         doi=candidate["doi"],
     )
-    analysis = resolve_analysis(md_path, candidate)
-
-    # Stage everything in a temp dir; promote only after both gates pass.
+    # Stage in a temp dir; promote only after both gates pass. A gate hard-fail
+    # carries `staging` in its exception so the spoke can preserve it as a failure
+    # scene; `handed_off` then tells `finally` NOT to delete it (audit F). Success
+    # and SpokeCancelled keep it False → staging is cleaned up.
     staging = Path(tempfile.mkdtemp(prefix="paper-rolling-stage-"))
+    handed_off = False
     try:
-        stage_ai = staging / "ai" / "ara"
-        stage_person = staging / "person"
-        write_branch2(stage_ai, candidate, analysis, md_path=md_path, repo_resolver=repo_resolver)
+        stage_ai, analysis = stage_branch2(
+            staging,
+            candidate,
+            md_path,
+            resolve_analysis=resolve_analysis,
+            repo_resolver=repo_resolver,
+            prior_failure=prior_failure_analyzer,
+            analysis=reuse_analysis,
+        )
 
-        ara_errors = validate_ara_tree(stage_ai)
-        if ara_errors:
-            raise ValueError(f"branch2 failed Seal-1: {'; '.join(ara_errors[:5])}")
-
-        # G2 (after branch2, before branch1): adversarial data-fidelity gate on
-        # the staged ARA evidence. A hard block aborts BEFORE branch1 and any
-        # promotion, so OT-5 holds (nothing reaches the real vault).
+        # G2 (after branch2, before branch1): adversarial data-fidelity gate on the
+        # staged ARA. A hard block aborts BEFORE branch1/promotion (OT-5 holds).
         if g2_gate is not None:
             verdict = g2_gate(staging / "ai")  # staged ai ENTRY dir (parent of ara/)
             if verdict.blocked:
-                raise ProduceGateBlocked(verdict)
-            # Tolerant mode: G2 returned non-blocking (advisory) data-fidelity
-            # findings. The paper is kept, but the tolerated numbers are MARKED in
-            # the pack so the miss is visible downstream rather than silently
-            # absorbed (config/audit.yaml data_fidelity.mode: tolerant).
+                raise ProduceGateBlocked(verdict, staged_dir=staging)
+            # Tolerant mode: mark the tolerated (non-blocking) numbers in the pack.
             if verdict.findings:
                 _write_audit_flags(stage_ai, verdict)
 
-        # branch1 derives from branch2 and self-gates on the anchor lint;
-        # any unanchored empirical claim raises AnchorGateError here. `key` is
-        # the shared vault key so branch1 links to the paired ai_package.
-        # With a `write_report` seam, the human report is LLM-written (vivid
-        # Chinese sections + grounded assembly); else the deterministic thin
-        # renderer. Both pass the SAME three-layer anchor hard-gate.
-        if write_report is not None:
-            write_branch1_llm(stage_person, candidate, stage_ai, md_path, write_report, key=key)
-        else:
-            write_branch1(stage_person, candidate, stage_ai, md_path, analysis, key=key)
+        stage_branch1(
+            staging,
+            candidate,
+            stage_ai,
+            md_path,
+            write_report,
+            analysis,
+            key,
+            prior_failure=prior_failure_branch1,
+        )
 
-        # B2 / Codex R17: last safe point before any real-vault write. If the
-        # per-paper guard already abandoned this spoke (stall budget exceeded), a
-        # late-finishing daemon thread must NOT promote products the hub has
-        # recorded as failed — bail out; the `finally` cleans staging.
+        # Last safe point before any real-vault write (Codex R17): if the guard
+        # already abandoned this spoke, skip promotion; the `finally` cleans staging.
         if cancel is not None and cancel.is_set():
             raise SpokeCancelled("spoke cancelled before vault promotion (stall budget exceeded)")
 
-        # Both gates passed → promote atomically. Remove prior same-identity
-        # entries first (OT-2), then move staging into place.
-        #
-        # SEAM (ADR-0002, deferred): this promotion is written for exactly TWO
-        # co-promoted branches (person + ai). Only the branch SET is centralized
-        # (paths.VAULT_BRANCHES); generalizing this block to N-or-neither awaits a
-        # real 3rd branch — see docs/guides/EXTENDING.md "Add an output branch".
-        person_dest = person_vault / key
-        ai_dest = ai_package / key
-        person_vault.mkdir(parents=True, exist_ok=True)
-        ai_package.mkdir(parents=True, exist_ok=True)
-        for prior in find_existing_entries(person_vault, candidate["arxiv_id"], candidate["doi"]):
-            shutil.rmtree(prior, ignore_errors=True)
-        for prior in find_existing_entries(ai_package, candidate["arxiv_id"], candidate["doi"]):
-            shutil.rmtree(prior, ignore_errors=True)
-        if person_dest.exists():
-            shutil.rmtree(person_dest)
-        if ai_dest.exists():
-            shutil.rmtree(ai_dest)
-        shutil.move(str(stage_person), str(person_dest))
-        shutil.move(str(staging / "ai"), str(ai_dest))
-
-        # B2 / Codex R18+R19: REVERT the promotion if the guard fired during any
-        # durable step. There is one cancel re-check after EACH such step (the
-        # moves, then the code-ref ledger note), so a cancel landing in either
-        # window undoes both vault dirs. This closes both reproduced races
-        # (slow shutil.move, slow record_code_ref). On revert the (idempotent)
-        # code-ref note may already be appended — harmless: landscapes scan vault
-        # dirs, not code-ref notes, and the next-tick reconciliation (see
-        # store.consistency_check) prunes any vault dir not backed by a `done`
-        # row regardless.
-        #
-        # RESIDUAL (Codex R20): once promotion succeeds here, the vault dirs exist
-        # for the rest of the abandoned worker's life — not just until this
-        # function returns, but through the spoke's post-promotion G3 pass too.
-        # So a stalled worker can briefly leave a promoted vault for a paper the
-        # hub has recorded `failed`. This is the irreducible cost of cancelling a
-        # non-killable thread mid-commit; it is NOT reproducible by app-code delay
-        # injection beyond this point, and store.consistency_check prunes any such
-        # orphan (vault dir without a complete `done` row) at the next tick start,
-        # so it self-heals within one tick (eventual consistency). A literal
-        # zero-residual would require moving promotion out of the spoke thread into
-        # the single-writer hub (a larger change; ADR if pursued).
-        if cancel is not None and cancel.is_set():
-            shutil.rmtree(person_dest, ignore_errors=True)
-            shutil.rmtree(ai_dest, ignore_errors=True)
-            raise SpokeCancelled("spoke cancelled during vault promotion (stall budget exceeded)")
-
-        ledger.record_code_ref(key, str(ai_dest / "ara" / "src/code_ref.md"))
-        if cancel is not None and cancel.is_set():
-            shutil.rmtree(person_dest, ignore_errors=True)
-            shutil.rmtree(ai_dest, ignore_errors=True)
-            raise SpokeCancelled("spoke cancelled after vault promotion (stall budget exceeded)")
-        return ProduceResult(key=key, person_path=person_dest, ai_path=ai_dest)
+        result = promote(
+            staging,
+            key,
+            candidate=candidate,
+            ledger=ledger,
+            person_vault=person_vault,
+            ai_package=ai_package,
+            cancel=cancel,
+        )
+        # Surface the branch2 bundle so a branch1-only G3 re-emit can reuse it.
+        return replace(result, analysis=analysis)
+    except (StructuralSealFailed, ProduceGateBlocked, AnchorGateError):
+        # A gate hard-failed: its exception carries `staging` (the failure scene),
+        # so do NOT let `finally` delete it. SpokeCancelled + success keep this
+        # False, so their staging is still cleaned up (no temp leak).
+        handed_off = True
+        raise
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        if not handed_off:
+            shutil.rmtree(staging, ignore_errors=True)
