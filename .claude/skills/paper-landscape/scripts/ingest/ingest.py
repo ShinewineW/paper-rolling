@@ -20,6 +20,7 @@ from pathlib import Path
 
 from scripts.ingest.contract import (
     MdContract,
+    corpus_readiness_problems,
     count_equation_blocks,
     count_table_blocks,
     sha256_bytes,
@@ -134,6 +135,44 @@ def _finalize(
     )
 
 
+def _reuse_ready_corpus(paper_dir: Path, paper_id: str) -> IngestResult | None:
+    """Reuse an already-converted, ready corpus entry instead of re-converting.
+
+    The converted ``{ID}.md`` is the tracked SSOT (基调-D2); downstream reads only it.
+    When it AND a consistent ``.md_contract.json`` are already present (and
+    ``corpus_readiness_problems`` is clean), re-running Tier-1/Tier-2 would only
+    overwrite that SSOT with a fresh conversion — and for a Tier-2 paper whose MD was
+    built off-box because local MinerU can't run it (e.g. OOM), it would DESTROY the
+    only good copy. So reuse it and never invoke the converter seams.
+
+    Escape hatch to force a fresh conversion: delete ``{ID}.md`` or ``.md_contract.json``
+    (or let the MD drift from its contract) — any of those makes this return None.
+    """
+    md_path = paper_dir / f"{paper_id}.md"
+    contract_path = paper_dir / ".md_contract.json"
+    if not (md_path.is_file() and contract_path.is_file()):
+        return None
+    if corpus_readiness_problems(md_path):
+        return None
+    c = json.loads(contract_path.read_text(encoding="utf-8"))
+    converter = c.get("converter", "")
+    content_list = paper_dir / "content_list.json"
+    return IngestResult(
+        md_path=md_path,
+        contract=MdContract(
+            source_pdf_sha256=c.get("source_pdf_sha256"),
+            converter=converter,
+            converter_version=c.get("converter_version", ""),
+            md_sha256=c.get("md_sha256", ""),
+            image_count=int(c.get("image_count") or 0),
+            equation_block_count=int(c.get("equation_block_count") or 0),
+        ),
+        tier=1 if converter == "pandoc" else 2,
+        images_dir=paper_dir / "images",
+        content_list_path=content_list if content_list.is_file() else None,
+    )
+
+
 def ingest(
     candidate: dict,
     corpus_dir: Path,
@@ -142,11 +181,19 @@ def ingest(
     run_cli,
     now=None,
 ) -> IngestResult:
-    """Ingest one candidate into corpus/{ID}/. Raises IngestFailed if both tiers fail."""
+    """Ingest one candidate into corpus/{ID}/. Raises IngestFailed if both tiers fail.
+
+    Fast path: a ready, already-converted corpus entry is reused verbatim (no
+    download, no converter) — see ``_reuse_ready_corpus``.
+    """
     corpus_dir = Path(corpus_dir)
     paper_id = _paper_id(candidate)
     paper_dir = corpus_dir / "corpus" / paper_id
     paper_dir.mkdir(parents=True, exist_ok=True)
+
+    reused = _reuse_ready_corpus(paper_dir, paper_id)
+    if reused is not None:
+        return reused
 
     aid = candidate.get("arxiv_id")
     ver = candidate.get("arxiv_version") or ""

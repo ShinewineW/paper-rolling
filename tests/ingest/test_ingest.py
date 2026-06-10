@@ -56,6 +56,71 @@ def _now():
     return FIXED_NOW
 
 
+def _write_ready_corpus(tmp_path, candidate, *, md, converter="mineru", with_content_list=True):
+    """Pre-populate a committed, ready corpus entry (MD + consistent contract)."""
+    from scripts.ingest.contract import MdContract, write_contract
+
+    pid = _paper_id(candidate)
+    paper_dir = tmp_path / "corpus" / pid
+    paper_dir.mkdir(parents=True)
+    (paper_dir / f"{pid}.md").write_text(md, encoding="utf-8")
+    if with_content_list:
+        (paper_dir / "content_list.json").write_text('[{"type":"equation"}]', encoding="utf-8")
+    write_contract(
+        MdContract(
+            source_pdf_sha256="deadbeef",
+            converter=converter,
+            converter_version="2.0.0",
+            md_sha256=sha256_bytes(md.encode("utf-8")),
+            image_count=0,
+            equation_block_count=md.count("$$") // 2,
+        ),
+        paper_dir / ".md_contract.json",
+    )
+    return paper_dir, pid
+
+
+def test_ingest_reuses_ready_corpus_and_skips_reconvert(tmp_path, fake_http, fake_cli, candidate):
+    """A committed, ready corpus entry is reused verbatim — ingest must NOT download
+    or run the converter, so an off-box (pod) MinerU MD survives a re-emit instead of
+    being overwritten by a fresh local conversion."""
+    paper_dir, pid = _write_ready_corpus(tmp_path, candidate, md="# Reused\n$$a$$\n")
+
+    res = ingest(candidate, tmp_path, http=fake_http, run_cli=fake_cli, now=_now)
+
+    assert res.tier == 2
+    assert res.md_path == paper_dir / f"{pid}.md"
+    assert res.content_list_path == paper_dir / "content_list.json"
+    assert fake_http.requested == []  # nothing fetched
+    assert fake_cli.calls == []  # converter never invoked
+
+
+def test_ingest_reconverts_when_committed_md_drifted(tmp_path, fake_http, fake_cli, candidate):
+    """If the committed MD no longer matches its contract (corrupted/truncated), the
+    reuse guard must distrust it and fall through to a fresh conversion attempt."""
+    from scripts.ingest.contract import MdContract, write_contract
+
+    pid = _paper_id(candidate)
+    paper_dir = tmp_path / "corpus" / pid
+    paper_dir.mkdir(parents=True)
+    (paper_dir / f"{pid}.md").write_text("# drifted body\n", encoding="utf-8")
+    write_contract(
+        MdContract(
+            source_pdf_sha256=None,
+            converter="mineru",
+            converter_version="2.0.0",
+            md_sha256="0" * 64,  # deliberately wrong → drift
+            image_count=0,
+            equation_block_count=0,
+        ),
+        paper_dir / ".md_contract.json",
+    )
+    # all routes 404 → a genuine conversion attempt fails loudly, proving no reuse.
+    with pytest.raises(IngestFailed):
+        ingest(candidate, tmp_path, http=fake_http, run_cli=fake_cli, now=_now)
+    assert fake_http.requested  # it DID try to fetch — i.e. did not reuse
+
+
 def test_ingest_tier1_success_writes_md_and_contract(tmp_path, fake_http, fake_cli, candidate):
     aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
     html = b'<html><body><p><math><mi>x</mi></math></p><img src="f.png"/></body></html>'
