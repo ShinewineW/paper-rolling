@@ -23,6 +23,7 @@ from scripts.audit.g3_seal import run_g3
 from scripts.audit_config import load_audit_config
 from scripts.engine_version import current_commit
 from scripts.failure_scene import FAILED_REL, write_scene
+from scripts.ingest.contract import corpus_readiness_problems
 from scripts.output.branch1_report import AnchorGateError
 from scripts.output.naming import vault_key
 from scripts.output.produce import (
@@ -229,6 +230,16 @@ def _revive_one(
     failed_gate = manifest.get("failed_gate")
     findings = manifest.get("findings", [])
     content_list_path = scene_dir / "content_list.json"
+    # READINESS gate (省 token):branch 重发要复用 corpus(MD + 其引用的 images/)。images
+    # 是 gitignored,跨机/清理过的 checkout 可能没有 → 重发会一路烧完 analyzer/G2/writer
+    # 才在末端图门挂。这里在任何 seam 调用之前,拿 .md_contract.json 机械核对完整性,不全
+    # 就直接判 manual(需 re-ingest),0 token。
+    ready_problems = corpus_readiness_problems(md_path)
+    if ready_problems:
+        _log(f"scene {scene_dir.name} corpus 不完备 → manual: {'; '.join(ready_problems)}")
+        return RevivalResult(
+            key=scene_dir.name, ledger_key=ledger_key, status="manual", failed_gate=failed_gate
+        )
     roots = _classify_roots(findings)
 
     # 审计 R18:只要混入任一 ingest 根(公式保真等),MD 本身坏,引擎内任何 branch 重跑都

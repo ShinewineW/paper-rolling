@@ -242,6 +242,38 @@ def test_revive_structural_gate_scene_still_bad_stays_failed(tmp_path):
     assert lk in led.skip_set()  # 仍 deferred(无 TTL)
 
 
+def test_revive_incomplete_corpus_missing_images_is_manual(tmp_path):
+    # 跨机/清理过的 checkout:contract 声称有图但 corpus images/ 缺失 → 在烧任何
+    # LLM token 之前(readiness 门)直接判 manual(需 re-ingest),不调用任何 seam。
+    led = Ledger(tmp_path)
+    scene, lk = _seed_scene(tmp_path, led, failed_gate="最终门", findings=_RIGOR_FINDING)
+    md = next((tmp_path / "corpus").rglob("*.md"))
+    (md.parent / ".md_contract.json").write_text(
+        json.dumps(
+            {
+                "source_pdf_sha256": None,
+                "converter": "mineru",
+                "converter_version": "x",
+                "md_sha256": "",  # 空 → 跳过 sha 校验,单独验 image_count 这条
+                "image_count": 5,  # 声称 5 张图,但没建 images/
+                "equation_block_count": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def _tripwire(*a, **k):
+        raise AssertionError("seam 被调用了 —— readiness 门没在烧 token 前短路")
+
+    seams = _seams(rigor_scores=_good_rigor)
+    seams["resolve_analysis"] = _tripwire  # 必须不被调用
+    with led.acquire():
+        res = revive_all(workspace=tmp_path, ledger=led, seams=seams)
+    assert res[0].status == "manual"  # 不完备 → manual
+    assert (scene / "scene.json").exists()  # 现场保留
+    assert lk in led.skip_set()  # ledger 未动,等 re-ingest
+
+
 def test_load_scenes_recovers_crash_between_renames(tmp_path):
     base = tmp_path / "_failed"
     base.mkdir()
