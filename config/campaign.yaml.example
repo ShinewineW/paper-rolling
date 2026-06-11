@@ -6,11 +6,12 @@
 # config/campaign.yaml via `campaign.write_campaign()` with the locked fields
 # below. Copy this file to config/campaign.yaml only if you want to seed it by
 # hand. Daily /loop ticks read the live file and run autonomously WITHOUT
-# re-gating; re-run the Hard Gate only to change topic or n_per_tick.
+# re-gating; re-run the Hard Gate only to change topic, n_per_tick, or auto_discover.
 #
 # The fields `campaign.load_campaign()` actually reads are: topic, n_per_tick,
-# is_ad_domain, force_include. The remaining fields are discovery-policy overrides
-# consumed by the discovery adapter / authority scorer (they have code defaults).
+# is_ad_domain, force_include, auto_discover. The remaining fields are
+# discovery-policy overrides consumed by the discovery adapter / authority scorer
+# (they have code defaults).
 
 # --- Hard-Gate-confirmed (人在场显式钉死) — the locked CampaignConfig ---
 # Precise, non-ambiguous research topic. The Hard Gate refuses vague topics
