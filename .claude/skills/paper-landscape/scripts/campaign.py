@@ -78,6 +78,9 @@ class CampaignConfig:
     n_per_tick: int
     is_ad_domain: bool
     force_include: list[dict] = field(default_factory=list)
+    # 指定列表 mode (ADR-0010): True = 自发查找 (discover by topic, force_include adds on
+    # top); False = 指定列表 (discovery OFF, force_include IS the whole work set).
+    auto_discover: bool = True
 
     def __post_init__(self) -> None:
         # Reads-only validation (frozen dataclass — no field assignment here).
@@ -97,6 +100,7 @@ def load_campaign(workspace: Path) -> CampaignConfig | None:
         n_per_tick=int(data["n_per_tick"]),
         is_ad_domain=bool(data["is_ad_domain"]),
         force_include=list(data.get("force_include") or []),
+        auto_discover=bool(data.get("auto_discover", True)),
     )
 
 

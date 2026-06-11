@@ -76,3 +76,25 @@ def test_shipped_template_loads_with_runtime_schema(tmp_path: Path):
     assert cfg.topic
     assert isinstance(cfg.n_per_tick, int) and cfg.n_per_tick > 0
     assert isinstance(cfg.is_ad_domain, bool)
+
+
+def test_campaign_config_auto_discover_defaults_true_and_round_trips(tmp_path):
+    from scripts.campaign import CampaignConfig, load_campaign, write_campaign
+
+    # Default preserves current behavior.
+    cfg = CampaignConfig(topic="world model survey", n_per_tick=5, is_ad_domain=True)
+    assert cfg.auto_discover is True
+
+    # list-mode value survives a write→load round trip.
+    listed = CampaignConfig(
+        topic="my reading list on world models",
+        n_per_tick=5,
+        is_ad_domain=True,
+        force_include=[{"arxiv_id": "2407.01392", "title": "DiffusionForcing"}],
+        auto_discover=False,
+    )
+    write_campaign(tmp_path, listed)
+    loaded = load_campaign(tmp_path)
+    assert loaded is not None
+    assert loaded.auto_discover is False
+    assert loaded.force_include[0]["arxiv_id"] == "2407.01392"
