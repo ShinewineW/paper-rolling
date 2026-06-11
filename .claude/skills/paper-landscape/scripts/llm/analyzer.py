@@ -237,10 +237,10 @@ def analyze_chunked(
 ) -> dict:
     """Run the 5 analyzer chunks CONCURRENTLY on `provider`; merge into one bundle.
 
-    Each chunk emits only its own keys (small output). When ``grounded`` (claude-
-    code only — needs local file tools), the chunk-agent READS the MD file itself
-    (Read/Grep, grep-verifying numbers) with a tiny prompt — robust + faithful, no
-    huge one-shot embed. Otherwise the (capped) MD is embedded inline. A chunk
+    Each chunk emits only its own keys (small output). When ``grounded`` (a LOCAL
+    agent — claude-code or codex — needs local file tools), the chunk-agent READS
+    the MD file itself (Read/Grep, grep-verifying numbers) with a tiny prompt —
+    robust + faithful, no huge one-shot embed. Otherwise the (capped) MD is embedded inline. A chunk
     whose JSON won't parse is retried once. Returns the merged ARA bundle (caller
     does the required-key check + float coercion).
     """

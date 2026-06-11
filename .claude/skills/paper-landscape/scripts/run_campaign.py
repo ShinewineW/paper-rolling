@@ -74,6 +74,7 @@ def run_campaign(
     requested_topic: str | None = None,
     requested_n: int | None = None,
     requested_auto_discover: bool | None = None,
+    max_concurrent: int = 5,
 ) -> TickResult:
     """Run one /loop campaign tick end-to-end (gates included).
 
@@ -165,6 +166,7 @@ def run_campaign(
             requested_topic=requested_topic,
             requested_n=requested_n,
             requested_auto_discover=requested_auto_discover,
+            max_concurrent=max_concurrent,
         )
 
 

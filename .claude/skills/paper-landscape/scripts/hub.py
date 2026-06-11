@@ -21,7 +21,9 @@ import inspect
 import re
 import threading
 import time
+from collections import deque
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -207,8 +209,27 @@ class Watchdog:
         return recovered
 
 
+class _OrEvent:
+    """A cancel signal that is set when ANY of its component events is. The spoke /
+    produce layer only ever calls ``.is_set()`` on its cancel, so this is a
+    sufficient stand-in for ``threading.Event`` when a paper must abort on EITHER
+    its own stall budget OR a tick-wide fatal abort (EngineAbort in another paper)."""
+
+    __slots__ = ("_events",)
+
+    def __init__(self, *events: threading.Event) -> None:
+        self._events = events
+
+    def is_set(self) -> bool:
+        return any(e.is_set() for e in self._events)
+
+
 def _run_spoke_guarded(
-    spoke: SpokeFn, candidate: dict, *, stall_seconds: int | None
+    spoke: SpokeFn,
+    candidate: dict,
+    *,
+    stall_seconds: int | None,
+    abort: threading.Event | None = None,
 ) -> SpokeResult:
     """Run one paper's spoke ISOLATED from the tick (中枢-D2 failure isolation).
 
@@ -216,20 +237,26 @@ def _run_spoke_guarded(
     and catches any unexpected exception, so a hung or crashing spoke can never
     abort the unattended /loop tick — it becomes a failed SpokeResult the hub
     quarantines + back-fills. ``stall_seconds`` None/<=0 means no wall-clock cap
-    (the spoke's own injected seams enforce their timeouts). The synchronous
-    reference uses one worker; the production harness fans spokes out concurrently
-    with the same per-paper budget (Codex Round-14).
+    (the spoke's own injected seams enforce their timeouts).
+
+    ``abort`` is a tick-wide event the parallel dispatcher SETS when one paper
+    hits a fatal EngineAbort: every other in-flight spoke then sees its cancel set
+    and refuses to promote, so a fatal abort cannot leave an unledgered product on
+    disk (the serial reference aborted before any other paper ran).
     """
     box: dict[str, object] = {}
     # Stall-abort signal: SET on timeout so a late-finishing daemon spoke aborts
-    # before promoting to the vault (Codex R17). Passed only to spokes that accept
-    # it, so ad-hoc test spokes `def spoke(cand)` keep working.
+    # before promoting to the vault (Codex R17). Combined with the tick-wide
+    # ``abort`` so this paper also stops promoting if ANOTHER paper aborts the tick.
     cancel = threading.Event()
+    spoke_cancel = cancel if abort is None else _OrEvent(cancel, abort)
     accepts_cancel = "cancel" in inspect.signature(spoke).parameters
 
     def _worker() -> None:
         try:
-            box["result"] = spoke(candidate, cancel=cancel) if accepts_cancel else spoke(candidate)
+            box["result"] = (
+                spoke(candidate, cancel=spoke_cancel) if accepts_cancel else spoke(candidate)
+            )
         except Exception as exc:  # noqa: BLE001 — per-paper isolation; never abort the tick
             box["error"] = exc
 
@@ -285,8 +312,9 @@ def run_tick(
 ) -> HubResult:
     """Process one /loop tick: dispatch + skip + backfill until N done or pool out.
 
-    Spokes run serial here (deterministic, testable); the real harness fans them
-    out via the Agent/Task tool up to ``max_concurrent`` papers in parallel. N is
+    Spokes run up to ``max_concurrent`` papers in PARALLEL (a bounded window,
+    serial WITHIN a paper); results are recorded in submission order on the main
+    thread, so the single-writer ledger order + counting stay deterministic. N is
     the count of SUCCESSFUL papers (中枢-D2), not attempts. A claimed-done result
     with missing vault paths is recorded but NOT counted (吸收-D3) — the watchdog
     re-fires it.
@@ -312,12 +340,12 @@ def run_tick(
     stall_seconds = watchdog.stall_seconds if watchdog is not None else None
     done = 0
     failed = 0
-    for candidate in queue:
-        if done >= n_target:
-            break
-        # Per-paper isolation (中枢-D2): a hung or crashing spoke must not abort
-        # the unattended tick — it becomes a failed result we quarantine + backfill.
-        result = _run_spoke_guarded(spoke, candidate, stall_seconds=stall_seconds)
+
+    def _record(candidate: dict, result: SpokeResult) -> None:
+        """Apply one spoke result to the ledger + counters. Called ONLY from the
+        main thread, so the single-writer ledger invariant holds even though the
+        spokes themselves run in worker threads."""
+        nonlocal done, failed
         if result.status == "done" and result.person_vault_path and result.ai_package_path:
             ledger.record(
                 candidate["key"],
@@ -350,6 +378,62 @@ def run_tick(
             ledger.record(candidate["key"], status="failed", failure_class=result.failure_class)
             _quarantine(workspace, candidate, result)
             failed += 1
+
+    # Dispatch up to `max_concurrent` spokes IN PARALLEL across papers (serial
+    # within a paper — that's the spoke's own contract). Per-paper isolation
+    # (中枢-D2) is preserved by _run_spoke_guarded. Results are recorded in
+    # SUBMISSION ORDER on the main thread, so the ledger write order AND the
+    # N/backfill counting are byte-identical to the serial reference — only the
+    # wall-clock shrinks. A new paper is dispatched only while we still need more
+    # successes than are already in flight (``done + in_flight < n_target``), so
+    # failures backfill from the pool yet N is never overshot.
+    qit = iter(queue)
+    window: deque = deque()
+    # Tick-wide fatal-abort signal: when ANY paper raises EngineAbort, SET this so
+    # every other in-flight spoke refuses to promote (the executor's __exit__ waits
+    # for them, and an unguarded in-flight spoke would otherwise publish a product
+    # the hub never ledgers — a regression from the serial fatal-abort path).
+    abort = threading.Event()
+
+    def _on_done(f) -> None:
+        # Runs in the worker thread the moment a spoke future settles. Set `abort`
+        # PROMPTLY on ANY paper's fatal exception — NOT just the front one we happen
+        # to be waiting on — so a later-submitted paper that aborts first still
+        # unblocks (cancels) an earlier slow paper instead of hanging it (Codex R5).
+        if f.cancelled():
+            return
+        if f.exception() is not None:
+            abort.set()
+
+    with ThreadPoolExecutor(max_workers=max(1, max_concurrent)) as ex:
+
+        def _fill() -> None:
+            while len(window) < max_concurrent and (done + len(window)) < n_target:
+                nxt = next(qit, None)
+                if nxt is None:
+                    return
+                fut = ex.submit(
+                    _run_spoke_guarded, spoke, nxt, stall_seconds=stall_seconds, abort=abort
+                )
+                fut.add_done_callback(_on_done)
+                window.append((fut, nxt))
+
+        try:
+            _fill()
+            while window:
+                fut, candidate = window.popleft()
+                # EngineAbort (LLM transport failure, no fallback) propagates here
+                # and aborts the whole tick — never quarantined as a per-paper failure.
+                _record(candidate, fut.result())
+                _fill()
+        except BaseException:
+            # Fatal abort (EngineAbort) or interrupt: stop every in-flight spoke from
+            # promoting (they re-check `abort` before/around the durable vault step),
+            # and cancel any not-yet-started futures, before the executor waits on exit.
+            abort.set()
+            for pending_fut, _cand in window:
+                pending_fut.cancel()
+            raise
 
     if watchdog is not None and done < n_target:
         done += watchdog.recover(

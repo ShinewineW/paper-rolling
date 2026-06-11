@@ -6,18 +6,31 @@ callable (see scripts/run_campaign.py). This module supplies the *transport*
 behind those callables as swappable PROVIDERS, so the runtime can route each
 seam to a different backend WITHOUT touching the engine.
 
-Two provider TYPES ship; neither is hard-wired to a vendor:
+Four provider TYPES ship; none is hard-wired to a vendor:
 
-  - ``claude_code``        — a headless ``claude -p`` subprocess (uses the
-                             caller's Claude Code subscription auth, supports
-                             ``--effort`` and grounded Read/Grep). NOT a default:
-                             a seam reaches it only when explicitly routed here.
+  - ``claude_code``        — a headless ``claude -p`` subprocess (Claude Code
+                             subscription auth, ``--effort``, grounded Read/Grep).
+                             A LOCAL agent: ``grounded_capable``. NOT a default.
+  - ``codex_cli``          — a headless ``codex exec`` subprocess (Codex/ChatGPT
+                             login, no-sandbox so it reads files itself). Also a
+                             LOCAL agent: ``grounded_capable``.
   - ``openai_compatible``  — ANY OpenAI-/chat-completions-compatible HTTP API,
-                             fully described by config (base_url + model ids +
-                             api-key env var). OpenCode (deepseek) is just ONE
-                             instance of this; adding OpenAI / Gemini(-compat) /
-                             DeepSeek-direct / Together / a local vLLM is a config
-                             block, NOT a new class. Do not couple to any vendor.
+                             described by config (base_url + model ids + api-key
+                             env var). OpenCode (deepseek) is ONE instance; OpenAI
+                             / Gemini(-compat) / a local vLLM are config blocks, not
+                             new classes. NOT grounded (no local file access).
+  - ``round_robin``        — a COMPOSITE that alternates calls across N member
+                             providers, so each member's own cap fills in parallel
+                             (e.g. claude + codex → 10-wide). Grounded only if every
+                             member is.
+
+GROUNDED capability is explicit per type (``grounded_capable``), not inferred from
+a missing ``base_url``: a grounded seam (the analyzer reads the source MD itself)
+may route only to a grounded-capable provider — a local agent, or a pool of them.
+
+CONCURRENCY is PER-PROVIDER: each leaf instance owns a semaphore sized to its own
+``max_concurrent`` (from config/llm.yaml), so a generous backend can run wide and a
+token-expensive one narrow — there is no process-global cap.
 
 A provider exposes one method, ``complete(prompt, *, tier, effort, timeout) ->
 str``, returning the raw assistant text (JSON parsing lives in the seam layer).
@@ -30,11 +43,12 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import tempfile
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import ClassVar, Protocol, runtime_checkable
 
 import requests
 
@@ -43,13 +57,17 @@ import requests
 # StrictProvider raises it and seam code imports it from here.
 from scripts.paths import EngineAbort
 
-# GLOBAL hard cap on concurrent `claude -p` subprocesses (account-level rate-limit
-# guard). The analyzer fans out 5 chunks/paper; without this, N concurrent papers
-# -> 5N concurrent `claude -p` saturated the API and stalled the whole run (see
-# HANDOFF.md). This semaphore bounds it process-wide regardless of orchestration.
-# Env-overridable but defaults to 5 (one paper's chunk fan-out).
-_CLAUDE_P_MAX = max(1, int(os.environ.get("CLAUDE_P_MAX_CONCURRENCY", "5")))
-_CLAUDE_P_SEM = threading.Semaphore(_CLAUDE_P_MAX)
+# Default concurrency cap when a provider spec omits `max_concurrent`. Concurrency
+# is a PER-PROVIDER concern, NOT a process-global one: each provider INSTANCE owns
+# its own semaphore (built in __post_init__, sized to its own `max_concurrent`),
+# so every routed provider — claude-code, codex, an HTTP API, a future 3rd/4th
+# model — can be given its OWN cap from config/llm.yaml. A cheap/generous backend
+# may run wide (e.g. 10); a token-expensive one narrow (e.g. 3). The subprocess
+# agents default to 5 (one paper's chunk fan-out — also the claude/codex account
+# rate-limit guard); HTTP backends default higher since they have no subprocess
+# cost. There is deliberately no module-global semaphore.
+_DEFAULT_AGENT_CONCURRENCY = 5
+_DEFAULT_API_CONCURRENCY = 8
 
 
 class ProviderError(RuntimeError):
@@ -105,11 +123,21 @@ class ClaudeCodeProvider:
     explicitly (in ``config/llm.yaml``). Routing a seam to the Claude Code
     subscription is always a deliberate choice, never an implicit default —
     silently defaulting here is what drained the account.
+
+    ``max_concurrent`` is this instance's OWN cap (its own semaphore) — the
+    account rate-limit guard, settable per provider in config/llm.yaml.
     """
 
     name: str
     strong_model: str
     fast_model: str
+    max_concurrent: int = _DEFAULT_AGENT_CONCURRENCY
+    _sem: threading.Semaphore = field(init=False, compare=False, repr=False, default=None)
+    cli: ClassVar[str] = "claude"  # preflight presence-checks `which(cli)`
+    grounded_capable: ClassVar[bool] = True  # local Read/Grep → can run grounded
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_sem", threading.Semaphore(max(1, self.max_concurrent)))
 
     def _model(self, tier: str) -> str:
         return self.strong_model if tier == "strong" else self.fast_model
@@ -138,7 +166,7 @@ class ClaudeCodeProvider:
                 _backoff_sleep(attempt)
             attempt += 1
             try:
-                with _CLAUDE_P_SEM:  # global cap: <=5 concurrent `claude -p` (rate-limit guard)
+                with self._sem:  # this instance's own cap (config max_concurrent)
                     proc = subprocess.run(  # noqa: S603 — fixed argv, prompt via stdin
                         argv,
                         input=prompt,
@@ -195,6 +223,15 @@ class OpenAICompatibleProvider:
     # Set for internal endpoints that must be reached DIRECT (e.g. a company API
     # behind Clash with a DIRECT rule) while other providers keep using the proxy.
     no_proxy: bool = False
+    # This instance's OWN in-flight request cap (its own semaphore). An expensive
+    # API can be throttled narrow (e.g. 3); a generous one run wide — per provider,
+    # from config/llm.yaml (Goal 3).
+    max_concurrent: int = _DEFAULT_API_CONCURRENCY
+    _sem: threading.Semaphore = field(init=False, compare=False, repr=False, default=None)
+    grounded_capable: ClassVar[bool] = False  # HTTP API: no local file access → no grounded
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_sem", threading.Semaphore(max(1, self.max_concurrent)))
 
     def _model(self, tier: str) -> str:
         return self.strong_model if tier == "strong" else self.fast_model
@@ -218,8 +255,9 @@ class OpenAICompatibleProvider:
         tools: tuple[str, ...] | None = None,
     ) -> str:
         # `tools` (grounded mode) is ignored: an HTTP API has no access to local
-        # files, so grounded extraction is a claude-code-only capability. The
-        # caller routes grounded seams to claude-code.
+        # files, so grounded extraction is a LOCAL-agent capability (claude-code /
+        # codex). The routing layer (grounded_capable) keeps grounded seams off
+        # this provider, so `tools` never arrives meaningfully here.
         url = self.base_url.rstrip("/") + "/chat/completions"
         payload: dict = {
             "model": self._model(tier),
@@ -247,14 +285,15 @@ class OpenAICompatibleProvider:
                 time.sleep(min(cap, base * (2 ** (attempt - 1))))
             attempt += 1
             try:
-                if self.no_proxy:
-                    # Ignore env proxies so this host is reached DIRECT (then the OS
-                    # routing / Clash DIRECT rule takes it straight to the server).
-                    with requests.Session() as sess:
-                        sess.trust_env = False
-                        resp = sess.post(url, json=payload, headers=headers, timeout=timeout)
-                else:
-                    resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+                with self._sem:  # this instance's own in-flight cap (config max_concurrent)
+                    if self.no_proxy:
+                        # Ignore env proxies so this host is reached DIRECT (then the OS
+                        # routing / Clash DIRECT rule takes it straight to the server).
+                        with requests.Session() as sess:
+                            sess.trust_env = False
+                            resp = sess.post(url, json=payload, headers=headers, timeout=timeout)
+                    else:
+                        resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
             except requests.RequestException as exc:
                 last = ProviderError(f"{self.name} request error: {exc}")
                 conn_fail = True
@@ -276,6 +315,164 @@ class OpenAICompatibleProvider:
                 continue
             return str(content)
         raise ProviderError(f"{self.name} failed after {attempt} attempt(s): {last}")
+
+
+# --------------------------------------------------------------------------- #
+# Provider 3: Codex CLI (`codex exec`) — local agent, grounded-capable          #
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class CodexCliProvider:
+    """Headless ``codex exec`` subprocess provider — a LOCAL agent like
+    ``claude_code``, but on the Codex CLI (Codex/ChatGPT login, no API key).
+
+    Runs with ``--dangerously-bypass-approvals-and-sandbox`` so the non-interactive
+    agent (a) reads source files itself — GROUNDED, the equal of claude-code's
+    Read/Grep — and (b) never blocks on an approval prompt. The final agent message
+    is captured via ``-o <file>`` and returned RAW (JSON parsing lives in the seam
+    layer), mirroring :class:`ClaudeCodeProvider`. NOT a default: a seam reaches it
+    only when explicitly routed here.
+
+    ``model`` is OPTIONAL: empty string lets the Codex CLI use its own configured
+    default model (the codex convention). ``tier`` is ignored (single model);
+    ``tools`` is ignored — codex always has its own file tools, and the grounded
+    prompt names the path to read. ``max_concurrent`` is this instance's OWN cap
+    (its own semaphore), settable per provider in config/llm.yaml. ``grounded_capable``
+    is True → the routing layer permits it for grounded seams.
+    """
+
+    name: str
+    model: str = ""  # "" => codex CLI default model
+    max_concurrent: int = _DEFAULT_AGENT_CONCURRENCY
+    _sem: threading.Semaphore = field(init=False, compare=False, repr=False, default=None)
+    cli: ClassVar[str] = "codex"  # preflight checks `which(cli)` for local providers
+    grounded_capable: ClassVar[bool] = True  # bypassed-sandbox agent reads files itself
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_sem", threading.Semaphore(max(1, self.max_concurrent)))
+
+    def complete(
+        self,
+        prompt: str,
+        *,
+        tier: str = "strong",
+        effort: str = "high",
+        timeout: float = 900.0,
+        tools: tuple[str, ...] | None = None,
+    ) -> str:
+        argv = ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "-C", os.getcwd()]
+        if self.model:
+            argv += ["-m", self.model]
+        last: Exception | None = None
+        attempt = 0
+        max_retries = 4
+        while attempt <= max_retries:
+            if attempt:
+                _backoff_sleep(attempt)
+            attempt += 1
+            fd, out_path = tempfile.mkstemp(prefix="codex_out_", suffix=".txt")
+            os.close(fd)
+            try:
+                with self._sem:  # this instance's own cap (config max_concurrent)
+                    proc = subprocess.run(  # noqa: S603 — fixed argv, prompt via stdin
+                        [*argv, "-o", out_path],
+                        input=prompt,
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout,
+                        check=False,
+                    )
+                if proc.returncode != 0:
+                    last = ProviderError(f"codex exec exit {proc.returncode}: {proc.stderr[-400:]}")
+                    continue
+                result = Path(out_path).read_text(encoding="utf-8")
+                if not result.strip():
+                    last = ProviderError("codex exec produced an empty final message")
+                    continue
+                return result
+            except subprocess.TimeoutExpired:
+                last = ProviderError(f"codex exec timed out after {timeout:.0f}s")
+                continue
+            finally:
+                try:
+                    os.unlink(out_path)
+                except OSError:
+                    pass
+        raise ProviderError(f"{self.name} failed after {attempt} attempt(s): {last}")
+
+
+# --------------------------------------------------------------------------- #
+# Composite: round-robin across local agent providers (claude + codex)          #
+# --------------------------------------------------------------------------- #
+
+
+class RoundRobinProvider:
+    """Alternate each ``complete()`` call across N member providers (thread-safe).
+
+    Lets the analyzer's chunk fan-out (and parallel papers) spread across several
+    backends — e.g. claude-code + codex — so each member's OWN semaphore (its
+    per-instance ``max_concurrent``) fills independently and total concurrency is
+    the SUM of the members' caps (e.g. 5 claude + 5 codex = 10) instead of one
+    backend's 5. Members are assumed interchangeable in quality (operator's
+    explicit choice). NOT frozen: it holds a rotating index behind a lock.
+
+    Capability is derived from the members, NOT faked: ``grounded_capable`` is True
+    only when EVERY member is grounded-capable, so a pool with an HTTP member is
+    correctly rejected for a grounded seam. ``members`` exposes them so preflight
+    recurses into each (agent → presence-check its CLI; HTTP → key/liveness).
+    ``member_clis`` reports only the agent members' CLI binaries.
+    """
+
+    def __init__(self, name: str, members: tuple[LLMProvider, ...]) -> None:
+        if not members:
+            raise ProviderError(f"round_robin provider {name!r}: needs >= 1 member")
+        self.name = name
+        self._members = members
+        self._lock = threading.Lock()
+        self._i = 0
+
+    @property
+    def members(self) -> tuple[LLMProvider, ...]:
+        """The pool's member providers (for recursive preflight / validation)."""
+        return self._members
+
+    @property
+    def grounded_capable(self) -> bool:
+        """True only if EVERY member can run grounded (local file access). A pool
+        containing an HTTP member is NOT grounded-capable — the routing layer uses
+        this to reject it for a grounded seam instead of silently letting an HTTP
+        member fail to read the source file."""
+        return all(getattr(m, "grounded_capable", False) for m in self._members)
+
+    @property
+    def member_clis(self) -> tuple[str, ...]:
+        # Distinct CLI binaries of the AGENT members only (e.g. ("claude", "codex")).
+        # HTTP members have no `cli` and are presence-checked differently (by key/
+        # liveness in preflight via `members`), so they are NOT defaulted to claude.
+        seen: list[str] = []
+        for m in self._members:
+            cli = getattr(m, "cli", None)
+            if cli and cli not in seen:
+                seen.append(cli)
+        return tuple(seen)
+
+    def _next(self) -> LLMProvider:
+        with self._lock:
+            m = self._members[self._i % len(self._members)]
+            self._i += 1
+            return m
+
+    def complete(
+        self,
+        prompt: str,
+        *,
+        tier: str = "strong",
+        effort: str = "high",
+        timeout: float = 900.0,
+        tools: tuple[str, ...] | None = None,
+    ) -> str:
+        return self._next().complete(prompt, tier=tier, effort=effort, timeout=timeout, tools=tools)
 
 
 # --------------------------------------------------------------------------- #
@@ -329,24 +526,56 @@ class StrictProvider:
 # Factory                                                                      #
 # --------------------------------------------------------------------------- #
 
-_PROVIDER_TYPES = ("claude_code", "openai_compatible")
+_PROVIDER_TYPES = ("claude_code", "openai_compatible", "codex_cli", "round_robin")
 
 
-def build_provider(name: str, spec: dict) -> LLMProvider:
+def build_provider(
+    name: str, spec: dict, *, built: dict[str, LLMProvider] | None = None
+) -> LLMProvider:
     """Construct a provider from a config spec dict.
 
     Args:
         name: The provider's config key (its routing identity).
-        spec: ``{"type": "claude_code"|"openai_compatible", ...}``. For
-            ``openai_compatible``: requires ``base_url``, ``strong_model``,
+        spec: ``{"type": "claude_code"|"openai_compatible"|"codex_cli"|"round_robin",
+            ...}``. For ``openai_compatible``: requires ``base_url``, ``strong_model``,
             ``fast_model``, ``api_key_env``; optional ``send_reasoning_effort``.
             For ``claude_code``: requires ``strong_model`` / ``fast_model``
-            (no default — must be specified explicitly).
+            (no default — must be specified explicitly). For ``codex_cli``: optional
+            ``model``. For ``round_robin``: ``members`` (a list of OTHER provider
+            names), resolved from ``built``.
+        built: already-constructed providers, for ``round_robin`` member resolution
+            (a 2-pass build: leaves first, then composites).
+
+    Every leaf provider also takes an optional ``max_concurrent`` (its OWN cap —
+    a per-instance semaphore). ``round_robin`` takes no cap: each member self-limits
+    with its own, so the pool's total is the sum of the members' caps.
 
     Raises:
-        ProviderError: unknown type or missing required field.
+        ProviderError: unknown type, missing required field, an unresolved member,
+            or a non-positive ``max_concurrent``.
     """
     ptype = spec.get("type")
+
+    def _max_concurrent(default: int) -> int:
+        v = spec.get("max_concurrent", default)
+        if not isinstance(v, int) or isinstance(v, bool) or v < 1:
+            raise ProviderError(
+                f"provider {name!r}: max_concurrent must be a positive integer, got {v!r}"
+            )
+        return v
+
+    if ptype == "round_robin":
+        member_names = spec.get("members") or []
+        if not isinstance(member_names, list) or not member_names:
+            raise ProviderError(f"provider {name!r}: round_robin needs a non-empty 'members' list")
+        pool = built or {}
+        missing = [m for m in member_names if m not in pool]
+        if missing:
+            raise ProviderError(
+                f"provider {name!r}: round_robin members {missing} are not defined "
+                f"(define them as providers; members must precede composites)"
+            )
+        return RoundRobinProvider(name=name, members=tuple(pool[m] for m in member_names))
     if ptype == "claude_code":
         missing = [k for k in ("strong_model", "fast_model") if not spec.get(k)]
         if missing:
@@ -359,6 +588,15 @@ def build_provider(name: str, spec: dict) -> LLMProvider:
             name=name,
             strong_model=spec["strong_model"],
             fast_model=spec["fast_model"],
+            max_concurrent=_max_concurrent(_DEFAULT_AGENT_CONCURRENCY),
+        )
+    if ptype == "codex_cli":
+        # No required fields: `model` is optional (empty => codex CLI default).
+        # Auth is the local Codex login; there is no api_key_env to validate.
+        return CodexCliProvider(
+            name=name,
+            model=spec.get("model") or "",
+            max_concurrent=_max_concurrent(_DEFAULT_AGENT_CONCURRENCY),
         )
     if ptype == "openai_compatible":
         missing = [
@@ -374,6 +612,7 @@ def build_provider(name: str, spec: dict) -> LLMProvider:
             api_key_env=spec["api_key_env"],
             send_reasoning_effort=bool(spec.get("send_reasoning_effort", False)),
             no_proxy=bool(spec.get("no_proxy", False)),
+            max_concurrent=_max_concurrent(_DEFAULT_API_CONCURRENCY),
         )
     raise ProviderError(
         f"provider {name!r}: unknown type {ptype!r} (expected one of {_PROVIDER_TYPES})"

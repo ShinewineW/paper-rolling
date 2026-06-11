@@ -7,25 +7,50 @@
 # The engine itself is provider-agnostic; ALL transport choices live here.
 
 # ----------------------------------------------------------------------------
-# providers: name -> spec. Two provider TYPES (NEITHER is bound to any vendor):
-#   claude_code       : headless `claude -p` (your Claude Code subscription auth;
-#                       supports --effort and grounded Read/Grep). Models MUST be
-#                       specified explicitly below — there is NO default model.
+# providers: name -> spec. Four provider TYPES (NONE is bound to any vendor):
+#   claude_code       : headless `claude -p` (Claude Code subscription auth;
+#                       --effort + grounded Read/Grep). A LOCAL agent. Models MUST
+#                       be specified explicitly — there is NO default model.
+#   codex_cli         : headless `codex exec` (Codex/ChatGPT login, no API key;
+#                       no-sandbox so it reads files itself). Also a LOCAL agent.
+#                       `model` is optional (empty => codex CLI default).
 #   openai_compatible : ANY OpenAI chat-completions API behind an API TOKEN —
-#                       described purely by {base_url, models, api_key_env}. This
-#                       is the generic "API-token provider"; the instances below
-#                       (opencode / deepseek-official / openrouter / …) are just
-#                       config, NOT code. Swap or add vendors freely; nothing in
-#                       the engine knows any vendor name.
+#                       described purely by {base_url, models, api_key_env}. The
+#                       instances below (opencode / hellorobotaxi / …) are config,
+#                       NOT code. NOT grounded (no local file access).
+#   round_robin       : a COMPOSITE that alternates calls across its `members`
+#                       (other providers), so each member's own cap runs in
+#                       parallel. Grounded only if EVERY member is grounded.
+#
+# CONCURRENCY is PER-PROVIDER: each leaf provider may set `max_concurrent` (its
+# own in-flight cap / semaphore). A generous backend runs wide (e.g. 10); a
+# token-expensive one narrow (e.g. 3). Omitted => 5 for agents, 8 for HTTP. A
+# round_robin needs no cap — each member self-limits, so the pool's total is the
+# SUM of its members' caps (claude 5 + codex 5 = 10-wide).
+#
+# GROUNDED is a per-type CAPABILITY (local agents only), not inferred from config:
+# a `mode: grounded` seam may route only to a grounded-capable provider (a local
+# agent, or a pool whose every member is one).
 #
 # The api_key_env value names an env var read from .env (gitignored) — keys are
 # NEVER hard-coded. Each instance carries its own token env.
 # ----------------------------------------------------------------------------
 providers:
-  claude-code:                       # only used by seams explicitly routed here (e.g. grounded analyzer)
+  claude-code:                       # local agent; only seams explicitly routed here use the Claude sub
     type: claude_code
     strong_model: claude-sonnet-4-6
     fast_model: claude-haiku-4-5-20251001
+    max_concurrent: 5                # this instance's own `claude -p` cap (account rate-limit guard)
+
+  # --- Local agent providers (grounded-capable; subscription auth, no API key) ---
+  codex:                             # headless `codex exec` (Codex/ChatGPT login); model unset => CLI default
+    type: codex_cli
+    max_concurrent: 5                # this instance's own `codex exec` cap (independent of claude's)
+    # model: gpt-5.3-codex            # optional: pin a model; empty => codex CLI default
+
+  analyzer-pool:                     # round-robin claude-code <-> codex for the grounded analyzer
+    type: round_robin                # alternates backends; total = sum of member caps → 5 claude + 5 codex = 10-wide
+    members: [claude-code, codex]
 
   # --- API-token providers (any OpenAI-compatible endpoint) -------------------
   opencode:                          # OpenCode "Zen/Go" gateway
@@ -34,6 +59,7 @@ providers:
     api_key_env: OPENCODE_API_KEY
     strong_model: deepseek-v4-pro
     fast_model: deepseek-v4-flash
+    max_concurrent: 8                # this instance's own in-flight HTTP cap
     # send_reasoning_effort: false   # set true only if the backend accepts OpenAI reasoning_effort
 
   hellorobotaxi:                     # 公司内网 API-Hub (OpenAI 兼容) — Clash DIRECT 直连
@@ -43,6 +69,7 @@ providers:
     strong_model: qwen3.7-max        # tier=strong 的 seam 用 (writer)
     fast_model: qwen3.7-plus         # tier=fast 的 seam 用 (skeptic/entailment/expand)
     no_proxy: true                   # 内网平台必须绕开 env 代理直连 (否则 TLS 被代理链掐断)
+    max_concurrent: 8                # gates(skeptic/rigor/entailment)+writer 的并发上限,独立于 analyzer
 
   # Ready-to-use alternatives — uncomment + set the key env in .env to switch.
   # NOT bound to opencode: same code path, different base_url + token.
@@ -62,7 +89,7 @@ providers:
 # ----------------------------------------------------------------------------
 # seams: which provider + execution mode runs each LLM seam.
 #   value = a provider name (mode defaults), or {provider, mode}.
-#   mode  = inline | grounded(claude-code reads files itself) | agent_team(opt-in).
+#   mode  = inline | grounded(a local agent reads the source files itself) | agent_team(opt-in).
 # EVERY seam MUST be explicitly routed (no default provider). On provider failure
 # the engine aborts LOUDLY (EngineAbort) — there is NO fallback, so a bad key /
 # endpoint surfaces instead of silently draining the Claude Code subscription.
@@ -73,9 +100,9 @@ providers:
 # value below is the v1 form; the routing schema is shaped to grow into a list.
 # ----------------------------------------------------------------------------
 seams:
-  analyzer: { provider: claude-code, mode: grounded }   # heaviest + most critical SSOT; grounded = claude -p reads MD itself, chunked-parallel
+  analyzer: { provider: analyzer-pool, mode: grounded }  # grounded chunked-parallel, round-robin claude-code + codex (5+5 = 10-wide)
   skeptic: hellorobotaxi       # G2 number-fidelity (tier=fast → qwen3.7-plus)
-  rigor: hellorobotaxi         # G3 6-dim rigor (tier=strong → qwen3.7-max);analyzer 仍 claude-code,审计跨模型不破
+  rigor: hellorobotaxi         # G3 6-dim rigor (tier=strong → qwen3.7-max);analyzer 走 claude+codex,审计在 qwen,跨模型不破
   entailment: hellorobotaxi    # G3 entailment — tiny in/out (tier=fast → qwen3.7-plus)
   expand: hellorobotaxi        # discovery query expansion (tier=fast → qwen3.7-plus)
   writer: hellorobotaxi        # human chain (tier=strong → qwen3.7-max)

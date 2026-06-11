@@ -7,8 +7,9 @@ Three layers (cheap → expensive):
   1. check_environment()  — presence: python deps + pandoc/mineru on PATH (stdlib-only).
   2. check_llm()          — config: llm.yaml routing valid, api keys set, and a
                             LIVENESS probe of each routed API provider (a trivial
-                            prompt → does it reply). claude-code is presence-only —
-                            NOT probed (claude -p IP detection = account-ban risk).
+                            prompt → does it reply). Local agents (claude-code /
+                            codex) are presence-only — NOT probed (a gratuitous
+                            subprocess call = IP-detection / account-ban risk).
   3. deep_smoke()         — FUNCTIONAL: pandoc converts; mineru actually parses a
                             tiny bundled PDF and its products match a committed
                             golden. mineru is CACHED (keyed on version+fixture) —
@@ -116,9 +117,10 @@ def check_llm(workspace: str | Path = ".", *, probe: bool = True) -> list[Check]
     """Layer 2 — llm.yaml routing validity + api-key presence + provider liveness.
 
     `probe=True` calls each ROUTED openai-compatible provider with a trivial prompt
-    to confirm the key/endpoint actually work. claude-code is presence-only (NOT
-    probed): a gratuitous `claude -p` carries IP-detection / account-ban risk, and
-    the real analyzer workload exercises it anyway.
+    to confirm the key/endpoint actually work. Local agents (claude-code / codex,
+    incl. round_robin pool members) are presence-only (NOT probed): a gratuitous
+    subprocess call carries IP-detection / account-ban risk, and the real analyzer
+    workload exercises it anyway.
     """
     try:
         from scripts.llm.config import SEAMS, load_llm_config
@@ -143,48 +145,62 @@ def check_llm(workspace: str | Path = ".", *, probe: bool = True) -> list[Check]
         p = cfg.for_seam(seam)
         distinct.setdefault(p.name, p)
 
-    for name, p in distinct.items():
-        base_url = getattr(p, "base_url", None)
+    def _check_leaf(label: str, leaf) -> list[Check]:
+        """Checks for ONE non-composite provider: a local agent (presence-only) or
+        an HTTP API (key set + optional liveness probe)."""
+        base_url = getattr(leaf, "base_url", None)
         if base_url is None:
-            # claude-code (or any local provider): presence-only, NOT probed.
-            cl = shutil.which("claude")
-            checks.append(
+            # local agent (claude-code / codex): presence-only, NOT probed — a
+            # gratuitous subprocess call carries IP/account risk and the real
+            # workload exercises it anyway. It names its CLI via `cli`.
+            binary = getattr(leaf, "cli", "claude")
+            cl = shutil.which(binary)
+            return [
                 Check(
-                    name=f"provider:{name}",
+                    name=f"provider:{label}",
                     ok=cl is not None,
                     detail=(
-                        f"{cl} (presence-only; not probed — claude -p IP risk)"
+                        f"{cl} (presence-only; not probed — local-agent IP risk)"
                         if cl
-                        else "claude CLI not on PATH"
+                        else f"{binary} CLI not on PATH"
                     ),
-                    fix="install the Claude Code CLI",
+                    fix=f"install the {binary} CLI",
                 )
-            )
-            continue
-        key_env = getattr(p, "api_key_env", None)
+            ]
+        # HTTP API: the key must be set, then (when probing) a liveness check.
+        key_env = getattr(leaf, "api_key_env", None)
         key_set = bool(os.environ.get(key_env, "").strip()) if key_env else False
         if not key_set:
-            checks.append(
+            return [
                 Check(
-                    f"provider:{name}",
+                    f"provider:{label}",
                     False,
                     f"api key env {key_env} is UNSET",
                     f"set {key_env} in .env",
                 )
-            )
-            continue
+            ]
         if not probe:
-            checks.append(Check(f"provider:{name}", True, f"{key_env} set (liveness skipped)", ""))
-            continue
-        ok, detail = _provider_live(p)
-        checks.append(
+            return [Check(f"provider:{label}", True, f"{key_env} set (liveness skipped)", "")]
+        ok, detail = _provider_live(leaf)
+        return [
             Check(
-                f"provider:{name}",
+                f"provider:{label}",
                 ok,
                 detail,
                 f"verify {base_url} reachability / {key_env} validity",
             )
-        )
+        ]
+
+    for name, p in distinct.items():
+        members = getattr(p, "members", None)
+        if members:
+            # round_robin pool: recurse into EVERY member so an HTTP member still
+            # gets its key/liveness check and an agent member its presence check —
+            # the composite itself has no base_url and would otherwise be skipped.
+            for m in members:
+                checks.extend(_check_leaf(f"{name}:{m.name}", m))
+        else:
+            checks.extend(_check_leaf(name, p))
 
     return checks
 

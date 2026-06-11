@@ -21,8 +21,15 @@ run_campaign(*, workspace, discover, resolve_analysis, skeptic_votes,
              cross_model_votes=None, cross_model_sample=0.0,
              empirical_classifier=None, write_report=None,
              repo_resolver=None, requested_topic=None,
-             requested_n=None) -> TickResult
+             requested_n=None, requested_auto_discover=None,
+             max_concurrent=5) -> TickResult
 ```
+
+`max_concurrent` is how many papers' spokes run in PARALLEL per tick (serial
+within a paper). Each paper's analyzer fans out across whatever the `analyzer`
+seam routes to, so with a `round_robin` of claude-code + codex and
+`max_concurrent=2` you get ~5 `claude -p` + 5 `codex exec` in flight. Per-backend
+concurrency is each provider's own `max_concurrent` in `config/llm.yaml`.
 
 It deterministically wires `Ledger(workspace)` → `make_spoke(...)` →
 (LS-1 lock `ledger.acquire()`) → `run_campaign_tick(...)`, and returns

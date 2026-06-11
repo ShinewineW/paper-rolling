@@ -9,7 +9,8 @@ Each seam is finalized as ``{provider, mode}``:
       * ``inline``     — content embedded in the prompt (default; fits API + small
                          inputs).
       * ``grounded``   — the backend READS the source files itself (Read/Grep) with
-                         a small prompt — claude-code only (an HTTP API has no local
+                         a small prompt — a LOCAL agent only (claude-code or codex,
+                         or a round_robin pool of them; an HTTP API has no local
                          files). Used for the heavy analyzer so it never does an
                          unstable one-shot embed of the whole paper.
       * ``agent_team`` — OPT-IN: the runtime agent dispatches isolated sub-agents
@@ -17,9 +18,10 @@ Each seam is finalized as ``{provider, mode}``:
                          which only AGGREGATES results. NOT executable by the
                          synchronous engine — it requires the agent-driven runner.
 
-Default operating state is provider seams (claude-code / API); agent_team is only
-used when the operator selects it. The file is OPTIONAL — absent, every seam is
-``claude-code`` / its default mode.
+Default operating state is provider seams (a local agent / an API); agent_team is
+only used when the operator selects it. The file is REQUIRED and EVERY seam must be
+explicitly routed — there is NO implicit default to ``claude-code`` (an absent file
+or an unrouted seam is a hard error; ``load_llm_config`` raises).
 
 A seam entry may be a bare provider string (``writer: opencode`` -> default mode)
 or a mapping (``analyzer: {provider: claude-code, mode: grounded}``).
@@ -131,7 +133,15 @@ def load_llm_config(workspace: Path) -> LLMConfig:
     prov_specs = raw.get("providers") or {}
     if not isinstance(prov_specs, dict) or not prov_specs:
         raise ValueError(f"{LLM_CONFIG_REL}: 'providers' must be a non-empty mapping")
-    providers = {name: build_provider(name, spec) for name, spec in prov_specs.items()}
+    # 2-pass build: leaf providers first, then composites (round_robin) that
+    # reference leaves by name. Keeps round_robin member resolution simple.
+    providers: dict = {}
+    composite = {n: s for n, s in prov_specs.items() if (s or {}).get("type") == "round_robin"}
+    for pname, spec in prov_specs.items():
+        if pname not in composite:
+            providers[pname] = build_provider(pname, spec)
+    for pname, spec in composite.items():
+        providers[pname] = build_provider(pname, spec, built=providers)
 
     seams_cfg = raw.get("seams") or {}
     if not isinstance(seams_cfg, dict):
@@ -156,16 +166,16 @@ def load_llm_config(workspace: Path) -> LLMConfig:
             raise ValueError(
                 f"{LLM_CONFIG_REL}: seam {s!r} has invalid mode {mode!r}; {VALID_MODES}"
             )
-        if (
-            mode == "grounded"
-            and providers[provider].name != "claude-code"
-            and (getattr(providers[provider], "base_url", None) is not None)
-        ):
-            # grounded needs local file tools; an HTTP API can't. Fail fast so the
-            # operator fixes the routing rather than silently degrading.
+        if mode == "grounded" and not getattr(providers[provider], "grounded_capable", False):
+            # grounded needs local file tools (the agent reads the source MD itself).
+            # Only a LOCAL agent — or a round_robin pool of agents where EVERY member
+            # is grounded-capable — qualifies. An HTTP API (or a pool containing one)
+            # is rejected loud so the operator fixes the routing, never silently
+            # degrades into a member that cannot read the file.
             raise ValueError(
-                f"{LLM_CONFIG_REL}: seam {s!r} mode=grounded requires a claude-code "
-                f"provider (local Read/Grep); {provider!r} is an HTTP API."
+                f"{LLM_CONFIG_REL}: seam {s!r} mode=grounded requires a grounded-capable "
+                f"provider (a local agent, or a pool whose every member is one); "
+                f"{provider!r} is not (an HTTP member cannot read local files)."
             )
         routing[s], modes[s] = provider, mode
     return LLMConfig(providers=providers, routing=routing, modes=modes)

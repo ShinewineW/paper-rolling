@@ -88,18 +88,23 @@ skeptic); **G3** = seal (anchor + equation fidelity + entailment + 6-dim rigor).
 
 ## LLM provider routing
 
-`config/llm.yaml` routes each of the 6 seams to a provider. Two provider types
-(neither vendor-bound): `claude_code` (headless `claude -p`; models must be
-specified explicitly — **no default model**) and `openai_compatible` (any
-OpenAI-compat API by `{base_url, models, api_key_env}`). Every seam is wrapped in
-`StrictProvider`: on provider failure it raises `EngineAbort` (loud, aborts the
-tick) with **no fallback** — a bad key / dead endpoint / wrong model fails loudly
-instead of silently draining the Claude Code subscription. `config/llm.yaml` is
-**required** and **every seam must be explicitly routed** (a missing file or an
-unrouted seam is a hard error — there is no implicit default to `claude -p`).
-`grounded` mode still requires a `claude_code` provider (local Read/Grep). The
-active config routes the analyzer to `claude-code` (grounded) and the other 5
-seams to an `openai_compatible` provider, keys from `.env` (gitignored).
+`config/llm.yaml` routes each of the 6 seams to a provider. Four provider types
+(none vendor-bound): `claude_code` (headless `claude -p`) and `codex_cli` (headless
+`codex exec`, no-sandbox) are **local agents**; `openai_compatible` is any
+OpenAI-compat API by `{base_url, models, api_key_env}`; `round_robin` is a composite
+that alternates calls across `members` (e.g. claude-code + codex). Every seam is
+wrapped in `StrictProvider`: on provider failure it raises `EngineAbort` (loud,
+aborts the tick) with **no fallback** — a bad key / dead endpoint / wrong model
+fails loudly instead of silently draining the Claude Code subscription.
+`config/llm.yaml` is **required** and **every seam must be explicitly routed** (a
+missing file or an unrouted seam is a hard error — no implicit default). **Concurrency
+is per-provider**: each leaf provider sets its own `max_concurrent` (its own
+semaphore) — a generous backend runs wide, a token-expensive one narrow; a
+`round_robin` total = sum of member caps (claude 5 + codex 5 = 10-wide). `grounded`
+mode requires a **grounded-capable** provider (a local agent, or a pool whose every
+member is one) — enforced by `grounded_capable`, not by a name/base_url heuristic.
+The active config routes the analyzer to `analyzer-pool` (round_robin claude-code +
+codex, grounded) and the other 5 seams to `openai_compatible`, keys from `.env`.
 
 ## Non-obvious invariants (will bite you otherwise)
 

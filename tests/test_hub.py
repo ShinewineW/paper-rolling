@@ -1,6 +1,7 @@
 # tests/test_hub.py
 from pathlib import Path
 
+import pytest
 from scripts.hub import HubResult, SpokeResult, run_tick
 
 
@@ -766,3 +767,153 @@ def test_audit_block_failure_recorded_deferred_without_note(tmp_path: Path):
     assert rows[-1]["retry_after"] is None  # no TTL → permanent skip until revival
     # audit_block does NOT write a _failed/<key>.md note (the scene is the record).
     assert not list((tmp_path / "_failed").glob("p0*.md"))
+
+
+def test_run_tick_dispatches_papers_concurrently(tmp_path: Path):
+    # The parallel dispatch (max_concurrent=3) runs up to 3 spokes at the SAME
+    # time — a serial loop would peak at 1. Counts/back-fill are still exact.
+    import threading
+    import time as _time
+
+    ledger = FakeLedger()
+    pool = [_candidate(f"p{i}") for i in range(6)]
+    lock = threading.Lock()
+    live = {"cur": 0, "peak": 0}
+
+    def spoke(cand: dict) -> SpokeResult:
+        with lock:
+            live["cur"] += 1
+            live["peak"] = max(live["peak"], live["cur"])
+        _time.sleep(0.05)  # hold the slot so overlap is observable
+        with lock:
+            live["cur"] -= 1
+        return _ok(cand)
+
+    res = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=6,
+        ledger=ledger,
+        discover=lambda topic, n_target: pool,
+        spoke=spoke,
+        max_concurrent=3,
+    )
+    assert res.done_count == 6
+    assert live["peak"] >= 2, "spokes ran serially — parallel dispatch is not engaged"
+    assert live["peak"] <= 3, "exceeded the max_concurrent cap"
+
+
+def test_run_tick_concurrency_never_overshoots_target(tmp_path: Path):
+    # done + in_flight < n_target gating: with N=1 and a wide cap, only as many
+    # papers as needed are dispatched — the extra pool papers are NOT attempted.
+    ledger = FakeLedger()
+    pool = [_candidate(f"p{i}") for i in range(5)]
+    attempted: list[str] = []
+    import threading
+
+    lock = threading.Lock()
+
+    def spoke(cand: dict) -> SpokeResult:
+        with lock:
+            attempted.append(cand["key"])
+        return _ok(cand)
+
+    res = run_tick(
+        workspace=tmp_path,
+        topic="t",
+        n_target=1,
+        ledger=ledger,
+        discover=lambda topic, n_target: pool,
+        spoke=spoke,
+        max_concurrent=4,
+    )
+    assert res.done_count == 1
+    assert attempted == ["p0"], f"overshot N=1, attempted {attempted}"
+
+
+def test_run_tick_engine_abort_stops_inflight_promotion(tmp_path: Path):
+    # Final-gate regression (Codex R3): under parallel dispatch a fatal EngineAbort
+    # in one paper must STOP every other in-flight spoke from promoting — else the
+    # executor waits for it on exit and it publishes a product the hub never ledgers.
+    import threading
+    import time as _time
+
+    from scripts.paths import EngineAbort
+
+    led = FakeLedger()
+    pool = [_candidate("p0"), _candidate("p1")]
+    promoted: list[str] = []
+    p1_running = threading.Event()
+
+    def spoke(cand: dict, *, cancel=None) -> SpokeResult:
+        if cand["key"] == "p0":
+            p1_running.wait(2)  # ensure p1 is in flight before the fatal abort
+            raise EngineAbort("routed provider failed (no fallback)")
+        # p1: in flight; only "promotes" (records the side effect) if not cancelled,
+        # mirroring produce.py's cancel re-check around the durable vault step.
+        p1_running.set()
+        _time.sleep(0.1)
+        if cancel is not None and cancel.is_set():
+            raise RuntimeError("p1 saw the tick abort — does not promote")
+        promoted.append(cand["key"])
+        return _ok(cand)
+
+    with pytest.raises(EngineAbort):
+        run_tick(
+            workspace=tmp_path,
+            topic="t",
+            n_target=2,
+            ledger=led,
+            discover=lambda topic, n: pool,
+            spoke=spoke,
+            max_concurrent=2,
+        )
+    assert promoted == [], "an in-flight spoke promoted after a fatal EngineAbort"
+
+
+def test_run_tick_engine_abort_in_later_paper_does_not_hang(tmp_path: Path):
+    # Final-gate regression (Codex R5): when a LATER-submitted paper aborts while an
+    # EARLIER slow paper is still running, run_tick must set the tick abort PROMPTLY
+    # (via the future done-callback) so the slow paper is cancelled — not hang
+    # waiting on it. Guarded by a thread join timeout so a regression fails, not hangs.
+    import threading
+    import time as _time
+
+    from scripts.paths import EngineAbort
+
+    led = FakeLedger()
+    pool = [_candidate("p0"), _candidate("p1")]
+    promoted: list[str] = []
+
+    def spoke(cand: dict, *, cancel=None) -> SpokeResult:
+        if cand["key"] == "p1":
+            _time.sleep(0.05)  # let p0 (the earlier future) get in flight first
+            raise EngineAbort("routed provider failed (no fallback)")
+        # p0: earlier + slow; promotes only if it is NEVER cancelled. The later p1
+        # abort must flip its cancel so it stops well before this 2s budget elapses.
+        for _ in range(200):
+            if cancel is not None and cancel.is_set():
+                raise RuntimeError("p0 saw the tick abort — does not promote")
+            _time.sleep(0.01)
+        promoted.append("p0")
+        return _ok(cand)
+
+    outcome: dict = {}
+
+    def _run() -> None:
+        try:
+            run_tick(
+                workspace=tmp_path, topic="t", n_target=2, ledger=led,
+                discover=lambda topic, n: pool, spoke=spoke, max_concurrent=2,
+            )
+        except EngineAbort:
+            outcome["aborted"] = True
+        except BaseException as exc:  # noqa: BLE001
+            outcome["error"] = exc
+
+    th = threading.Thread(target=_run, daemon=True)
+    th.start()
+    th.join(timeout=5)
+    assert not th.is_alive(), "run_tick HUNG on a later-paper EngineAbort"
+    assert outcome.get("aborted") is True, outcome
+    assert promoted == [], "the earlier in-flight spoke promoted after a later abort"
