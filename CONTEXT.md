@@ -3,6 +3,31 @@
 Domain terms specific to the paper-rolling engine. Source of truth for
 terminology; implementation lives in `.claude/skills/paper-landscape/scripts/`.
 
+## Input
+
+The engine's candidate set comes from one of two **binary** input modes; the
+operator-supplied paper set rides the same `force_include` container in both — the
+only difference is whether auto-discovery also runs.
+
+**自发查找 (auto-discovery)**:
+The default input mode — the engine finds candidate papers itself by topic via the
+multi-signal source pipeline (OpenAlex/S2/arXiv/DBLP/HF). Operator `force_include`
+papers, if any, are added on top.
+
+**指定列表 (paper-list run)**:
+The input mode where auto-discovery is OFF and the engine processes ONLY the
+operator-supplied paper set (the `force_include` container becomes the whole work
+set). Binary with 自发查找 — a campaign is one or the other, never partway.
+_Avoid_: "manual mode" (ambiguous), force_include-as-a-mode (force_include is the container, not the mode)
+
+**topic (主题)**:
+The subject label that scopes a campaign, **required in both input modes**. In
+自发查找 it doubles as the discovery query; in BOTH modes it is the grouping key
+for landscapes AND the organizing axis the products are structured under for the
+**future knowledge-graph architecture**. Kept precise (the Hard Gate rejects a
+vague topic) because it is a structural key feeding the KG, not just a search
+string — a 指定列表 run still declares a precise topic.
+
 ## Pipeline & products
 
 **AI知识库 (AI-Knowledge-Base)**:
