@@ -1,3 +1,53 @@
+auto_discover: false
+force_include:
+- arxiv_id: '1803.10122'
+  title: WorldModels
+- arxiv_id: '2301.04104'
+  title: MasteringDiverseDomainsThroughWorldModel
+- arxiv_id: '2309.17080'
+  title: GAIA1AGenerativeWorldModelForAutonomousD
+- arxiv_id: '2311.17918'
+  title: DrivingIntoTheFutureMultiviewVisualForec
+- arxiv_id: '2402.15391'
+  title: GenieGenerativeInteractiveEnvironments
+- arxiv_id: '2405.12399'
+  title: DiffusionForWorldModelingVisualDetailsMa
+- arxiv_id: '2405.17398'
+  title: VistaAGeneralizableDrivingWorldModelWith
+- arxiv_id: '2407.01392'
+  title: DiffusionForcingNextTokenPredictionMeets
+- arxiv_id: '2408.14197'
+  title: DrivingInTheOccupancyWorldVisionCentric4
+- arxiv_id: '2408.14837'
+  title: DiffusionModelsAreRealTimeGameEngines
+- arxiv_id: '2411.15139'
+  title: DiffusionDriveTruncatedDiffusionModelFor
+- arxiv_id: '2501.03575'
+  title: CosmosWorldFoundationModelPlatformForPhy
+- arxiv_id: '2503.19755'
+  title: ORIONAHolisticEndToEndAutonomousDrivingF
+- arxiv_id: '2506.21539'
+  title: WorldVLATowardsAutoregressiveActionWorld
+- arxiv_id: '2507.00603'
+  title: World4DriveEndToEndAutonomousDrivingViaI
+- arxiv_id: '2509.24527'
+  title: TrainingAgentsInsideOfScalableWorldModel
+- arxiv_id: '2510.20668'
+  title: FromMasksToWorldsAHitchhikerSGuideToWorl
+- arxiv_id: '2511.00062'
+  title: WorldSimulationWithVideoFoundationModels
+- arxiv_id: '2601.18692'
+  title: APragmaticVLAFoundationModel
+- arxiv_id: '2603.00825'
+  title: COMBATConditionalWorldModelsForBehaviora
+- arxiv_id: '2603.16666'
+  title: FastWAMDoWorldActionModelsNeedTestTimeFu
+- arxiv_id: '2603.28955'
+  title: EnhancingPolicyLearningWithWorldActionMo
+- arxiv_id: '2604.01765'
+  title: DriveDreamerPolicyAGeometryGroundedWorld
+- arxiv_id: '2606.02800'
+  title: Cosmos3OmnimodalWorldModelsForPhysicalAI
 is_ad_domain: true
 n_per_tick: 5
-topic: NVIDIA Cosmos world foundation models for physical AI
+topic: world models for autonomous driving and embodied AI

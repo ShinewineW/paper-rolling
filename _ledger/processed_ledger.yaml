@@ -152,6 +152,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_FastWAM_2603.16666
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_FastWAM_2603.16666
   processed_at: '2026-06-08T17:22:52Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '2601.18692'
   md_sha256: null
   status: failed
@@ -168,6 +169,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_DiffusionDrive_2411.15139
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_DiffusionDrive_2411.15139
   processed_at: '2026-06-08T17:56:53Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '2503.19755'
   md_sha256: null
   status: failed
@@ -200,6 +202,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_DrivingIntoTheFuture_2311.17918
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_DrivingIntoTheFuture_2311.17918
   processed_at: '2026-06-08T18:37:42Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '2506.21539'
   md_sha256: null
   status: done
@@ -208,6 +211,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_WorldVLA_2506.21539
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_WorldVLA_2506.21539
   processed_at: '2026-06-08T18:42:30Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '2603.28955'
   md_sha256: null
   status: done
@@ -216,6 +220,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_EnhancingPolicyLearningWithWorldActionModel_2603.28955
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_EnhancingPolicyLearningWithWorldActionModel_2603.28955
   processed_at: '2026-06-08T18:55:57Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '2603.00825'
   md_sha256: null
   status: failed
@@ -240,6 +245,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_CosmosWorldFoundationModelPlatformForPhysicalAI_2501.03575
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_CosmosWorldFoundationModelPlatformForPhysicalAI_2501.03575
   processed_at: '2026-06-08T19:31:22Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '2309.17080'
   md_sha256: null
   status: done
@@ -248,6 +254,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_GAIA1_2309.17080
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_GAIA1_2309.17080
   processed_at: '2026-06-08T19:34:01Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '2405.17398'
   md_sha256: null
   status: done
@@ -256,6 +263,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_Vista_2405.17398
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_Vista_2405.17398
   processed_at: '2026-06-08T19:52:10Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '2402.15391'
   md_sha256: null
   status: failed
@@ -272,6 +280,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_DiffusionModelsAreRealTimeGameEngines_2408.14837
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_DiffusionModelsAreRealTimeGameEngines_2408.14837
   processed_at: '2026-06-08T20:13:25Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '1803.10122'
   md_sha256: null
   status: done
@@ -280,6 +289,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_WorldModels_1803.10122
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_WorldModels_1803.10122
   processed_at: '2026-06-08T20:35:15Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '2407.01392'
   md_sha256: null
   status: failed
@@ -304,6 +314,7 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-08_MasteringDiverseDomainsThroughWorldModels_2301.04104
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-08_MasteringDiverseDomainsThroughWorldModels_2301.04104
   processed_at: '2026-06-08T21:06:06Z'
+  rescinded_at: '2026-06-11T05:46:27Z'
 - key: '2405.12399'
   md_sha256: null
   status: failed
