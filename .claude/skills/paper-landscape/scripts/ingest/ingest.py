@@ -187,16 +187,28 @@ def ingest(
     download, no converter) — see ``_reuse_ready_corpus``.
     """
     corpus_dir = Path(corpus_dir)
+    aid = candidate.get("arxiv_id")
+    ver = candidate.get("arxiv_version") or ""
     paper_id = _paper_id(candidate)
     paper_dir = corpus_dir / "corpus" / paper_id
-    paper_dir.mkdir(parents=True, exist_ok=True)
+
+    # Reuse an already-committed corpus entry keyed by the STABLE identity (arxiv_id),
+    # not the title-derived dir name (ADR-0010 指定列表): an operator's force_include entry
+    # may carry only an arxiv_id or a differently-spelled title, so `_paper_id`'s
+    # title-derived dir may not match the committed `corpus/{aid}_{ShortName}/`. When the
+    # title-derived dir is absent but EXACTLY ONE `corpus/{aid}_*` exists, reuse THAT — so a
+    # list-mode run reuses the committed MD instead of re-fetching + re-converting (Tier-2
+    # MinerU OOMs on big PDFs). A genuinely new paper has no such dir → ingest fresh below.
+    if aid and not paper_dir.is_dir():
+        matches = sorted((corpus_dir / "corpus").glob(f"{aid}_*"))
+        if len(matches) == 1:
+            paper_dir, paper_id = matches[0], matches[0].name
 
     reused = _reuse_ready_corpus(paper_dir, paper_id)
     if reused is not None:
         return reused
 
-    aid = candidate.get("arxiv_id")
-    ver = candidate.get("arxiv_version") or ""
+    paper_dir.mkdir(parents=True, exist_ok=True)
     tier1_reason: str | None = None
 
     # SEAM (ADR-0002, deferred): the tier chain below is a hardcoded

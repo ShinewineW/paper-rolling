@@ -320,3 +320,43 @@ def test_quarantine_writes_failure_record(tmp_path, candidate):
     assert rec["attempted_tiers"] == [1, 2]
     assert rec["failed_at"] == FIXED_NOW
     assert "html_missing" in rec["reason"]
+
+
+def test_ingest_reuses_committed_corpus_by_arxiv_id_despite_title_mismatch(
+    tmp_path, fake_http, fake_cli
+):
+    """ADR-0010 指定列表: an entry identified by arxiv_id reuses the committed
+    corpus/{aid}_{ShortName}/ even when the operator's title does NOT match the slug
+    — no download, no converter (a re-ingest would hit arXiv / OOM on Tier-2)."""
+    from scripts.ingest.contract import MdContract, sha256_bytes, write_contract
+
+    # Committed entry: dir slug derived from the FULL paper title.
+    paper_dir = tmp_path / "corpus" / "2407.01392_DiffusionForcingNextTokenPredictionMeets"
+    paper_dir.mkdir(parents=True)
+    md = "# Reused via arxiv id\n$$a$$\n"
+    (paper_dir / "2407.01392_DiffusionForcingNextTokenPredictionMeets.md").write_text(
+        md, encoding="utf-8"
+    )
+    (paper_dir / "content_list.json").write_text('[{"type":"equation"}]', encoding="utf-8")
+    write_contract(
+        MdContract(
+            source_pdf_sha256="x",
+            converter="mineru",
+            converter_version="3.2.3",
+            md_sha256=sha256_bytes(md.encode("utf-8")),
+            image_count=0,
+            equation_block_count=1,
+        ),
+        paper_dir / ".md_contract.json",
+    )
+
+    # Operator lists it by arxiv_id with a SHORT title → _paper_id slug
+    # "2407.01392_DiffusionForcing" ≠ the committed dir, so reuse must resolve by arxiv_id.
+    candidate = {"arxiv_id": "2407.01392", "title": "DiffusionForcing"}
+    res = ingest(candidate, tmp_path, http=fake_http, run_cli=fake_cli, now=_now)
+
+    assert res.tier == 2
+    assert res.md_path == paper_dir / "2407.01392_DiffusionForcingNextTokenPredictionMeets.md"
+    assert res.content_list_path == paper_dir / "content_list.json"
+    assert fake_http.requested == []  # NOT re-fetched
+    assert fake_cli.calls == []  # NOT re-converted
