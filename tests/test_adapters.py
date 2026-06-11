@@ -89,7 +89,17 @@ def test_build_discover_wires_five_sources_and_config(monkeypatch):
     assert cfg["from_date"] == "2025-01-01"
     assert cfg["overfetch_factor"] == 2
     assert cfg["force_include"] == [{"arxiv_id": "2401.00001", "title": "Forced"}]
+    assert cfg["auto_discover"] is True  # default (自发查找) forwarded
     assert seen["llm"] is fake_llm
+
+
+def test_build_discover_forwards_auto_discover_false(monkeypatch):
+    """指定列表 mode: auto_discover=False must reach the orchestrator's campaign_config
+    (a silent default-to-True would turn list mode into auto-discovery — wrong papers)."""
+    seen = {}
+    monkeypatch.setattr(adapters, "_discover", lambda c, s, _llm: seen.update(c) or [])
+    build_discover(lambda _p: [], auto_discover=False)("t", 3)
+    assert seen["auto_discover"] is False
 
 
 def test_build_discover_defaults_from_year_to_two_years_back(monkeypatch):
