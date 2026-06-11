@@ -281,6 +281,7 @@ def run_tick(
     spoke: SpokeFn,
     max_concurrent: int = 5,
     watchdog: Watchdog | None = None,
+    auto_discover: bool = True,
 ) -> HubResult:
     """Process one /loop tick: dispatch + skip + backfill until N done or pool out.
 
@@ -302,7 +303,10 @@ def run_tick(
     # only un-skipped forced so already-done forced papers don't inflate the
     # discovered backfill.
     forced_pending = sum(1 for c in pool if c.get("forced") and c["key"] not in skip)
-    n_target = max(n_target, forced_pending)
+    if auto_discover:
+        # 自发查找: must-includes must all be attempted this tick (中枢-D1).
+        # 指定列表 (auto_discover=False): the list pages by n_per_tick (ADR-0010), do NOT raise.
+        n_target = max(n_target, forced_pending)
     queue = [c for c in pool if c["key"] not in skip]
 
     stall_seconds = watchdog.stall_seconds if watchdog is not None else None
@@ -416,6 +420,7 @@ def run_campaign_tick(
         spoke=spoke,
         max_concurrent=max_concurrent,
         watchdog=watchdog,
+        auto_discover=cfg.auto_discover,
     )
     landscape = generate_landscapes(workspace, topic=cfg.topic)
     return TickResult(hub=hub, landscape=landscape)

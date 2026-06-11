@@ -606,6 +606,35 @@ def test_watchdog_recover_isolates_a_crashing_refire(tmp_path: Path):
     assert res.exhausted is True  # p0 never truly done; tick completed without crashing
 
 
+def test_run_tick_list_mode_pages_and_does_not_raise_n(tmp_path: Path):
+    # 指定列表 (auto_discover=False): discover() returns the whole list but the hub
+    # must respect n_target as a hard cap (pagination), NOT raise it to cover all
+    # forced-pending candidates (ADR-0010).  auto_discover=True (default) keeps the
+    # existing 中枢-D1 raise behaviour — tested by the tests above.
+    forced = [{**_candidate(f"24{i:02d}.0000"), "forced": True} for i in range(6)]
+
+    def discover(topic: str, n: int) -> list[dict]:
+        return [dict(c) for c in forced]  # whole list, like 指定列表 discover() returns
+
+    seen: list[str] = []
+
+    def spoke(cand: dict) -> SpokeResult:
+        seen.append(cand["key"])
+        return _ok(cand)
+
+    ledger = FakeLedger()
+    run_tick(
+        workspace=tmp_path,
+        topic="my list",
+        n_target=2,
+        ledger=ledger,
+        discover=discover,
+        spoke=spoke,
+        auto_discover=False,
+    )
+    assert len(seen) == 2  # list mode respects n_target=2, does NOT raise to 6
+
+
 def test_audit_block_failure_recorded_deferred_without_note(tmp_path: Path):
     """Chunk 3.5 wiring (CR MED-2): an audit-block spoke failure records `deferred`
     (retry_after=None → enters skip_set, waits for revival) and does NOT write a
