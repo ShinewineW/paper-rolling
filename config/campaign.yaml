@@ -48,6 +48,8 @@ force_include:
   title: DriveDreamerPolicyAGeometryGroundedWorld
 - arxiv_id: '2606.02800'
   title: Cosmos3OmnimodalWorldModelsForPhysicalAI
+- arxiv_id: '2606.03159'
+  title: OmniDreamsRealTimeGenerativeWorldModel
 is_ad_domain: true
 n_per_tick: 5
 topic: world models for autonomous driving and embodied AI
