@@ -79,7 +79,10 @@ force_include=[{'arxiv_id': '2401.00001', 'title': 'A must-include paper'}]))"
 Until `config/campaign.yaml` exists, `run_campaign_tick` raises `GateRequired`
 and processing is blocked. Changing the topic or N re-fires the gate; a plain
 `/loop` tick on an unchanged campaign **reads the config and re-gates not at all
-— no re-gate** (吸收-D4). It runs autonomously.
+— no re-gate** (吸收-D4). It runs autonomously. Flipping `auto_discover` also
+re-fires the gate: `true` = 自发查找 (topic discovery, `force_include` adds on top);
+`false` = 指定列表 (discovery OFF — `force_include` is the entire work set, paged
+by `n_per_tick`; ADR-0010).
 
 > **`is_ad_domain` wiring**: when you build the production `discover` seam, copy
 > `CampaignConfig.is_ad_domain` into the discovery `config` dict. `score_authority`
@@ -260,6 +263,7 @@ result = run_campaign(
         llm=seams["expand_llm"],
         is_ad_domain=campaign.is_ad_domain if campaign else True,
         force_include=campaign.force_include if campaign else [],
+        auto_discover=campaign.auto_discover if campaign else True,
     ),
     http=build_http(),
     run_cli=build_run_cli(),

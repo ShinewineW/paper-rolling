@@ -1,7 +1,7 @@
 # Extending paper-rolling
 
 > **创建日期**: 2026-06-06
-> **更新日期**: 2026-06-07
+> **更新日期**: 2026-06-11
 > **适用环境**: `~/Coding/paper-rolling/` 仓库；扩展引擎前阅读；改动后保持 `uv run pytest` 绿 + `uv run ruff check .` 干净。
 
 ---
@@ -20,6 +20,11 @@ All paths below are under `.claude/skills/paper-landscape/scripts/`.
 ---
 
 ## Add a discovery source — DROP-IN ✅
+
+Two input modes govern whether discovery runs at all (ADR-0010): `auto_discover=True`
+(自发查找 — topic fan-out runs, `force_include` adds on top) and `auto_discover=False`
+(指定列表 — discovery is skipped entirely; `force_include` is the whole candidate set,
+paged by `n_per_tick`). See `CONTEXT.md` + ADR-0010 for the full design rationale.
 
 The fan-out is registry-driven (`discovery/discover.py`, `_SEARCH_SOURCES`).
 

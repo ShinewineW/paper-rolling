@@ -17,6 +17,10 @@
 # (e.g. bare "autonomous driving") and forces a narrowed scope here.
 topic: "PLACEHOLDER — set a precise topic at the campaign Hard Gate"
 
+# auto_discover: true  = 自发查找 (discover by topic; force_include adds on top).
+# auto_discover: false = 指定列表 (discovery OFF; force_include IS the whole work set, paged by n_per_tick).
+auto_discover: true
+
 # Per-tick target = number of SUCCESSFULLY processed papers each /loop tick
 # (中枢-D2: failures are skipped and back-filled from the candidate pool).
 # Also the cost / disk ceiling per tick (中枢-D1 side effect).

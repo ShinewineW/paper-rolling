@@ -126,6 +126,9 @@ def build_discover(
         force_include: copy of ``CampaignConfig.force_include`` — mandatory papers
             prepended to the pool (they bypass the authority filter but still go
             through ingest + G2 + G3).
+        auto_discover: True = 自发查找 (topic discovery + force_include on top); False =
+            指定列表 (discovery OFF, force_include is the whole candidate set). Copy of
+            CampaignConfig.auto_discover. Default True preserves discovery behavior.
     """
     sources: dict[str, Any] = {
         "openalex": OpenAlexSource(ThrottledClient(polite=bool(polite_email)), polite_email),
