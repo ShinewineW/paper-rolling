@@ -635,6 +635,100 @@ def test_run_tick_list_mode_pages_and_does_not_raise_n(tmp_path: Path):
     assert len(seen) == 2  # list mode respects n_target=2, does NOT raise to 6
 
 
+def test_list_mode_tick_processes_only_force_include_paged_and_respects_skipset(
+    tmp_path: Path,
+) -> None:
+    """End-to-end: auto_discover=False list-mode campaign through run_campaign_tick.
+
+    Proves the integrated wiring load_campaign → gate_needed → run_tick is correct
+    for 指定列表 mode (ADR-0010).  Four claims verified in one tick:
+
+    1. Only force_include papers are attempted (discovery is not called for new
+       candidates — the fake discover returns exactly the forced list).
+    2. The hub pages by n_per_tick (=2): a 4-paper list produces exactly 2 done
+       results; the hub does NOT raise n_target to cover all 4.
+    3. skip_set is respected: one of the 4 is pre-seeded as done, so 3 are eligible
+       but still only 2 are processed (paged) — the skipped paper is never attempted.
+    4. No re-gate fires (the campaign is already locked).
+    """
+    # Four force-include papers.  _validate_force_include requires arxiv_id
+    # (ingestible + identity).  Keys match the _candidate() helper's arxiv_id field.
+    force_include_entries = [
+        {"arxiv_id": f"24{i:02d}.0000", "title": f"Paper {i:02d}"} for i in range(4)
+    ]
+    write_campaign(
+        tmp_path,
+        CampaignConfig(
+            topic="autonomous driving perception",
+            n_per_tick=2,
+            is_ad_domain=True,
+            auto_discover=False,
+            force_include=force_include_entries,
+        ),
+    )
+
+    # Pre-seed "2400.0000" as already done.
+    ledger = FakeLedger(skip={"2400.0000"})
+
+    # Track which keys the spoke is called with.
+    attempted: list[str] = []
+
+    def spoke(cand: dict) -> SpokeResult:
+        k = cand["key"]
+        attempted.append(k)
+        # Write a minimal ai_package entry so generate_landscapes doesn't fail on
+        # an empty corpus.  Pattern mirrors test_run_campaign_tick_runs_and_builds_landscape.
+        ara = tmp_path / "ai_package" / f"2026-06-10_{k}" / "ara"
+        ara.mkdir(parents=True, exist_ok=True)
+        (ara / "PAPER.md").write_text(
+            "---\n"
+            f"title: T{k}\nyear: 2025\nkey: {k}\nschema_version: 1\n"
+            "headline_metric: acc\nheadline_value: 80.0\nparams_million: 30.0\n---\n",
+            encoding="utf-8",
+        )
+        return SpokeResult(
+            status="done",
+            person_vault_path=f"person_vault/2026-06-10_{k}",
+            ai_package_path=f"ai_package/2026-06-10_{k}",
+            failure_class=None,
+            failure_reason=None,
+            source_url=cand.get("source_url"),
+            attempted_tier="tier1",
+        )
+
+    # In 指定列表 mode the real discover() returns _build_forced(force_include) which
+    # emits the whole force_include list tagged forced=True.  Mirror that shape.
+    def discover(topic: str, n: int) -> list[dict]:
+        return [
+            {
+                "arxiv_id": e["arxiv_id"],
+                "title": e["title"],
+                "source_url": f"http://arxiv.org/abs/{e['arxiv_id']}",
+                "forced": True,
+            }
+            for e in force_include_entries
+        ]
+
+    res = run_campaign_tick(
+        workspace=tmp_path,
+        ledger=ledger,
+        discover=discover,
+        spoke=spoke,
+    )
+
+    # Claim 1 + 2: exactly 2 papers processed (n_per_tick=2 caps the list; hub does
+    # NOT raise n_target to 3 for all pending-forced papers in list mode).
+    assert res.hub.done_count == 2, f"expected 2 done, got {res.hub.done_count}"
+    assert len(attempted) == 2, f"expected 2 spoke calls, got {attempted}"
+
+    # Claim 3: the pre-seeded done paper ("2400.0000") was never attempted.
+    assert "2400.0000" not in attempted, "pre-done paper must be skipped"
+
+    # Claim 4: no GateRequired was raised (the call above completed without
+    # exception — this assertion is redundant but documents the intent).
+    assert res.hub.exhausted is False
+
+
 def test_audit_block_failure_recorded_deferred_without_note(tmp_path: Path):
     """Chunk 3.5 wiring (CR MED-2): an audit-block spoke failure records `deferred`
     (retry_after=None → enters skip_set, waits for revival) and does NOT write a
