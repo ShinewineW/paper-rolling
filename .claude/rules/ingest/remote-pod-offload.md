@@ -13,6 +13,11 @@ that a high-RAM pod handles), offload Tier-2 ingest to a borrowed CPU pod.
 - **User-gated, secret-free.** The user must explicitly designate the pod and supply the
   SSH command for that session. Never hardcode or record the host / port / key, and never
   write secrets into any file (keys live in the user's `~/.ssh/config`).
+- **Connect via the `~/.ssh/config` alias, NOT the bare `ssh root@host -p PORT` the user
+  pastes.** The bare command omits `IdentityFile`, so on a freshly reopened pod it fails
+  `Permission denied (publickey)`. First scan `~/.ssh/config`, match the user's `HostName` +
+  `Port` to a `Host` block, and connect through that alias — it carries the right key
+  (`IdentityFile` + `IdentitiesOnly yes`). Use the same alias for `scp`.
 - **Borrowed CPU only.** Keep ALL work under `/tmp/<workdir>` — the venv and the model
   cache included (`MODELSCOPE_CACHE=/tmp/<workdir>/...`). Leave zero residue.
 
