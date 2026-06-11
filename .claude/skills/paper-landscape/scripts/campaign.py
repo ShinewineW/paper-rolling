@@ -119,13 +119,13 @@ def gate_needed(
     *,
     requested_topic: str | None,
     requested_n: int | None,
+    requested_auto_discover: bool | None = None,
 ) -> bool:
     """True if the Hard Gate must fire before processing.
 
     Fires when (a) no campaign exists (first-time), or (b) the caller requests a
-    topic/N that differs from the locked config. A bare /loop tick
-    (requested_topic and requested_n both None) on an established campaign never
-    re-gates.
+    topic/N/auto_discover that differs from the locked config. A bare /loop tick
+    (all requested_* None) on an established campaign never re-gates.
     """
     cfg = load_campaign(workspace)
     if cfg is None:
@@ -133,5 +133,7 @@ def gate_needed(
     if requested_topic is not None and requested_topic.strip() != cfg.topic:
         return True
     if requested_n is not None and requested_n != cfg.n_per_tick:
+        return True
+    if requested_auto_discover is not None and requested_auto_discover != cfg.auto_discover:
         return True
     return False

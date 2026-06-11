@@ -387,17 +387,23 @@ def run_campaign_tick(
     spoke: SpokeFn,
     requested_topic: str | None = None,
     requested_n: int | None = None,
+    requested_auto_discover: bool | None = None,
     max_concurrent: int = 5,
     watchdog: Watchdog | None = None,
 ) -> TickResult:
     """One /loop tick end-to-end: gate-check -> dispatch batch -> rebuild landscape.
 
-    On an established campaign with no topic/N change this runs fully autonomously
-    (no re-gate, no mid-pipeline questions — 中枢-D2 / 吸收-D4). If no campaign is
-    locked (or topic/N changed), raises GateRequired so the harness runs the HITL
-    setup gate first.
+    On an established campaign with no topic/N/auto_discover change this runs
+    fully autonomously (no re-gate, no mid-pipeline questions — 中枢-D2 / 吸收-D4).
+    If no campaign is locked (or topic/N/auto_discover changed), raises GateRequired
+    so the harness runs the HITL setup gate first.
     """
-    if gate_needed(workspace, requested_topic=requested_topic, requested_n=requested_n):
+    if gate_needed(
+        workspace,
+        requested_topic=requested_topic,
+        requested_n=requested_n,
+        requested_auto_discover=requested_auto_discover,
+    ):
         raise GateRequired(
             "campaign Hard Gate required: confirm topic + per-tick N "
             "(write config/campaign.yaml) before processing"

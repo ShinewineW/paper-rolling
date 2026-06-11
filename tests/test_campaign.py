@@ -98,3 +98,27 @@ def test_campaign_config_auto_discover_defaults_true_and_round_trips(tmp_path):
     assert loaded is not None
     assert loaded.auto_discover is False
     assert loaded.force_include[0]["arxiv_id"] == "2407.01392"
+
+
+def test_gate_needed_refires_when_auto_discover_flips(tmp_path):
+    from scripts.campaign import CampaignConfig, gate_needed, write_campaign
+
+    write_campaign(
+        tmp_path,
+        CampaignConfig(topic="world model survey", n_per_tick=5, is_ad_domain=True),
+    )
+    # No requested change → no re-gate.
+    assert (
+        gate_needed(tmp_path, requested_topic=None, requested_n=None, requested_auto_discover=None)
+        is False
+    )
+    # Requesting list mode (flip True→False) → re-gate.
+    assert (
+        gate_needed(tmp_path, requested_topic=None, requested_n=None, requested_auto_discover=False)
+        is True
+    )
+    # Requesting the same value → no re-gate.
+    assert (
+        gate_needed(tmp_path, requested_topic=None, requested_n=None, requested_auto_discover=True)
+        is False
+    )

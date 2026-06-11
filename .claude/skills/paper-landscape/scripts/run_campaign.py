@@ -73,6 +73,7 @@ def run_campaign(
     audit_config: AuditConfig | None = None,
     requested_topic: str | None = None,
     requested_n: int | None = None,
+    requested_auto_discover: bool | None = None,
 ) -> TickResult:
     """Run one /loop campaign tick end-to-end (gates included).
 
@@ -163,6 +164,7 @@ def run_campaign(
             spoke=spoke,
             requested_topic=requested_topic,
             requested_n=requested_n,
+            requested_auto_discover=requested_auto_discover,
         )
 
 
