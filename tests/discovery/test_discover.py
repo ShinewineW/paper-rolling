@@ -320,6 +320,33 @@ def test_search_source_registry_lists_the_fanout_sources():
     assert [k for k, _ in disc._SEARCH_SOURCES] == ["openalex", "s2", "arxiv", "hf_papers"]
 
 
+def test_discover_list_mode_returns_only_forced_without_touching_sources():
+    from scripts.discovery.discover import discover
+
+    def boom_llm(*a, **k):
+        raise AssertionError("LLM query-expansion must NOT run in list mode")
+
+    class BoomSource:
+        def search(self, *a, **k):
+            raise AssertionError("sources must NOT be queried in list mode")
+
+    sources = {"openalex": BoomSource(), "s2": BoomSource(), "arxiv": BoomSource()}
+    cfg = {
+        "topic": "my world-model list",
+        "top_k": 5,
+        "auto_discover": False,
+        "force_include": [
+            {"arxiv_id": "2407.01392", "title": "DiffusionForcing"},
+            {"arxiv_id": "1803.10122", "title": "WorldModels"},
+        ],
+    }
+
+    out = discover(cfg, sources, boom_llm)
+
+    assert [c["arxiv_id"] for c in out] == ["2407.01392", "1803.10122"]
+    assert all(c.get("forced") for c in out)  # _build_forced marked them
+
+
 def test_registering_a_new_source_is_drop_in(monkeypatch):
     """Appending one entry to _SEARCH_SOURCES fans a new source in — no edit to
     discover()'s body. Proves the source seam is genuinely drop-in (ADR-0002)."""

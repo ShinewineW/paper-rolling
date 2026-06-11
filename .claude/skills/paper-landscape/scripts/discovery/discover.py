@@ -81,6 +81,11 @@ def discover(
         Authoritative candidates, sorted by authority_score descending,
         capped at top_k * overfetch_factor for backfill headroom.
     """
+    # 指定列表 mode (ADR-0010): discovery OFF — the work set IS force_include. Skip the
+    # source fan-out + LLM query-expansion entirely; _build_forced normalizes + marks them.
+    if not campaign_config.get("auto_discover", True):
+        return _build_forced(campaign_config.get("force_include") or [])
+
     topic = campaign_config["topic"]
     top_k = campaign_config["top_k"]
     overfetch = campaign_config.get("overfetch_factor", 3)

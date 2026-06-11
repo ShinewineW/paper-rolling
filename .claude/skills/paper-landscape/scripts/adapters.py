@@ -107,6 +107,7 @@ def build_discover(
     from_year: int | None = None,
     overfetch_factor: int = 3,
     force_include: list[dict[str, Any]] | None = None,
+    auto_discover: bool = True,
 ) -> Callable[[str, int], list[dict[str, Any]]]:
     """Return a ``discover(topic, n) -> list[dict]`` seam wiring all five sources.
 
@@ -146,6 +147,7 @@ def build_discover(
             "from_date": f"{floor_year}-01-01",
             "current_year": current_year,
             "force_include": list(force_include or []),
+            "auto_discover": auto_discover,
         }
         return _discover(campaign_config, sources, llm)
 
