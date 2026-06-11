@@ -1,0 +1,1039 @@
+[
+    {
+        "type": "text",
+        "text": "Enhancing Policy Learning with World-Action Model",
+        "text_level": 1,
+        "bbox": [
+            189,
+            88,
+            807,
+            112
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Yuci Han<sup>1</sup> and Alper Yilmaz<sup>1</sup>",
+        "bbox": [
+            383,
+            132,
+            611,
+            150
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Abstract— This paper presents the World-Action Model (WAM), an action-regularized world model that jointly reasons over future visual observations and the actions that drive state transitions. Unlike conventional world models trained solely via image prediction, WAM incorporates an inverse dynamics objective into DreamerV2 that predicts actions from latent state transitions, encouraging the learned representations to capture action-relevant structure critical for downstream control. We evaluate WAM on enhancing policy learning across eight manipulation tasks from the CALVIN benchmark. We first pretrain a diffusion policy via behavioral cloning on world model latents, then refine it with model-based PPO inside the frozen world model. Without modifying the policy architecture or training procedure, WAM improves average behavioral cloning success from 59.4% to 71.2% over DreamerV2 and DiWA baselines. After PPO fine-tuning, WAM achieves 92.8% average success versus 79.8% for the baseline, with two tasks reaching 100%, using 8.7× fewer training steps.",
+        "bbox": [
+            81,
+            186,
+            490,
+            416
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Index Terms—Reinforcement Learning, Robotics and World Model, Diffusion Policy.",
+        "bbox": [
+            81,
+            416,
+            490,
+            446
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "I. INTRODUCTION",
+        "text_level": 2,
+        "bbox": [
+            220,
+            457,
+            354,
+            469
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "World models have become a critical tool for learning environment dynamics in robotics, allowing agents to plan and refine behaviors through imagined rollouts rather than expensive real-world interactions [1]–[5]. These models compress high-dimensional observations into compact latent spaces that capture the temporal and physical structures of environments, enabling sample-efficient policy learning through imagined experiences in latent space. Recent work has shown that policies trained entirely within learned world models can reach strong performance on robotic manipulation benchmarks [6]–[8], and in some cases transfer directly to physical hardware without further fine-tuning [9].",
+        "bbox": [
+            81,
+            469,
+            490,
+            651
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "However, conventional world models are trained solely to predict future observations [1]–[4], [7], [9]. They forecast future visual states conditioned on past observations and actions, but never explicitly model the actions themselves. This asymmetry limits the quality of learned representations. The world model encodes each observation into a latent state $z _ { t } ,$ which serves as the direct input to the downstream diffusion policy in model-based pipelines such as DiWA [8]—yet z<sub>t</sub> is optimized only for pixel prediction and KL regularization, with no explicit pressure to encode action-relevant structure. Recent work on unified actionworld models [10] has begun to address this gap by jointly generating actions and images within a single autoregressive architecture, but these approaches rely on large foundation models and fundamentally redesign the architecture rather than improving the representations learned by existing world models.",
+        "bbox": [
+            81,
+            651,
+            491,
+            878
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            504,
+            186,
+            915,
+            217
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "We take a different and complementary approach: rather than redesigning the architecture, we augment the training objective of DreamerV2 [4] with an inverse dynamics head that predicts actions from consecutive encoder embeddings, regularizing the learned representations toward actionrelevant structure. We argue that requiring the model to predict the action that caused a given state transition forces the encoder to capture fine-grained information about how the environment responds to agent behavior. This information is critical for downstream policy learning but is overlooked when the training signal comes only from observation reconstruction. This idea draws on inverse dynamics models in self-supervised representation learning [11], [12], where predicting actions between consecutive states yields representations focused on controllable aspects of the environment while filtering out task-irrelevant distractors.",
+        "bbox": [
+            504,
+            217,
+            915,
+            459
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "We present the World-Action Model (WAM) and evaluate it on enhancing policy learning across eight manipulation tasks from the CALVIN benchmark [13]. We first pretrain a diffusion policy via behavioral cloning on world model latents, then refine it with model-based PPO using the frozen world model as a simulator. Compared to the DiWA baseline [8], WAM improves average behavioral cloning success from 59.4% to 71.2% and achieves 92.8% average success after PPO fine-tuning versus 79.8%, with two tasks reaching 100%, using 8.7× fewer training steps.",
+        "bbox": [
+            504,
+            459,
+            915,
+            611
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Our main contributions are:",
+        "bbox": [
+            524,
+            611,
+            715,
+            626
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "• We present WAM, a lightweight extension of DreamerV2 that augments the training objective with an inverse dynamics head, explicitly regularizing latent representations toward action-relevant structure.",
+        "bbox": [
+            524,
+            628,
+            915,
+            690
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "• We demonstrate that action regularization improves world model generation quality on the CALVIN benchmark. WAM matches or exceeds DreamerV2 [4] on LPIPS, PSNR, SSIM, and FVD with fewer training steps.",
+        "bbox": [
+            524,
+            690,
+            915,
+            765
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "• We show that the improved representations enhance downstream policy learning, outperforming the DiWA baseline on both behavioral cloning and PPO fine-tuning across all eight tasks on the CALVIN benchmark.",
+        "bbox": [
+            524,
+            765,
+            915,
+            827
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "II. RELATED WORKS",
+        "text_level": 2,
+        "bbox": [
+            632,
+            838,
+            787,
+            853
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "A. World Models",
+        "text_level": 2,
+        "bbox": [
+            506,
+            861,
+            629,
+            875
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "World models learn a predictive representation of environment dynamics, enabling agents to optimize policies through imagined trajectories without requiring additional real-world data collection. Ha and Schmidhuber [1] introduced an early approach encoding observations into a latent space with an RNN for dynamics modeling. PlaNet [2] proposed the Recurrent State-Space Model (RSSM), combining deterministic and stochastic components for long-horizon prediction. The Dreamer series [3]–[5] progressively extended RSSMbased latent imagination for behavior learning. DreamerV2 replaced Gaussian latents with categorical representations, while DreamerV3 introduced robustness techniques that allowed a single set of hyperparameters to work across diverse domains. However, these world models are trained purely as observation predictors without explicitly reasoning about the actions that drive state transitions. Our work introduces action regularization into the world model, jointly predicting both actions and future observations to better capture environment dynamics.",
+        "bbox": [
+            504,
+            881,
+            915,
+            928
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "aside_text",
+        "text": "arXiv:2603.28955v1 [cs.AI] 30 Mar 2026",
+        "bbox": [
+            22,
+            277,
+            57,
+            717
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "page_footnote",
+        "text": "<sup>1</sup>Yuci Han and Alper Yilmaz are with the Photogrammetry and Computer Vision Lab, The Ohio State University, Columbus, OH 43210, USA. {han.1489, yilmaz.15}@osu.edu",
+        "bbox": [
+            81,
+            888,
+            490,
+            926
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "image",
+        "img_path": "images/e386c90b3bfd15dc527f7ece352bd6762525668a9c50c9165628c7f4cae2b75f.jpg",
+        "image_caption": [
+            "Fig. 1: (a) Standard world models predict only future observations, treating actions solely as conditioning inputs. (b) Our World-Action Model adds an inverse dynamics head that jointly predicts observations and actions during training. (c) The action-aware world model serves as a learned simulator for offline policy fine-tuning via PPO."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            86,
+            64,
+            913,
+            318
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            81,
+            383,
+            491,
+            626
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "B. World Models for Policy Learning",
+        "text_level": 2,
+        "bbox": [
+            83,
+            635,
+            341,
+            650
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "Beyond modeling dynamics, world models can be directly used as complementary environments for policy optimization, where agents learn behaviors through imagined rollouts within the learned model. The Dreamer series [3]–[5] first demonstrated that actor-critic policies can be trained entirely through imagined latent rollouts, and DayDreamer [9] demonstrated this paradigm on physical robots. In offline settings, DITTO [6] proposed imitation learning by optimizing a distance metric in a frozen world model’s latent space, and LUMOS [7] extended this to language-conditioned multitask learning. DiWA [8] fine-tuned diffusion policies via PPO within a learned world model, achieving sample efficiency orders of magnitude beyond model-free baselines. More recently, WMPO [14] introduced pixel-based world models for on-policy GRPO optimization of Vision-Language-Action models, and World4RL [15] employed diffusionbased world models for end-to-end policy refinement. While these works confirm the effectiveness of world-model-based policy learning, they rely on world models trained solely for observation prediction. Our approach enriches the world model with action prediction, providing a stronger training signal for downstream policy optimization.",
+        "bbox": [
+            81,
+            654,
+            491,
+            928
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            504,
+            383,
+            915,
+            445
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "III. METHOD",
+        "text_level": 2,
+        "bbox": [
+            660,
+            462,
+            761,
+            476
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "A. World-Action Model",
+        "text_level": 2,
+        "bbox": [
+            504,
+            487,
+            671,
+            502
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "We propose to regularize the world model with an inverse dynamics objective, producing representations that are simultaneously predictive of visual dynamics and aware of the actions driving state transitions.",
+        "bbox": [
+            504,
+            510,
+            915,
+            570
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "1) World Model Backbone: WAM builds on the RSSM architecture from DreamerV2 [4]. A dual-stream CNN encoder processes static and gripper camera images, fusing them with proprioceptive state to produce embeddings $e _ { t } \\in$ <sup>R</sup><sup>1554</sup>. The RSSM models latent dynamics through:",
+        "bbox": [
+            504,
+            571,
+            915,
+            648
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "equation",
+        "img_path": "images/69686336c87b49f8add2d051f9636b4639d02650713edd6deefa5b19bcd0584a.jpg",
+        "text": "$$\nh _ { t } = f _ { \\phi } ( h _ { t - 1 } , z _ { t - 1 } , a _ { t - 1 } )\\tag{1}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            619,
+            660,
+            799,
+            678
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "equation",
+        "img_path": "images/a85c7ec5bc7ccb3e7a13fb0eaa8721affefb22f63f7869f23bd79d06db8da4c5.jpg",
+        "text": "$$\nz _ { t } \\sim q _ { \\phi } ( z _ { t } \\mid h _ { t } , e _ { t } )\\tag{2}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            622,
+            679,
+            754,
+            695
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "equation",
+        "img_path": "images/32daab6971a07d487638d668a7291a2337d74a382b3fce7e2f41363b8b2ac3cb.jpg",
+        "text": "$$\n\\hat { z } _ { t } \\sim p _ { \\phi } ( z _ { t } \\mid h _ { t } )\\tag{3}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            622,
+            698,
+            735,
+            714
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "equation",
+        "img_path": "images/4d3145a5f04b87afcab6be1962b6aa22cce4c896543817e6ed73f0d0a3c3d29c.jpg",
+        "text": "$$\n\\hat { o } _ { t } \\sim p _ { \\phi } ( o _ { t } \\mid f _ { t } ) ,\\tag{4}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            622,
+            717,
+            736,
+            733
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "where $h _ { t }$ is the deterministic recurrent state, $z _ { t }$ is a stochastic categorical variable (32×32), and $f _ { t } = [ h _ { t } ; z _ { t } ] \\in \\mathbb { R } ^ { 2 0 4 8 }$ is the combined latent feature used for decoding and policy learning.",
+        "bbox": [
+            504,
+            746,
+            913,
+            806
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "2) Action-Regularized World Model: The observationonly objective (Eq. 4) produces features optimized for pixel reconstruction, potentially discarding action-relevant information. WAM addresses this by augmenting the world model with an inverse dynamics component, yielding a unified model M<sub>θ</sub> with two pathways:",
+        "bbox": [
+            504,
+            808,
+            915,
+            898
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "equation",
+        "img_path": "images/459029cf28a99e8ac0e9f2892d908ee8bd2284e11b87b6da3c0104c2b978870b.jpg",
+        "text": "$$\n\\begin{array} { r } { \\hat { o } _ { t } = \\mathcal { M } _ { \\theta } ^ { \\mathrm { w o r l d } } \\big ( o _ { 1 : t } , a _ { 1 : t - 1 } \\big ) , \\quad \\hat { a } _ { t } = \\mathcal { M } _ { \\theta } ^ { \\mathrm { a c t i o n } } \\big ( e _ { t } , e _ { t + 1 } \\big ) , } \\end{array}\\tag{5}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            521,
+            910,
+            875,
+            928
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "image",
+        "img_path": "images/7bccb2347aa84ac7e894899f8b9b435611752f39bb58cdef293317966888aaa9.jpg",
+        "image_caption": [
+            "Fig. 2: WAM architecture. Observations $x _ { t }$ are encoded and produce posterior $z _ { t } ,$ which is regularized toward the prior $\\hat { z } _ { t }$ via KL divergence. The inverse dynamics head predicts actions $\\hat { a } _ { t }$ from consecutive encoder embeddings, cascading action-aware structure through the posterior to the prior. The decoder reconstructs observations $\\hat { x } _ { t }$ and a reward estimator provides task-completion signals for policy fine-tuning."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            88,
+            63,
+            496,
+            351
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "where $\\mathcal { M } _ { \\theta } ^ { \\mathrm { w o r l d } }$ denotes the RSSM pathway (Eqs. 1–4) and $\\mathcal { M } _ { \\theta } ^ { \\mathrm { a c t i o n } }$ is an inverse dynamics head:",
+        "bbox": [
+            81,
+            500,
+            490,
+            531
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "equation",
+        "img_path": "images/5f0a16e85d817ff81dd80be6ef3e0bd66d714798a05e47b7da21056a060e4781.jpg",
+        "text": "$$\n\\hat { a } _ { t } = \\psi ( [ e _ { t } ; e _ { t + 1 } ] ) ,\\tag{6}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            218,
+            540,
+            352,
+            558
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "with ψ a three-layer MLP and $[ \\cdot ; \\cdot ]$ denoting concatenation. A critical design in WAM is the cascading effect created by the action head through the full model. We operate on encoder embeddings $e _ { t }$ rather than RSSM features $f _ { t }$ since $f _ { t }$ receives $a _ { t - 1 }$ through the GRU (Eq. 1) and would make action prediction trivially solvable. By regularizing the encoder directly, the action-aware structure in $e _ { t }$ cascades forward: it shapes the posterior $\\displaystyle z _ { t } \\sim q _ { \\phi } ( \\boldsymbol { z } _ { t } \\mid h _ { t } , e _ { t } )$ , which the KL loss propagates to the prior $\\hat { z } _ { t } ~ \\sim ~ p _ { \\phi } ( z _ { t } ~ | ~ h _ { t } )$ , and ultimately reaches the diffusion policy through imagined rollouts generated from $\\hat { z } _ { t }$ . This chain ensures that the action prediction signal at the encoder level translates into more informative features for downstream control. As illustrated in Fig. 2, the action-aware structure cascades from the encoder through the posterior to the prior across timesteps.",
+        "bbox": [
+            81,
+            565,
+            490,
+            791
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Training Objective. WAM is trained end-to-end by minimizing:",
+        "bbox": [
+            81,
+            786,
+            488,
+            815
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "equation",
+        "img_path": "images/a25d2b4945b7f4a1a42319f29b5abe487595297090b369def79630e38e459118.jpg",
+        "text": "$$\n{ \\mathcal { L } } _ { \\mathrm { W A M } } = \\lambda _ { \\mathrm { K L } } { \\mathcal { L } } _ { \\mathrm { K L } } + \\lambda _ { \\mathrm { i m g } } { \\mathcal { L } } _ { \\mathrm { r e c o n } } + \\lambda _ { \\mathrm { a c t } } { \\mathcal { L } } _ { \\mathrm { a c t i o n } } ,\\tag{7}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            135,
+            825,
+            437,
+            842
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "where ${ \\mathcal { L } } _ { \\mathrm { K L } } ~ = ~ \\mathrm { K L } \\big [ q _ { \\phi } ( z _ { t } ~ \\mid ~ h _ { t } , e _ { t } ) \\mid \\mid p _ { \\phi } ( z _ { t } ~ \\mid h _ { t } ) \\big ] , ~ { \\mathcal { L } } _ { \\mathrm { r e c o n } } ~ =$ $\\| o _ { t } - \\hat { o } _ { t } \\| _ { 2 } ^ { 2 }$ , and $\\mathcal { L } _ { \\mathrm { a c t i o n } } = \\| \\hat { a } _ { t } - a _ { t } \\| _ { 1 }$ . We carefully tune the loss coefficients to balance the trade-off between reconstruction quality and action prediction, ensuring that the encoder learns representations that serve both objectives effectively.",
+        "bbox": [
+            81,
+            849,
+            490,
+            928
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "B. Enhancing Downstream Policy Learning with WAM",
+        "text_level": 2,
+        "bbox": [
+            506,
+            65,
+            882,
+            82
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "After world model training, we leverage WAM to enhance downstream policy learning. The frozen WAM defines a latent space MDP $\\mathcal { M } _ { \\mathrm { w m } } = ( \\mathcal { Z } , \\mathcal { A } , P _ { \\phi } , R _ { \\psi } , \\gamma )$ , where $\\mathcal { Z }$ is WAM’s latent space, $P _ { \\phi }$ the learned dynamics, and $R _ { \\psi }$ a learned reward classifier. We extract features $f _ { t } ~ \\in \\ \\mathbb { R } ^ { 2 0 4 8 }$ from expert demonstrations $\\mathcal { D } _ { \\mathrm { e x p } }$ (50 episodes per task) and train a diffusion-based policy in two stages: behavioral cloning followed by optional offline RL fine-tuning.",
+        "bbox": [
+            504,
+            88,
+            915,
+            210
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Behavioral Cloning. We freeze the WAM and extract features $f _ { t } \\in \\mathbb { R } ^ { 2 0 4 8 }$ from expert demonstrations $\\mathcal { D } _ { \\exp } .$ Following DiWA [8], we adopt a DiffusionMLP policy $\\textstyle { \\overline { { \\pi _ { \\theta } ( a _ { t } \\mid f _ { t } ) } } }$ that generates actions by iteratively denoising Gaussian noise through K steps:",
+        "bbox": [
+            506,
+            210,
+            913,
+            286
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "equation",
+        "img_path": "images/6e438696fe87a262724806518fa74a46a163b07090ef016dc29b2615d2779209.jpg",
+        "text": "$$\na _ { t } ^ { k - 1 } = \\mu _ { \\theta } ( f _ { t } , a _ { t } ^ { k } , k ) + \\sigma _ { k } \\epsilon , \\quad \\epsilon \\sim \\mathcal { N } ( 0 , I ) ,\\tag{8}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            560,
+            296,
+            857,
+            315
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "where $a _ { t } ^ { K } \\sim \\mathcal { N } ( 0 , I )$ and $a _ { t } ^ { 0 }$ are the predicted actions. The policy is trained by minimizing the denoising objective:",
+        "bbox": [
+            504,
+            325,
+            913,
+            358
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "equation",
+        "img_path": "images/8484d01bca4826835fc7ae00fa6195d170a2e0af9a6cfba7a7a04d1929be5003.jpg",
+        "text": "$$\n\\mathcal { L } _ { \\mathrm { B C } } = \\mathbb { E } _ { k , \\epsilon , ( f _ { t } , a _ { t } ) } \\left[ \\| \\mu _ { \\theta } ( f _ { t } , a _ { t } ^ { k } , k ) - a _ { t } ^ { k - 1 } \\| ^ { 2 } \\right] .\\tag{9}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            555,
+            368,
+            862,
+            388
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "The key advantage of WAM is the cascading effect: the action-regularized encoder produces action-aware $e _ { t }$ , which conditions the posterior $\\displaystyle z _ { t } \\sim q _ { \\phi } ( \\boldsymbol { z } _ { t } \\mid h _ { t } , e _ { t } )$ , yielding latent features $\\begin{array} { r c l } { f _ { t } } & { = } & { \\left[ h _ { t } ; z _ { t } \\right] } \\end{array}$ that encode richer action-relevant information. The diffusion policy trained on these features directly benefits from this improved representation.",
+        "bbox": [
+            504,
+            398,
+            913,
+            489
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Offline Policy Fine-tuning. After behavioral cloning, we further improve the policy using DPPO [16] entirely within the frozen world model’s latent space, requiring no physical interactions. During imagined rollouts, observations are unavailable, so the model relies on the prior $\\hat { z } _ { t } \\sim p _ { \\phi } ( z _ { t } $ $h _ { t } )$ to generate latent states. The cascading effect of WAM is critical here: the action-regularized encoder shapes the posterior $z _ { t }$ during training, and the KL loss propagates this action-aware structure to the prior $\\hat { z } _ { t }$ , ensuring that imagined rollouts benefit from action-relevant representations. At each iteration, 50 parallel imagined rollouts are generated within $\\mathcal { M } _ { \\mathrm { w m } }$ using the current policy. The fine-tuning objective maximizes:",
+        "bbox": [
+            504,
+            489,
+            915,
+            686
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "equation",
+        "img_path": "images/0f0ebf0b09fed76c0108e1cbe62e65fcda7c541ba048338f3e868d58665b0e40.jpg",
+        "text": "$$\n\\theta ^ { * } = \\arg \\operatorname* { m a x } _ { \\theta } \\mathbb { E } _ { \\tau \\sim \\pi _ { \\theta } , P _ { \\phi } } \\left[ \\sum _ { t = 0 } ^ { T } \\gamma ^ { t } R _ { \\psi } ( z _ { t } , a _ { t } ) \\right] ,\\tag{10}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            539,
+            694,
+            851,
+            736
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "where $R _ { \\psi }$ is a binary reward classifier. Since WAM produces different latent representations than the baseline DreamerV2, we retrain the reward classifiers on WAM features following DiWA’s pipeline [8]. All 8 classifiers achieve ${ \\geq } 0 . 9 7$ precision and 1.00 recall, confirming reliable reward estimation in WAM’s latent space. The policy is updated via clipped PPO. During rollouts, the diffusion policy uses 10 denoising steps with BC regularization (α<sub>BC</sub> = 0.025) to prevent catastrophic forgetting. As illustrated in Fig. 2, the action-aware structure propagates from the encoder through the prior to the imagined rollouts, benefiting both policy optimization and reward estimation during offline adaptation.",
+        "bbox": [
+            504,
+            744,
+            915,
+            928
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "image",
+        "img_path": "images/0d30f162a2c80c6766b0b259d65698de1eb45d5e5e54f4c4fd3ae190d8bfb218.jpg",
+        "image_caption": [
+            "Fig. 3: Qualitative comparison of imagined rollouts on the CALVIN benchmark. We visualize predicted frames at selected timesteps from both static and gripper cameras. Compared to DreamerV2, our WAM produces more realistic future state predictions across the entire rollout horizon."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            86,
+            60,
+            908,
+            532
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "IV. EXPERIMENTS",
+        "text_level": 2,
+        "bbox": [
+            218,
+            614,
+            356,
+            627
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "In our experiments, we aim to study the following questions:",
+        "bbox": [
+            81,
+            633,
+            488,
+            662
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "• Does the action regularization strategy effectively enhance the performance of WAM compared to the regular world model?",
+        "bbox": [
+            99,
+            665,
+            490,
+            709
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "• Does WAM, with its action-regularized representations, improve downstream policy learning in both offline behavioral cloning and online RL fine-tuning?",
+        "bbox": [
+            99,
+            710,
+            488,
+            752
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "We conduct experiments on the CALVIN benchmark environment D [13], a tabletop manipulation benchmark with a 7-DoF Franka Emika Panda robot. The benchmark provides 6 hours of teleoperated play data (∼500K transitions). Observations consist of 64 × 64 RGB images from static and gripper cameras. We train WAM on the play data and evaluate it on eight manipulation tasks.",
+        "bbox": [
+            81,
+            750,
+            490,
+            856
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "A. Action Regularization Enhances WAM.",
+        "text_level": 2,
+        "bbox": [
+            81,
+            862,
+            370,
+            877
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "1) Baselines: We assess generation quality by comparing WAM against the baseline world model DreamerV2 [17]. We sample 100 random sequences from the CALVIN validation set and perform 50-step open-loop imagination rollouts, conditioned on the first ground-truth observation and using ground-truth actions. We report PSNR, SSIM, LPIPS [18], and FVD [19] to evaluate generation quality.",
+        "bbox": [
+            81,
+            881,
+            490,
+            928
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            504,
+            613,
+            913,
+            675
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "2) Training Settings: We use a sequence length of $T =$ 50, a batch size of 500, and a learning rate of $3 \\times 1 0 ^ { - 4 }$ with AdamW (weight decay 0.05). The KL balance coefficient is set to $\\alpha = 0 . 8$ , with loss weights $\\lambda _ { \\mathrm { K L } } = 3 . 0 , \\lambda _ { \\mathrm { i m g } } = 1 . 0$ , and $\\lambda _ { \\mathrm { a c t } } = 1 0 0 0 . 0$ . The action prediction loss uses L1 regression. WAM is trained for only 230K gradient steps on ∼512K play frames from the CALVIN dataset, roughly 8.7× fewer than the 2M steps used by the baseline DreamingV2, while still achieving stronger downstream policy performance.",
+        "bbox": [
+            504,
+            679,
+            915,
+            816
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "3) Results: Table I presents the quantitative evaluation of generation quality on the CALVIN benchmark. Our World-Action Model consistently outperforms the DreamingV2 baseline across all four metrics (PSNR, SSIM, LPIPS, FVD). These improvements stem from the inverse dynamics head added during training, which regularizes the encoder to retain action-relevant information in its latent representations. By requiring the model to predict the action that caused each state transition, the encoder learns to capture not only visual appearance but also the causal structure underlying the observations, leading to more faithful future state generation.",
+        "bbox": [
+            504,
+            820,
+            916,
+            928
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "table",
+        "img_path": "images/e221efc59efc8834ec410e2322245e696ee55c48f78a338c4c4ab1a3f1196af3.jpg",
+        "table_caption": [
+            "TABLE I: Quantitative evaluation of imagination quality on the CALVIN benchmark. We report standard video prediction metrics between our World-Action Model (WAM) and the baseline (DreamerV2)."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Metric</td><td>Ours (WAM)</td><td>Baseline (DreamerV2)</td></tr><tr><td>PSNR↑</td><td> ${ \\bf 2 2 . 1 0 \\pm 2 . 2 2 }$ </td><td> $2 1 . 6 6 \\pm 2 . 2 0$ </td></tr><tr><td>SSIM↑</td><td> ${ \\bf 0 . 8 1 4 } \\pm { \\bf 0 . 0 6 1 }$ </td><td> $0 . 8 0 7 \\pm 0 . 0 6 7$ </td></tr><tr><td>LPIPS↓</td><td> ${ \\bf 0 . 1 4 4 \\pm 0 . 0 7 2 }$ </td><td> $0 . 1 4 9 \\pm 0 . 0 7 3$ </td></tr><tr><td>FVD↓</td><td>10.82</td><td> $1 2 . 1 3$ </td></tr></table>",
+        "bbox": [
+            102,
+            127,
+            475,
+            217
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "table",
+        "img_path": "images/05ccddedc3c6f54ef5f796c28bda0b90ae95794d980ddf80d379c23e73af2d1c.jpg",
+        "table_caption": [
+            "TABLE II: Baseline comparison. For downstream policy learning, we share the same policy architecture and training pipeline as DiWA, differing only in the world model."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td></td><td>DiWA</td><td>Ours</td></tr><tr><td>World Model</td><td>DreamerV2</td><td>WAM</td></tr><tr><td>Diffusion Policy</td><td>DiffusionMLP</td><td>DiffusionMLP</td></tr></table>",
+        "bbox": [
+            104,
+            281,
+            473,
+            342
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            81,
+            371,
+            490,
+            431
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Figure 3 provides a qualitative comparison of generated rollouts from both the static and gripper cameras. Compared to DreamingV2, our WAM produces more realistic future state predictions across the entire rollout horizon, with better preservation of object shapes, finer details, and more accurate colors, while DreamingV2 shows noticeable color drift and distorted object shapes.",
+        "bbox": [
+            81,
+            431,
+            491,
+            539
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "B. Enhancing Policy Learning with WAM",
+        "text_level": 2,
+        "bbox": [
+            83,
+            545,
+            370,
+            560
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "1) Baselines: We evaluate WAM on downstream policy learning by comparing against DiWA [8]. As summarized in Table II, both methods follow the same pipeline of world model pretraining, behavioral cloning, and optional online fine-tuning, with an identical policy architecture (Diffusion-MLP). We report behavioral cloning success rates and online RL fine-tuning efficiency.",
+        "bbox": [
+            81,
+            564,
+            491,
+            670
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "2) Behavioral Cloning Training Settings: Following the DiWA pipeline, we first pretrain the diffusion policy via behavioral cloning. Both DiWA and our method use the same frozen encoder and RSSM to extract $f _ { t } ~ \\in \\mathbb { R } ^ { 2 0 4 8 }$ features from 50 expert demonstrations per task. The downstream policy is a DiffusionMLP with K = 20 denoising steps and action horizon $T _ { a } = 4 ,$ , trained for 5,000 epochs with a batch size of 256, a learning rate of $1 0 ^ { - 4 }$ (cosine decay to $1 0 ^ { - 5 } )$ weight decay of $1 0 ^ { - 6 } .$ , and EMA with a decay of 0.995. The only difference between the two conditions is which world model provides the features.",
+        "bbox": [
+            81,
+            669,
+            491,
+            835
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "3) Online Policy Fine-tuning Settings: Following DiWA [8], we fine-tune the BC-pretrained diffusion policies using DPPO [16] entirely within the frozen world model’s latent space, requiring no physical interactions during policy optimization. At each iteration, the current policy generates 50 parallel imagined rollouts within the frozen world model’s latent space. The policy is updated via a clipped PPO surrogate objective with a batch size of 7,500, 10 update epochs per iteration, actor learning rate $1 0 ^ { - 5 }$ , critic learning rate $1 0 ^ { - 3 } , \\gamma = 0 . 9 9 9$ , and GAE $\\lambda = 0 . 9 5$ . During rollouts, the diffusion policy uses 10 denoising steps with BC regularization $( \\alpha _ { \\mathrm { { B C } } } ~ = ~ 0 . 0 2 5 )$ to prevent catastrophic forgetting. Fine-tuning runs for 800 iterations with evaluation every 25 iterations.",
+        "bbox": [
+            81,
+            835,
+            491,
+            928
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "table",
+        "img_path": "images/8bceb154a6df2b9ae865edd13c62801613078b0d11bb417782041668abe631a6.jpg",
+        "table_caption": [
+            "TABLE III: Behavioral Cloning (BC) success rates (%) on 8 CALVIN manipulation tasks. Both methods use identical diffusion policy architectures and training procedures; the only difference is the world model used for feature extraction."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Task</td><td>DiWA</td><td>WAM (Ours)</td></tr><tr><td>close_drawer</td><td> $5 8 . 6 \\pm 4 . 2$ </td><td> ${ \\bf 8 9 . 7 \\pm 3 . 1 }$ </td></tr><tr><td>open_drawer</td><td> $5 3 . 3 \\pm 5 . 1$ </td><td> ${ \\bf 7 3 . 3 \\pm 4 . 8 }$ </td></tr><tr><td>move_slider_left</td><td> $5 0 . 0 \\pm 3 . 7$ </td><td> ${ \\bf 6 8 . 8 \\pm 5 . 2 }$ </td></tr><tr><td>move_slider_right</td><td> $5 1 . 7 \\pm 4 . 5$ </td><td> ${ \\bf 8 2 . 8 \\pm 3 . 9 }$ </td></tr><tr><td>turn_on _lightbulb</td><td> $4 2 . 4 \\pm 3 . 3$ </td><td> ${ \\bf 5 1 . 5 \\pm 4 . 6 }$ </td></tr><tr><td>turn_off_lightbulb</td><td> $3 . 4 \\pm 1 . 8$ </td><td> ${ \\bf 1 7 . 2 \\pm 3 . 4 }$ </td></tr><tr><td>turn_on_led</td><td> ${ \\bf 4 4 . 8 \\pm 3 . 9 }$ </td><td> $4 1 . 4 \\pm 4 . 1$ </td></tr><tr><td>turn_off _led</td><td> $6 2 . 5 \\pm 5 . 3$ </td><td> ${ \\bf 6 8 . 8 \\pm 4 . 7 }$ </td></tr><tr><td>Average</td><td>45.8</td><td>61.7</td></tr></table>",
+        "bbox": [
+            526,
+            127,
+            897,
+            299
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            504,
+            319,
+            915,
+            441
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Crucially, since the WAM encoder produces different latent representations than the baseline DreamerV2, we retrain the reward classifiers on WAM features following DiWA’s full pipeline: (1) featurize the entire CALVIN play dataset with the WAM encoder, (2) extract matched features and raw states from the same 50 expert episodes per task (seed 42), (3) generate ground-truth reward labels by replaying expert actions in the CALVIN simulator, (4) augment training data with imagined rollouts inside the WAM, (5) balance class distribution, and (6) train contrastive reward classifiers. All 8 classifiers achieve ≥0.97 precision and 1.00 recall on training data, confirming reliable reward estimation in WAM’s latent space.",
+        "bbox": [
+            503,
+            441,
+            916,
+            638
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "4) Behavioral Cloning Results: Each policy is evaluated on 29 held-out initial configurations per task. The frozen world model encodes the current observation into $f _ { t } ,$ and the policy generates a 4-step action chunk via DDPM sampling (up to 18 decision points per episode, 72 max steps). An episode succeeds if CALVIN’s built-in task checker confirms completion. Table III reports results across all eight CALVIN tasks. WAM outperforms the DiWA baseline on 7 out of 8 tasks, achieving an average success rate of 61.7% compared to 45.8%. The largest gains appear on tasks involving articulated objects: close drawer (+31.1pp), move slider right (+31.1pp), and open drawer (+20.0pp), where precise position control is critical, and the encoder must capture fine-grained spatial cues that distinguish successful manipulation trajectories. The only task where the baseline marginally outperforms WAM is turn on led (44.8% vs. 41.4%), which we attribute to evaluation variance given the small number of test episodes. These results confirm that by jointly training on action prediction and state prediction,",
+        "bbox": [
+            503,
+            638,
+            916,
+            929
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "table",
+        "img_path": "images/a3ca3b396ad544f5dae1571f33575598aa1f6fda334b121e97f0bc6c1cbe60bb.jpg",
+        "table_caption": [
+            "TABLE IV: Diffusion policy success rates (%) on 8 CALVIN tasks after 800 iterations of model-based PPO fine-tuning. DPPO columns report environment steps required to match DiWA performance (lower = more sample-efficient)."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">Task</td><td>| iffusion Policy |</td><td>DiWA</td><td>WAM (Ours)</td><td colspan=\"2\">DPPO</td></tr><tr><td>Base</td><td>Offine Fine-Tuning</td><td>Online Fine-Tuning</td><td>Vision WM Encoder Env Steps to Match DiWA</td><td>Vision Env Steps to Match DiWA</td></tr><tr><td>open drawer</td><td> $7 3 . 3 \\pm 4 . 8$ </td><td> $7 4 . 4 4 \\pm 1 . 9 2$ </td><td> ${ \\bf 9 6 . 7 \\pm 2 . 4 }$ </td><td> $1 1 7 , 6 0 0 \\pm 2 3 , 7 5 8$ </td><td> $1 3 4 , 4 0 0 \\pm 2 6 , 5 0 8$ </td></tr><tr><td>close drawer</td><td> $8 9 . 7 \\pm 3 . 1 $ </td><td> $9 1 . 9 5 \\pm 1 . 9 9$ </td><td> ${ \\bf 9 6 . 6 \\pm 1 . 8 }$ </td><td> $6 0 0 , 6 0 0 \\pm 2 7 , 6 5 1$ </td><td> $1 , 5 4 5 , 6 0 0 \\pm 2 6 1 , 3 4 6$ </td></tr><tr><td>move slider left</td><td> $6 8 . 8 \\pm 5 . 2$ </td><td> $8 3 . 3 3 \\pm 1 . 8 0$ </td><td> ${ \\bf 8 7 . 5 \\pm 3 . 7 }$ </td><td> $2 7 0 , 9 3 3 \\pm 2 8 , 7 8 0$ </td><td> $1 , 3 7 7 , 6 0 0 \\pm 2 5 1 , 4 3 9$ </td></tr><tr><td>move slider right</td><td> $8 2 . 8 \\pm 3 . 9$ </td><td> $8 2 . 7 6 \\pm 3 . 4 5$ </td><td> ${ \\bf 8 9 . 7 \\pm 3 . 2 }$ </td><td> $2 4 9 , 6 0 0 \\pm 0 9 , 0 5 0$ </td><td> $5 3 7 , 6 0 0 \\pm 2 3 , 7 5 8$ </td></tr><tr><td>turn on lightbulb</td><td> $5 1 . 5 \\pm 4 . 6$ </td><td> $9 1 . 9 2 \\pm 1 . 7 5$ </td><td> ${ \\bf 1 0 0 . 0 \\ : \\pm { \\ : 0 . 0 } }$ </td><td> $3 0 2 , 9 3 3 \\pm 1 5 , 9 6 4$ </td><td> $5 8 8 , 0 0 0 \\pm 6 2 , 8 5 9$ </td></tr><tr><td>turn off lightbulb</td><td> $1 7 . 2 \\pm 3 . 4$ </td><td> ${ \\bf 7 7 . 0 1 \\pm 1 . 9 9 }$ </td><td> $7 5 . 9 \\pm 4 . 3$ </td><td> $3 2 7 , 0 6 6 \\pm 1 3 , 5 4 6$ </td><td> $1 , 2 6 0 , 0 0 0 \\pm 1 4 2 , 5 5 2$ </td></tr><tr><td>turn on LED</td><td> $4 1 . 4 \\pm 4 . 1$ </td><td> $8 6 . 2 1 \\pm 3 . 4 5$ </td><td> ${ \\bf 9 6 . 6 \\pm 2 . 1 }$ </td><td> $4 9 4 , 9 3 3 \\pm 4 5 , 6 5 5$ </td><td> $2 , 2 5 1 , 2 0 0 \\pm 3 3 , 9 4 0$ </td></tr><tr><td>turn off LED</td><td> $6 8 . 8 \\pm 4 . 7$ </td><td> $8 2 . 3 3 \\pm 6 . 5 3$ </td><td> ${ \\bf 1 0 0 . 0 \\ : \\pm { \\ : 0 . 0 } }$ </td><td> $2 7 7 , 3 3 3 \\pm 3 1 , 9 2 8$ </td><td> $1 8 4 , 8 0 0 \\pm 2 3 , 7 5 8$ </td></tr><tr><td>Total Physical Interactions |</td><td></td><td>0</td><td>0</td><td> $\\overline { { \\sim 2 . 5 \\mathbf { M } } }$ </td><td>~8M</td></tr></table>",
+        "bbox": [
+            83,
+            98,
+            911,
+            253
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "chart",
+        "img_path": "images/e17eaedc398f5a6115c16d25e0bc7457b455aa98c146344477414b599b75e29c.jpg",
+        "content": "",
+        "chart_caption": [
+            "Fig. 4: Behavioral cloning evaluation curves across all eight CALVIN tasks. WAM (orange) consistently reaches higher success rates than DiWA (blue) and converges faster on most tasks."
+        ],
+        "chart_footnote": [],
+        "bbox": [
+            84,
+            263,
+            913,
+            535
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "WAM learns representations that are more informative for downstream imitation learning without any modification to the policy architecture or training procedure.",
+        "bbox": [
+            80,
+            616,
+            490,
+            662
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "Figure 4 shows the evaluation curves during BC training across all eight tasks. WAM consistently reaches higher success rates than DiWA and converges faster on most tasks. <sub>5)</sub> <sub>Diffusion</sub> <sub>Policy</sub> <sub>Fine-tuning</sub> <sub>Results:</sub> <sub>Table</sub> <sub>IV</sub> <sub>re-</sub> ports the results. After 800 iterations of fine-tuning, WAM reaches a 92.8% average success rate across all eight tasks, outperforming DiWA (79.8%) by 13.0 percentage points. WAM outperforms DiWA on every task, with turn on lightbulb and turn off led reaching 100% success. The largest gains appear on open drawer (96.7% vs. 70.0%) and turn on led (96.6% vs. 86.2%), suggesting that actionregularized representations provide a better optimization landscape for policy fine-tuning within the world model. Combined with the BC results, these findings demonstrate that WAM features benefit both offline imitation and online policy adaptation.",
+        "bbox": [
+            80,
+            661,
+            491,
+            896
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "These results show that jointly training on action and state prediction not only improves BC policy quality (61.7% vs. 45.8% average) but also provides a stronger starting point for model-based RL fine-tuning (92.8% vs. 79.8% average), yielding a 13.0 percentage point gain over DiWA with the same policy architecture and 8.7× fewer world model training steps.",
+        "bbox": [
+            81,
+            896,
+            491,
+            928
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            503,
+            616,
+            915,
+            694
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "V. CONCLUSION",
+        "text_level": 2,
+        "bbox": [
+            647,
+            707,
+            772,
+            720
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "We presented the World-Action Model (WAM), a world model augmented with an inverse dynamics objective that regularizes learned representations toward action-relevant structure. The key insight is that under standard reconstruction objectives, the latent state $z _ { t }$ fed to the downstream diffusion policy is never explicitly trained to be actioninformative. By jointly predicting actions and future states, WAM propagates action-relevant gradients through the representation pathway, improving the quality of $z _ { t }$ for downstream control. Experiments on eight CALVIN manipulation tasks show that WAM improves behavioral cloning success from 45.8% to 61.7% and model-based RL fine-tuning from 79.8% to 92.8%, while using 8.7× fewer world model",
+        "bbox": [
+            503,
+            729,
+            916,
+            928
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "REFERENCES",
+        "text_level": 2,
+        "bbox": [
+            238,
+            90,
+            334,
+            103
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "list",
+        "sub_type": "ref_text",
+        "list_items": [
+            "[1] D. Ha and J. Schmidhuber, “Recurrent world models facilitate policy evolution,” in Advances in Neural Information Processing Systems (NeurIPS), vol. 31, 2018, pp. 2451–2463.",
+            "[2] D. Hafner, T. Lillicrap, I. Fischer, R. Villegas, D. Ha, H. Lee, and J. Davidson, “Learning latent dynamics for planning from pixels,” in International Conference on Machine Learning (ICML), 2019, pp. 2555–2565.",
+            "[3] D. Hafner, T. Lillicrap, J. Ba, and M. Norouzi, “Dream to control: Learning behaviors by latent imagination,” in International Conference on Learning Representations (ICLR), 2020.",
+            "[4] D. Hafner, T. Lillicrap, M. Norouzi, and J. Ba, “Mastering atari with discrete world models,” in International Conference on Learning Representations (ICLR), 2022.",
+            "[5] D. Hafner, J. Pasukonis, J. Ba, and T. Lillicrap, “Mastering diverse control tasks through world models,” Nature, vol. 640, pp. 647–653, 2025.",
+            "[6] B. DeMoss, P. Duckworth, J. Foerster, N. Hawes, and I. Posner, “Ditto: Offline imitation learning with world models,” in International Conference on Learning Representations (ICLR), 2025.",
+            "[7] I. Nematollahi, B. DeMoss, A. L. Chandra, N. Hawes, W. Burgard, and I. Posner, “Lumos: Language-conditioned imitation learning with world models,” in IEEE International Conference on Robotics and Automation (ICRA), 2025, pp. 8219–8225.",
+            "[8] A. L. Chandra, I. Nematollahi, C. Huang, T. Welschehold, W. Burgard, and A. Valada, “Diwa: Diffusion policy adaptation with world models,” in Conference on Robot Learning (CoRL), 2025.",
+            "[9] P. Wu, A. Escontrela, D. Hafner, K. Goldberg, and P. Abbeel, “Daydreamer: World models for physical robot learning,” in Conference on Robot Learning (CoRL), 2022.",
+            "[10] J. Cen, C. Yu, H. Yuan, Y. Jiang, S. Huang, J. Guo, X. Li, Y. Song, H. Luo, F. Wang, D. Zhao, and H. Chen, “WorldVLA: Towards autoregressive action world model,” arXiv preprint arXiv:2506.21539, 2025.",
+            "[11] D. Pathak, P. Agrawal, A. A. Efros, and T. Darrell, “Curiosity-driven exploration by self-supervised prediction,” in International Conference on Machine Learning (ICML), 2017, pp. 2778–2787.",
+            "[12] B. Baker, I. Akkaya, P. Zhokov, J. Huizinga, J. Tang, A. Ecoffet, B. Houghton, R. Sampedro, and J. Clune, “Video pretraining (VPT): Learning to act by watching unlabeled online videos,” in Advances in Neural Information Processing Systems (NeurIPS), vol. 35, 2022, pp. 24 639–24 654.",
+            "[13] O. Mees, L. Hermann, E. Rosete-Beas, and W. Burgard, “Calvin: A benchmark for language-conditioned policy learning for long-horizon robot manipulation tasks,” IEEE Robotics and Automation Letters (RA-L), vol. 7, no. 3, pp. 7327–7334, 2022.",
+            "[14] F. Zhu, Z. Yan, Z. Hong, Q. Shou, X. Ma, and S. Guo, “Wmpo: World model-based policy optimization for vision-language-action models,” arXiv preprint arXiv:2511.09515, 2025.",
+            "[15] Z. Jiang et al., “World4rl: Diffusion world models for policy refinement with reinforcement learning for robotic manipulation,” arXiv preprint arXiv:2509.19080, 2025.",
+            "[16] A. Z. Ren, J. Lidard, L. Ankile, A. Simeonov, P. Agrawal, A. Majumdar, B. Burchfiel, H. Dai, and M. Simchowitz, “Diffusion policy policy optimization,” ArXiv, vol. abs/2409.00588, 2024. [Online]. Available: https://api.semanticscholar.org/CorpusID: 272368064",
+            "[17] M. Okada and T. Taniguchi, “DreamingV2: Reinforcement learning with discrete world models without reconstruction,” in 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2022, pp. 985–991.",
+            "[18] R. Zhang, P. Isola, A. A. Efros, E. Shechtman, and O. Wang, “The unreasonable effectiveness of deep features as a perceptual metric,” in 2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition. Salt Lake City, UT: IEEE, 2018, p. 586–595. [Online]. Available: https://ieeexplore.ieee.org/document/8578166/",
+            "[19] T. Unterthiner, S. van Steenkiste, K. Kurach, R. Marinier, M. Michalski, and S. Gelly, “Towards accurate generative models of video: A new metric & challenges,” ArXiv, vol. abs/1812.01717, 2018. [Online]. Available: https://api.semanticscholar.org/CorpusID: 54458806"
+        ],
+        "bbox": [
+            91,
+            111,
+            488,
+            145
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "header",
+        "text": "training steps than the baseline.",
+        "bbox": [
+            84,
+            66,
+            300,
+            82
+        ],
+        "page_idx": 6
+    }
+]

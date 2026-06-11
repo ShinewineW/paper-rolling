@@ -1,0 +1,1570 @@
+[
+    {
+        "type": "text",
+        "text": "DiffusionDrive: Truncated Diffusion Model for End-to-End Autonomous Driving",
+        "text_level": 1,
+        "bbox": [
+            91,
+            128,
+            906,
+            152
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Bencheng Liao<sup>1,2,⋄</sup> Shaoyu Chen<sup>2,3</sup> Haoran Yin<sup>3</sup> Bo Jiang<sup>2,⋄</sup> Cheng Wang<sup>1,2,⋄</sup> Sixu Yan<sup>2</sup> Xinbang Zhang<sup>3</sup> Xiangyu Li<sup>3</sup> Ying Zhang<sup>3</sup> Qian Zhang<sup>3</sup> Xinggang Wang<sup>2</sup> <sup>\u0000</sup>",
+        "bbox": [
+            99,
+            179,
+            897,
+            218
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "<sup>1</sup> Institute of Artificial Intelligence, Huazhong University of Science & Technology <sup>2</sup> School of EIC, Huazhong University of Science & Technology <sup>3</sup> Horizon Robotics",
+        "bbox": [
+            202,
+            220,
+            861,
+            272
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Code & Model & Demo: hustvl/DiffusionDrive",
+        "bbox": [
+            269,
+            273,
+            725,
+            291
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Abstract",
+        "text_level": 2,
+        "bbox": [
+            246,
+            325,
+            326,
+            342
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Recently, the diffusion model has emerged as a powerful generative technique for robotic policy learning, capable of modeling multi-mode action distributions. Leveraging its capability for end-to-end autonomous driving is a promising direction. However, the numerous denoising steps in the robotic diffusion policy and the more dynamic, openworld nature of traffic scenes pose substantial challenges for generating diverse driving actions at a real-time speed. To address these challenges, we propose a novel truncated diffusion policy that incorporates prior multi-mode anchors and truncates the diffusion schedule, enabling the model to learn denoising from anchored Gaussian distribution to the multi-mode driving action distribution. Additionally, we design an efficient cascade diffusion decoder for enhanced interaction with conditional scene context. The proposed model, DiffusionDrive, demonstrates 10× reduction in denoising steps compared to vanilla diffusion policy, delivering superior diversity and quality in just 2 steps. On the planning-oriented NAVSIM dataset, with aligned ResNet-34 backbone, DiffusionDrive achieves 88.1 PDMS without bells and whistles, setting a new record, while running at a real-time speed of 45 FPS on an NVIDIA 4090. Qualitative results on challenging scenarios further confirm that DiffusionDrive can robustly generate diverse plausible driving actions.",
+        "bbox": [
+            88,
+            356,
+            485,
+            736
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "1. Introduction",
+        "text_level": 2,
+        "bbox": [
+            89,
+            763,
+            223,
+            780
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "End-to-end autonomous driving has gained significant attention in recent years due to advancements in perception models (detection [4, 17, 24, 42], tracking [54–56], online mapping [27, 28, 32], etc.), which directly learns the driving policy from the raw sensor inputs. This data-driven approach offers a scalable and robust alternative to traditional rule-based motion planning, which often struggles to generalize to complex real-world driving settings.",
+        "bbox": [
+            88,
+            790,
+            485,
+            867
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "image",
+        "img_path": "images/d01f09d0bb36e4cb614f3857b53a1b481ff6d6417d409fc704bfd7ac30e76971.jpg",
+        "image_caption": [
+            "Figure 1. The comparison of different end-to-end paradigms. (a) Single mode regression [7, 16, 20]. (b) Sampling from vocabulary [3, 25]. (c) Vanilla diffusion policy [6, 19]. (d) The proposed truncated diffusion policy."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            514,
+            324,
+            906,
+            500
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            511,
+            560,
+            906,
+            607
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "To effectively learn from data, mainstream end-to-end planners (e.g., Transfuser [7], UniAD [16], VAD [20]) typically regress a single-mode trajectory from an ego-query as shown in Fig. 1a. However, this paradigm does not account for the inherent uncertainty and multi-mode nature of driving behaviors. Recently, VADv2 [20] introduces a large fixed vocabulary of anchor trajectories (4096 anchors) to discretize the continuous action space and capture a broader range of driving behaviors, and then samples from these anchors based on predicted scores as shown in Fig. 1b. However, this large fixed-vocabulary paradigm is fundamentally constrained by the number and quality of anchor trajectories, often failing in out-of-vocabulary scenarios. Furthermore, managing a large number of anchors presents significant computational challenges for real-time applications. Rather than discretizing the action space, diffusion model [6] has proven to be a powerful generative decision-making policy in the robotics domain, which can directly sample multi-mode physically plausible actions from a Gaussian distribution via iterative denoising process.",
+        "bbox": [
+            509,
+            607,
+            908,
+            866
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "aside_text",
+        "text": "arXiv:2411.15139v3 [cs.CV] 10 Apr 2025",
+        "bbox": [
+            22,
+            261,
+            58,
+            705
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "page_footnote",
+        "text": "<sup>⋄</sup> Intern of Horizon Robotics; <sup>\u0000</sup> Corresponding author: Xinggang Wang (xgwang@hust.edu.cn).",
+        "bbox": [
+            89,
+            875,
+            485,
+            901
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "page_footnote",
+        "text": "To distinguish the term “multimodal” used to describe input data, we use “multi-mode” in this paper to refer to diverse planning decisions.",
+        "bbox": [
+            511,
+            875,
+            906,
+            901
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            89,
+            92,
+            485,
+            137
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "This inspires us to replicate the success of the diffusion model in the robotics domain to end-to-end autonomous driving. We apply the vanilla robotic diffusion policy to the well-known single-mode-regression method, Transfuser [7], by proposing a variant, Transfuser<sub>DP</sub>, which replaces the deterministic MLP regression head with a conditional diffusion model [34]. Though Transfuser<sub>DP</sub> improves planning performance, two major issues arise: 1) The numerous 20 denoising steps in the vanilla DDIM diffusion policy introduce heavy computational consumption during inference as shown in Tab. 2, hindering the real-time application for autonomous driving. 2) The trajectories sampled from different Gaussian noises severely overlap with each other, as illustrated in Fig. 2. This underscores the non-trivial challenge of taming the diffusion models for the dynamic and open-world traffic scenes.",
+        "bbox": [
+            88,
+            138,
+            485,
+            381
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "Unlike the vanilla diffusion policy, which samples actions from a random Gaussian noise conditioned on scene context, human drivers adhere to established driving patterns that they dynamically adjust in response to real-time traffic conditions. This insight motivates us to embed these prior driving patterns into the diffusion policy by partitioning the Gaussian distribution into multiple sub-Gaussian distributions centered around prior anchors, referred to as anchored Gaussian distribution. It is implemented by truncating the diffusion schedule to introduce a small portion of Gaussian noise around the prior anchors as shown in Fig. 3. Thanks to the multi-mode distributional expressivity of the diffusion model, the proposed truncated diffusion policy effectively covers the potential action space without requiring a large set of fixed anchors, as VADv2 does. With more reasonable initial noise samples from the anchored Gaussian distribution, we can truncate the denoising process, reducing the required steps from 20 to just 2—a substantial speedup that satisfies the real-time requirements of autonomous driving.",
+        "bbox": [
+            89,
+            382,
+            485,
+            685
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "To enhance the interaction with conditional scene context, we propose an efficient transformer-based diffusion decoder that interacts not only with structured queries from the perception module but also with Bird’s Eye View (BEV) and perspective view (PV) features through a sparse deformable attention mechanism [62]. Additionally, we introduce a cascade mechanism to iteratively refine the trajectory reconstruction within the diffusion decoder at each denoising step.",
+        "bbox": [
+            89,
+            686,
+            485,
+            824
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "With these innovations, we present DiffusionDrive, a diffusion model for real-time end-to-end autonomous driving. We benchmark our method on the planningoriented NAVSIM dataset [10] using non-reactive simulation and closed-loop evaluations. Without bells and whistles, DiffusionDrive achieves 88.1 PDMS on NAVSIM navtest split with the aligned ResNet-34 backbone, significantly outperforming previous state-of-the-art methods. Even compared to the NAVSIM challenge-winning solution Hydra-MDP-V<sub>8192</sub>-W-EP [25], which follows VADv2 with 8192 anchor trajectories and further incorporates postprocessing and additional supervision, DiffusionDrive still outperforms it by 1.6 PDMS through directly learning from human demonstrations and inferring without postprocessing, while running at real-time speed of 45 FPS on an NVIDIA 4090. We further validate the superiority of DiffusionDrive on popular nuScenes dataset [2] with openloop evaluations, DiffusionDrive runs 1.8× faster than VAD and outperforms it [20] by 20.8% lower L2 error and 63.6% lower collision rate with the same ResNet-50 backbone, demonstrating state-of-the-art planning performance.",
+        "bbox": [
+            89,
+            824,
+            485,
+            901
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            511,
+            90,
+            908,
+            333
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "Our contributions can be summarized as follows:",
+        "bbox": [
+            532,
+            334,
+            861,
+            349
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "• We firstly introduce the diffusion model to the field of end-to-end autonomous driving and propose a novel truncated diffusion policy to address the issues of mode collapse and heavy computational overhead found in direct adaptation of vanilla diffusion policy to the traffic scene.",
+        "bbox": [
+            513,
+            352,
+            908,
+            428
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "• We design an efficient transformer-based diffusion decoder that interacts with the conditional information in a cascaded manner for better trajectory reconstruction.",
+        "bbox": [
+            513,
+            428,
+            906,
+            472
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "• Without bells and whistles, DiffusionDrive significantly outperforms previous state-of-the-art methods, achieving a record-breaking 88.1 PDMS on the NAVSIM navtest split with the same backbone, while maintaining real-time performance at 45 FPS on an NVIDIA 4090.",
+        "bbox": [
+            513,
+            473,
+            906,
+            547
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "• We qualitatively demonstrate that DiffusionDrive can generate more diverse and plausible trajectories, exhibiting high-quality multi-mode driving actions in various challenging scenarios.",
+        "bbox": [
+            513,
+            547,
+            908,
+            609
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "2. Related Work",
+        "text_level": 2,
+        "bbox": [
+            513,
+            627,
+            656,
+            645
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "End-to-end autonomous driving. UniAD [16], as a pioneering work, demonstrates the potential of end-to-end autonomous driving by integrating multiple perception tasks to enhance planning performance. VAD [20] further explores the use of compact vectorized scene representations to improve efficiency. Subsequently, a series of works [5, 7, 12, 23, 26, 43, 45, 58] have adopted the single-trajectory planning paradigm to enhance planning performance further. More recently, VADv2 [3] shifts the paradigm towards multi-mode planning by scoring and sampling from a large fixed vocabulary of anchor trajectories. Hydra-MDP [25] improves the scoring mechanism of VADv2 by introducing extra supervision from a rule-based scorer. SparseDrive [39] explores an alternative BEV-free solution. Unlike existing multi-mode planning approaches, we propose a novel paradigm that leverages powerful generative diffusion models for end-to-end autonomous driving.",
+        "bbox": [
+            509,
+            659,
+            908,
+            902
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "image",
+        "img_path": "images/7d38feab517639143e76d999f53f39d05db947f4a16cfd4b8dd7f7b657f76f9d.jpg",
+        "image_caption": [],
+        "image_footnote": [],
+        "bbox": [
+            171,
+            85,
+            825,
+            334
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "image",
+        "img_path": "images/0546b86f513c954fe4037f154bdc1f62507eacfcfe13f6366a73ee2af1a88d97.jpg",
+        "image_caption": [
+            "(b) Top-1’s turning left and diverse top-10’s lane changing.",
+            "Figure 2. Qualitative comparison of Transfuser, Transfuser<sub>DP</sub> and DiffusionDrive on challenging scenes of NAVSIM navtest split. With the same inputs from front cameras and LiDAR, DiffusionDrive achieves the highest planning quality of top-1 scoring trajectory as illustrated in Tab. 2. We render the highlighted diverse trajectories predicted by DiffusionDrive in the front view. (a) and (b) shows that the top-1 scoring trajectory of DiffusionDrive closely matches the ground truth for both going straight and turning left. Additionally, DiffusionDrive’s top-10 scoring trajectory demonstrates high-quality lane changing—an ability not observed in multi-mode Transfuser<sub>DP</sub> and impossible for Transfuser."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            171,
+            335,
+            825,
+            597
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            89,
+            694,
+            442,
+            710
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Diffusion model for traffic simulation. Driving diffusion policy has been explored in the traffic simulation by leveraging only abstract perception groundtruth [8, 18, 21, 44]. MotionDiffuser [21] and CTG [60] are pioneering applications of diffusion models for multi-agent motion prediction, using a conditional diffusion model to sample target trajectories from Gaussian noise. CTG++ [59] further incorporates a large language model (LLM) for language-driven guidance, improving usability and enabling realistic traffic simulations. Diffusion-ES [48] replaces reward-gradientguided denoising with evolutionary search. Moving beyond diffusion models limited to traffic simulation with perception groundtruth, our approach unlocks the potential of diffusion models for real-time, end-to-end autonomous driving through our proposed truncated diffusion policy and efficient diffusion decoder.",
+        "bbox": [
+            88,
+            718,
+            485,
+            902
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            509,
+            694,
+            906,
+            756
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Diffusion model for robotic policy learning. Diffusion policy [6] demonstrates the great potential in robotic policy learning, effectively capturing multi-mode action distributions and high-dimensional action spaces. Diffuser [19] proposes an unconditional diffusion model for trajectory sampling, incorporating techniques such as classifier-free guidance and image inpainting to achieve guided sampling. Subsequently, numerous works have applied diffusion models to various robotic tasks, including stationary manipulafor end-to-end autonomous driving.",
+        "bbox": [
+            509,
+            763,
+            908,
+            902
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "image",
+        "img_path": "images/841a48195c03a1ac06fedf5d3ed854080bb8458926d3d9777cf994cf4391b8fd.jpg",
+        "image_caption": [],
+        "image_footnote": [],
+        "bbox": [
+            165,
+            89,
+            828,
+            271
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "image",
+        "img_path": "images/2aaf287c98404d6d94668d47088a6ca4dbce37b99d03bce3b43cb8376a1d1599.jpg",
+        "image_caption": [
+            "Figure 3. Illustration of truncated diffusion policy by comparing with vanilla diffusion policy. We truncate the diffusion process and only add a small portion of Gaussian noise to diffuse the anchor trajectories. Then, we train the diffusion model to reconstruct the ground-truth trajectory from the anchored Gaussian distribution with conditional scene context. During the inference, we also truncate the denoising process by starting from the better samples in the anchored Gaussian distribution than the pure Gaussian noise."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            165,
+            277,
+            831,
+            476
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            513,
+            542,
+            751,
+            558
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "tion [1, 53], mobile manipulation [47], autonomous navigation [37, 51], quadruped locomotion [38], and dexterous manipulation [46]. However, directly applying vanilla diffusion policy to end-to-end autonomous driving poses unique challenges, as it requires real-time efficiency and the generation of plausible multi-mode trajectories in dynamic and open-world traffic scenes. In this work, we propose a novel truncated diffusion policy to address these challenges, introducing concepts that have not yet been explored in the robotics field.",
+        "bbox": [
+            89,
+            542,
+            485,
+            694
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Diffusion model for image generation. Diffusion models have been extensively adopted for image generation tasks [33, 36, 49, 50, 61]. DDIM [35] enhances DDPM [14] by enabling efficient sampling with significantly fewer steps based on non-Markovian diffusion processes. Flow matching [30, 31] further optimizes the generative process by directly modeling continuous probability flows. TDPM [57] proposes truncated denoising, which initiates the generation process from an implicit intermediate distribution to accelerate sampling. In contrast to these approaches, our method introduces an explicit driving prior within the diffusion policy, effectively guiding the diffusion process toward more accurate and efficient generation tailored specifically",
+        "bbox": [
+            88,
+            703,
+            485,
+            901
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "3. Method",
+        "text_level": 2,
+        "bbox": [
+            513,
+            570,
+            604,
+            587
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "3.1. Preliminary",
+        "text_level": 2,
+        "bbox": [
+            513,
+            594,
+            643,
+            611
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Task formulation. End-to-end autonomous driving takes raw sensor data as input and predicts the future trajectory of the ego-vehicle. The trajectory is represented as a sequence of waypoints ${ \\boldsymbol { \\tau } } = \\{ ( x _ { t } , y _ { t } ) \\} _ { t = 1 } ^ { T _ { f } }$ , where $T _ { f }$ denotes the planning horizon, and $( x _ { t } , y _ { t } )$ is the location of each waypoint at time t in the current ego-vehicle coordinate system.",
+        "bbox": [
+            511,
+            621,
+            906,
+            714
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Conditional diffusion model. The conditional diffusion model poses a forward diffusion process as gradually adding noise to the data sample, which can be defined as:",
+        "bbox": [
+            511,
+            717,
+            906,
+            763
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "equation",
+        "img_path": "images/ab4494eee3e0718b89bdf98f12e8af7e090f64a4dc8e2b6ec2c6ebcc9ef653af.jpg",
+        "text": "$$\nq \\left( \\tau ^ { i } \\mid \\tau ^ { 0 } \\right) = { \\cal N } \\left( \\tau ^ { i } ; \\sqrt { \\bar { \\alpha } ^ { i } } \\tau ^ { 0 } , \\left( 1 - \\bar { \\alpha } ^ { i } \\right) \\mathbf { I } \\right) ,\\tag{1}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            565,
+            772,
+            852,
+            797
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "where $\\tau ^ { 0 }$ is the clean data sample, and $\\tau ^ { i }$ is the data sample with noise at time i (Note: we use superscript i to denote diffusion timestep). The constant $\\begin{array} { r } { \\bar { \\alpha ^ { i } } = \\prod _ { s = 1 } ^ { i } \\alpha ^ { s } = } \\end{array}$ $\\textstyle \\prod _ { s = 1 } ^ { i } ( 1 - \\beta ^ { s } )$ and $\\beta ^ { s }$ is the noise schedule. We train the reverse process model $f _ { \\theta } ( \\tau ^ { i } , z , i )$ to predict $\\tau ^ { 0 }$ from $\\tau ^ { i }$ with the guidance of conditional information $z ,$ where θ is the trainable model parameter. During inference, the trained diffusion model $f _ { \\theta }$ progressively refines from the random noise $\\tau ^ { T }$ sampled in Gaussian distribution to the predicted clean data sample $\\tau ^ { 0 }$ with the guidance of conditional information z, which is defined as:",
+        "bbox": [
+            511,
+            806,
+            906,
+            901
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "image",
+        "img_path": "images/68def0459b219142d129dcaf88da38c511c7211cc92c8d1b01e6a26345d2f237.jpg",
+        "image_caption": [
+            "Figure 4. Overall architecture of DiffusionDrive. (a) DiffusionDrive can integrate various existing perception modules and sensor inputs. (b) The designed diffusion decoder takes the sampled noisy trajectories from anchored Gaussian distribution as input and progressively denoises them with enhanced interactions with the conditional scene context in a cascade manner to generate the final predictions."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            91,
+            88,
+            905,
+            258
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            89,
+            311,
+            485,
+            387
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "equation",
+        "img_path": "images/bbb5edbe16112f26e57ef3f80298fca659434c5d1454d2fdab7270f79fd10991.jpg",
+        "text": "$$\n{ p _ { \\theta } } \\left( { { \\pmb { \\tau } } ^ { 0 } } \\mid z \\right) = \\int p \\left( { { \\pmb { \\tau } } ^ { T } } \\right) \\prod _ { i = 1 } ^ { T } { p _ { \\theta } } \\left( { { \\pmb { \\tau } } ^ { i - 1 } } \\mid { { \\pmb { \\tau } } ^ { i } } , z \\right) \\mathrm { d } { { \\pmb { \\tau } } ^ { 1 : T } } .\\tag{2}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            98,
+            397,
+            452,
+            440
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "3.2. Investigation",
+        "text_level": 2,
+        "bbox": [
+            89,
+            449,
+            228,
+            465
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Turn Transfuser [7] into conditional diffusion model. We begin from the representative deterministic end-to-end planner Transfuser [7] and turn it into a generative model Transfuser<sub>DP</sub> by simply replacing the regression MLP layers with the conditional diffusion model UNet following vanilla diffusion policy [6]. During the evaluation, we sample a random noise and progressively refine it with 20 steps. Tab. 2 shows that Transfuser<sub>DP</sub> achieves better planning quality than deterministic Transfuser.",
+        "bbox": [
+            89,
+            474,
+            483,
+            612
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Mode collapse. To further investigate the multi-mode property of the vanilla diffusion policy in driving, we sampled 20 random noises from Gaussian distribution and denoised them using 20 steps. As shown in Fig. 2, the different random noises converge to similar trajectories after the denoising process. To quantitatively analyze the phenomenon of mode collapse, we define a mode diversity score D based on the mean Intersection over Union (mIoU) between each denoised trajectory and the union of all denoised trajectories:",
+        "bbox": [
+            88,
+            614,
+            485,
+            765
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "equation",
+        "img_path": "images/ead3c6a5691cb06feb19218fce66c7398603666004a0d034aca7656c7fddeba5.jpg",
+        "text": "$$\n\\mathcal { D } = 1 - \\frac { 1 } { N } \\sum _ { i = 1 } ^ { N } \\frac { \\mathrm { A r e a } ( \\tau _ { i } \\cap \\bigcup _ { j = 1 } ^ { N } \\tau _ { j } ) } { \\mathrm { A r e a } ( \\tau _ { i } \\cup \\bigcup _ { j = 1 } ^ { N } \\tau _ { j } ) } ,\\tag{3}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            158,
+            762,
+            413,
+            805
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "where $\\tau _ { i }$ represents the i-th denoised trajectory, N is the total number of sampled trajectories and $\\textstyle \\bigcup _ { j = 1 } ^ { N } { \\bar { \\tau _ { j } } }$ is the union of all denoised trajectories. A higher mIoU indicates less diversity of the denoised trajectories. The quantitative mode diversity results in Tab. 2 further validate the observations presented in Fig. 2.",
+        "bbox": [
+            89,
+            810,
+            483,
+            901
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Heavy denoising overhead. The DDIM [35] diffusion policy requires 20 denoising steps to transform random noise into a feasible trajectory, which introduces significant computational overhead, reducing the FPS from 60 to $^ { 7 , }$ as shown in Tab. 2, and making it impractical for real-time online driving applications.",
+        "bbox": [
+            511,
+            311,
+            906,
+            404
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "3.3. Truncated Diffusion",
+        "text_level": 2,
+        "bbox": [
+            513,
+            417,
+            705,
+            434
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Human driving follows fixed patterns, unlike the random noise denoising in vanilla diffusion policy. Motivated by this, we propose a truncated diffusion policy that begins the denoising process from an anchored Gaussian distribution instead of a standard Gaussian distribution. To enable the model to learn to denoise from the anchored Gaussian distribution to the desired driving policy, we further truncate the diffusion schedule during training, adding only a small amount of Gaussian noise to the anchors.",
+        "bbox": [
+            511,
+            443,
+            906,
+            579
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Training. We first construct the diffusion process by adding Gaussian noise to anchors $\\{ \\mathbf { a } _ { k } \\} _ { k = 1 } ^ { N _ { \\mathrm { a n c h o r } } }$ clustered by K-Means on the training set, where $\\mathbf { a } _ { k } = \\{ ( x _ { t } , y _ { t } ) \\} _ { t = 1 } ^ { T _ { f } }$ . We truncate the diffusion noise schedule to diffuse the anchors to the anchored Gaussian distribution:",
+        "bbox": [
+            511,
+            583,
+            906,
+            661
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "equation",
+        "img_path": "images/d9c450b780fe8260ba9bbda51b06b74ac9a03ce7a6dce0ba7a0def904aa8a75b.jpg",
+        "text": "$$\n\\begin{array} { r } { \\tau _ { k } ^ { i } = \\sqrt { \\bar { \\alpha } ^ { i } } \\mathbf { a } _ { k } + \\sqrt { 1 - \\bar { \\alpha } ^ { i } } \\epsilon , \\quad \\epsilon \\sim \\mathcal { N } ( 0 , \\mathbf { I } ) , } \\end{array}\\tag{4}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            565,
+            675,
+            851,
+            694
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "where $i \\in [ 1 , T _ { \\mathrm { t r u n c } } ]$ and $T _ { \\mathrm { t r u n c } } \\ll T$ is the truncated diffusion steps.",
+        "bbox": [
+            511,
+            709,
+            905,
+            741
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "During training, the diffusion decoder $f _ { \\theta }$ takes as input $N _ { \\mathrm { a n c h o r } }$ noisy trajectories $\\{ \\tau _ { k } ^ { i } \\} _ { k = 1 } ^ { N _ { \\mathrm { a n c h o r } } }$ and predicts classification scores $\\{ \\hat { s } _ { k } \\} _ { k = 1 } ^ { N _ { \\mathrm { a n c h o t } } }$ and denoised trajectories $\\{ \\hat { \\tau } _ { k } \\} _ { k = 1 } ^ { N _ { \\mathrm { a n c h o r } } } :$",
+        "bbox": [
+            513,
+            742,
+            906,
+            792
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "equation",
+        "img_path": "images/816cdeb21ca2b263b5c4fc20ff0bde071cd9237ff03d2291977ee12f53454e48.jpg",
+        "text": "$$\n\\{ \\hat { s } _ { k } , \\hat { \\tau } _ { k } \\} _ { k = 1 } ^ { N _ { \\mathrm { a n c h o r } } } = f _ { \\theta } ( \\{ \\tau _ { k } ^ { i } \\} _ { k = 1 } ^ { N _ { \\mathrm { a n c h o r } } } , z ) ,\\tag{5}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            594,
+            805,
+            825,
+            827
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "where z represents the conditional information. We assign the noisy trajectory around the closest anchor to the ground truth trajectory $\\tau _ { \\mathrm { g t } }$ as positive sample $( y _ { k } = 1 )$ and others as negative samples $( y _ { k } = 0 )$ . The training objective combines trajectory reconstruction and classification:",
+        "bbox": [
+            511,
+            839,
+            906,
+            901
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "table",
+        "img_path": "images/df7a3ccde3f5be7829f485aa82288b45c8a4bbfbb30947ee6b6ddbca7656fd98.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Method</td><td>Input</td><td>Img. Backbone</td><td>Anchor</td><td>NC↑</td><td>DAC↑</td><td>TTC↑</td><td>Comf.↑</td><td>EP↑</td><td>PDMS ↑</td></tr><tr><td>UniAD [16]</td><td>Camera</td><td>ResNet-34 [13]</td><td>0</td><td>97.8</td><td>91.9</td><td>92.9</td><td>100</td><td>78.8</td><td>83.4</td></tr><tr><td>PARA-Drive [45]</td><td>Camera</td><td>ResNet-34 [13]</td><td>0</td><td>97.9</td><td>92.4</td><td>93.0</td><td>99.8</td><td>79.3</td><td>84.0</td></tr><tr><td>LTF [7]</td><td>Camera</td><td>ResNet-34 [13]</td><td>0</td><td>97.4</td><td>92.8</td><td>92.4</td><td>100</td><td>79.0</td><td>83.8</td></tr><tr><td>Transfuser [7]</td><td>C&amp;L</td><td>ResNet-34 [13]</td><td>0</td><td>97.7</td><td>92.8</td><td>92.8</td><td>100</td><td>79.2</td><td>84.0</td></tr><tr><td>DRAMA [52]</td><td>C&amp;L</td><td>ResNet-34 [13]</td><td>0</td><td>98.0</td><td>93.1</td><td>94.8</td><td>100</td><td>80.1</td><td>85.5</td></tr><tr><td> $\\mathrm { V A D v } 2 – \\mathcal { V } _ { 8 1 9 2 } \\ [ 3 ]$ </td><td>C&amp;L</td><td>ResNet-34 [13]</td><td>8192</td><td>97.2</td><td>89.1</td><td>91.6</td><td>100</td><td>76.0</td><td>80.9</td></tr><tr><td> $\\mathrm { H y d r a - M D P - } \\mathcal { V } _ { 8 1 9 2 } \\ [ 2 5 ]$ </td><td>C&amp;L</td><td>ResNet-34 [13]</td><td>8192</td><td>97.9</td><td>91.7</td><td>92.9</td><td>100</td><td>77.6</td><td>83.0</td></tr><tr><td> $\\mathrm { H y d r a - M D P - } \\mathcal { V } _ { 8 1 9 2 } \\mathrm { - } \\mathbf { W - E P } \\left[ 2 5 \\right]$ </td><td>C&amp;L</td><td>ResNet-34 [13]</td><td>8192</td><td>98.3</td><td>96.0</td><td>94.6</td><td>100</td><td>78.7</td><td>86.5</td></tr><tr><td>DiffusionDrive (Ours)</td><td>C&amp;L</td><td>ResNet-34 [13]</td><td>20</td><td>98.2</td><td>96.2</td><td>94.7</td><td>100</td><td>82.2</td><td>88.1</td></tr></table>",
+        "bbox": [
+            94,
+            89,
+            901,
+            260
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "table",
+        "img_path": "images/311a23fdec57dff1379155b818232fd8d1448929bc271633486641943a4355d1.jpg",
+        "table_caption": [
+            "Table 1. Comparison on planning-oriented NAVSIM navtest split with closed-loop metrics. $\\mathbf { \\ddot { C } } \\ \\& \\ \\mathbf { L } ^ { \\mathbf { \\vec { , } } \\mathbf { \\vec { , } } }$ denotes the use of both camera and LiDAR as sensor inputs. “V<sub>8192</sub>” denotes 8192 anchors. “Hydra- $\\mathbf { \\cdot M D P - } \\mathcal { V } _ { 8 1 9 2 } \\mathbf { - W } \\mathbf { - E P ^ { \\ast } }$ is a variant of Hydra-MDP [25], which is further trained to fit the EP evaluation metric with additional supervision from the rule-based evaluator and uses weighted confidence postprocessing. DiffusionDrive simply learns from human demonstrations and infers without post-processing. The best and the second best results are denoted by bold and underline.",
+            "Table 2. Roadmap from Transfuser to DiffusionDrive on NAVSIM navtest split. “Transfuser<sub>DP</sub>” denotes Transfuser with vanilla DDIM diffusion policy [6]. “Transfuser<sub>TD</sub>” denotes Transfuser with truncated diffusion policy. “Step Time” denotes the runtime of each denoising step. “FPS” and runtime are measured on an NVIDIA 4090 GPU. “D” denotes the mode diversity score defined in Eq. (3)."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">Method</td><td rowspan=\"2\">NC↑</td><td rowspan=\"2\">DAC↑</td><td rowspan=\"2\">TTC↑</td><td rowspan=\"2\">Comf.↑ EP↑</td><td rowspan=\"2\"></td><td rowspan=\"2\">PDMS↑|</td><td colspan=\"3\">Plan Module Time</td><td rowspan=\"2\">Total ↓|</td><td rowspan=\"2\"> $\\mathcal { D } \\uparrow$ </td><td rowspan=\"2\">Para.↓</td><td rowspan=\"2\">FPS↑</td></tr><tr><td>Arch.</td><td></td><td>Step Time↓ Steps ↓</td></tr><tr><td>Transfuser</td><td>97.7</td><td>92.8</td><td>92.8</td><td>100</td><td>79.2</td><td>84.0</td><td>|MLP</td><td>0.2ms</td><td>1</td><td>0.2ms(cid:)</td><td>0%</td><td>56M</td><td>60</td></tr><tr><td>TransfuserpP</td><td>97.5</td><td>93.7</td><td>92.7</td><td>100</td><td>79.4</td><td> $8 4 . 6 _ { + 0 . 6 }$ </td><td>UNet</td><td>6.5ms</td><td>20</td><td>130.0ms</td><td>11%</td><td>101M</td><td>7</td></tr><tr><td>TransfuserD</td><td>97.9</td><td>94.2</td><td>93.9</td><td>100</td><td>80.2</td><td> $8 5 . 7 _ { + 1 . 7 }$ </td><td>UNet</td><td>6.9ms</td><td>2</td><td>13.8ms</td><td>70%</td><td>102M</td><td>27</td></tr><tr><td>DiffusionDrive|</td><td>98.2</td><td>96.2</td><td>94.7</td><td>100</td><td>82.2</td><td> ${ \\bf 8 8 . 1 _ { + 4 . 1 } }$ </td><td>|Dec.</td><td>3.8ms</td><td>2</td><td>7.6ms</td><td>74%</td><td>60M</td><td>45</td></tr></table>",
+        "bbox": [
+            98,
+            334,
+            895,
+            436
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            89,
+            487,
+            379,
+            502
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "equation",
+        "img_path": "images/4fee21c0b20c5e8f494bb186f013606ace4632814765635f4dd262bc63cf705e.jpg",
+        "text": "$$\n\\mathcal { L } = \\sum _ { k = 1 } ^ { N _ { \\mathrm { a n c h o r } } } [ y _ { k } \\mathcal { L } _ { \\mathrm { r e c } } ( \\hat { \\tau } _ { k } , \\tau _ { \\mathrm { g t } } ) + \\lambda \\mathrm { B C E } ( \\hat { s } _ { k } , y _ { k } ) ] ,\\tag{6}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            138,
+            515,
+            433,
+            558
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "where λ balances the simple L1 reconstruction loss ${ \\mathcal { L } } _ { \\mathrm { r e c } }$ and binary cross-entropy (BCE) classification loss.",
+        "bbox": [
+            89,
+            569,
+            483,
+            599
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "Inference. We use a truncated denoising process that starts with noisy trajectories sampled from the anchored Gaussian distribution and progressively denoises them to final predictions. At each denoising timestep, the estimated trajectories from the previous step are passed to the diffusion decoder $f _ { \\theta } { } _ { ; }$ , which predicts classification scores $\\{ \\hat { s } _ { k } \\} _ { k = 1 } ^ { N _ { \\mathrm { i n f e r } } }$ and coordinates $\\{ \\hat { \\tau } _ { k } \\} _ { k = 1 } ^ { N _ { \\mathrm { i n f e r } } }$ . After obtaining the current timestep’s predictions, we apply the DDIM [35] update rule to sample trajectories for the next timestep.",
+        "bbox": [
+            89,
+            603,
+            485,
+            742
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "Inference flexibility. A key advantage of our approach lies in its inference flexibility. While the model is trained with $N _ { \\mathrm { a n c h o r } }$ trajectories, the inference process can accommodate an arbitrary number of trajectory samples $N _ { \\mathrm { i n f e r } }$ , where $N _ { \\mathrm { i n f e r } }$ can be dynamically adjusted based on computational resources or application requirements.",
+        "bbox": [
+            89,
+            744,
+            485,
+            837
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "3.4. Architecture",
+        "text_level": 2,
+        "bbox": [
+            89,
+            847,
+            227,
+            863
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "The overall architecture of our proposed method, Diffusion-Drive, is illustrated in Fig. 4. DiffusionDrive can integrate various existing perception modules used in previous endto-end planners [7, 16, 20, 39] and take different sensor inputs. The designed diffusion decoder is tailored for the complex and challenging driving application, which has enhanced interactions with the conditional scene context.",
+        "bbox": [
+            89,
+            869,
+            485,
+            901
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            509,
+            487,
+            908,
+            564
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "Diffusion decoder. Given the set of sampled noisy trajectories $\\left\\{ \\hat { \\tau } _ { k } \\right\\} _ { k = 1 } ^ { N _ { \\mathrm { i n f e r } } }$ from the anchored Gaussian distribution, we begin by applying deformable spatial cross-attention [29, 42, 62] to interact with Bird’s Eye View (BEV) or Perspective View (PV) features based on the trajectory coordinates. Subsequently, cross-attention is performed between the trajectory features and the agent/map queries derived from the perception module, followed by a feed-forward network (FFN). To encode the diffusion timestep information, we utilize a Timestep Modulation layer, which is followed by a Multi-Layer Perceptron (MLP) that predicts the confidence score and the offset relative to the initial noisy trajectory coordinates. The output from this diffusion decoder layer serves as the input for the subsequent cascade diffusion decoder layer. DiffusionDrive further reuses the cascade diffusion decoder to iteratively denoise the trajectory during inference, with parameters shared across the different denoising timesteps. The final trajectory with the highest confidence score is selected as the output.",
+        "bbox": [
+            509,
+            613,
+            908,
+            901
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "table",
+        "img_path": "images/3e9a9e566d27452dc89297b4a1c260e3bd849d7be7627ebf42a5de8cb7791f06.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">ID</td><td rowspan=\"2\">UNet Decoder</td><td rowspan=\"2\">Ego Query Interaction</td><td rowspan=\"2\">Spatial Cross-attn</td><td rowspan=\"2\">Agent/Map Cascade Cross-attn</td><td rowspan=\"2\">Decoder</td><td rowspan=\"2\">Param.↓</td><td colspan=\"6\">Planning Metric</td></tr><tr><td>NC↑</td><td>DAC↑</td><td>TTC↑</td><td>Comf.↑</td><td>EP↑</td><td>PDMS↑</td></tr><tr><td>1</td><td>√</td><td>√</td><td>x</td><td>x</td><td>x</td><td>102M</td><td>97.9</td><td>94.2</td><td>93.9</td><td>100</td><td>80.2</td><td>85.7</td></tr><tr><td>2</td><td>X</td><td>√</td><td>×</td><td>X</td><td>X</td><td>57M</td><td>88.7</td><td>83.2</td><td>80.0</td><td>84.8</td><td>43.3</td><td>55.1</td></tr><tr><td>3</td><td>X</td><td>√</td><td>√</td><td>X</td><td>X</td><td>58M</td><td>98.2</td><td>95.4</td><td>94.4</td><td>100</td><td>81.3</td><td>87.1</td></tr><tr><td>4</td><td>X</td><td>√</td><td>X</td><td>√</td><td>X</td><td>58M</td><td>97.9</td><td>93.5</td><td>93.8</td><td>100</td><td>79.8</td><td>85.1</td></tr><tr><td>5</td><td>X</td><td>√</td><td>√</td><td>√</td><td>X</td><td>59M</td><td>98.0</td><td>95.8</td><td>94.4</td><td>100</td><td>81.7</td><td>87.4</td></tr><tr><td>6</td><td>X</td><td>√</td><td>、</td><td>、</td><td>√</td><td>60M</td><td>98.2</td><td>96.2</td><td>94.7</td><td>100</td><td>82.2</td><td>88.1</td></tr></table>",
+        "bbox": [
+            93,
+            90,
+            901,
+            229
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "table",
+        "img_path": "images/2223f249e64fc2706791b1573dd61743807d0a473cf789b78295233a2f7b2336.jpg",
+        "table_caption": [
+            "Table 3. Ablation for design choices. “Cascade Decoder” indicates that we stack 2 cascade diffusion decoder layers. ID-1 refers to Transfuser<sub>TD</sub> in Tab. 2, utilizing conditional UNet and interaction with the ego-query, which Transfuser uses to directly regress the singlemode trajectory.",
+            "Table 4. Denoising step number."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Step |id:</td><td>|Param.</td><td>NC</td><td>DAC</td><td>TTC</td><td>Comf.</td><td>EP</td><td>PDMS</td></tr><tr><td>1</td><td>60M</td><td>98.</td><td>96.0</td><td>94.7</td><td>100</td><td>82.1</td><td>87.9</td></tr><tr><td>2</td><td>60M</td><td>98.2</td><td>96.2</td><td>94.7</td><td>100</td><td>82.2</td><td>88.1</td></tr><tr><td>3</td><td>60M</td><td>98.2</td><td>96.3</td><td>94.7</td><td>100</td><td>92.2</td><td>88.1</td></tr></table>",
+        "bbox": [
+            94,
+            280,
+            354,
+            334
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "table",
+        "img_path": "images/a6ea177aae457f919c8224e0de47a83ed3eba922dc87cc5672816ea40730aa25.jpg",
+        "table_caption": [
+            "Table 5. Cascade stages."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Stages |</td><td>| Param.</td><td>NC</td><td>DAC</td><td>TTC</td><td>Comf.</td><td>EP</td><td>PDMS</td></tr><tr><td>1</td><td>59M</td><td>98.0</td><td>95.8</td><td>94.4</td><td>100</td><td>81.7</td><td>87.4</td></tr><tr><td>2</td><td>60M</td><td>98.2</td><td>96.2</td><td>94.7</td><td>100</td><td>82.2</td><td>88.1</td></tr><tr><td>4</td><td>65M</td><td>98.4</td><td>96.2</td><td>94.9</td><td>100</td><td>82.4</td><td>88.2</td></tr></table>",
+        "bbox": [
+            367,
+            280,
+            632,
+            334
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "table",
+        "img_path": "images/5f4f41a05998b827faaa5016a452dc4c770c00e7be422cd16a44b6c8aa5e8822.jpg",
+        "table_caption": [
+            "Table 6. Number of sampled noises $N _ { \\mathrm { i n f e r } } .$"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td> $N _ { \\mathrm { i n f e r } }$ </td><td>Param.</td><td>NC</td><td>DAC</td><td>TTC</td><td>Comf.</td><td>EP</td><td>PDMS</td></tr><tr><td>10</td><td>60M</td><td>97.9</td><td>93.5</td><td>93.1</td><td>100</td><td>80.0</td><td>84.9</td></tr><tr><td>20</td><td>60M</td><td>98.2</td><td>96.2</td><td>94.7</td><td>100</td><td>82.2</td><td>88.1</td></tr><tr><td>40</td><td>60M</td><td>98.5</td><td>96.2</td><td>94.8</td><td>100</td><td>82.5</td><td>88.2</td></tr></table>",
+        "bbox": [
+            640,
+            280,
+            900,
+            334
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "4. Experiment",
+        "text_level": 2,
+        "bbox": [
+            91,
+            362,
+            215,
+            380
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "4.1. Dataset",
+        "text_level": 2,
+        "bbox": [
+            91,
+            387,
+            187,
+            404
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "NAVSIM. The NAVSIM dataset [10] is a real-world planning-oriented dataset builds upon OpenScene [9], a compact redistribution of nuPlan [22], the largest publicly available annotated driving dataset. NAVSIM leverages eight cameras to achieve a full 360<sup>◦</sup> FOV, along with a merged LiDAR point cloud derived from five sensors. Annotations are provided at a frequency of 2Hz and include both HD maps and object bounding boxes. The dataset is designed to emphasize challenging driving scenarios involving dynamic changes in driving intentions, while deliberately excluding trivial situations such as stationary scenes or constant-speed driving.",
+        "bbox": [
+            89,
+            412,
+            485,
+            594
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "NAVSIM benchmarks planning performance using nonreactive simulations and closed-loop metrics for comprehensive evaluation. In this paper, we employ the proposed PDM score (PDMS) [10], which is a weighted combination of several sub-scores: no at-fault collisions (NC), drivable area compliance (DAC), time-to-collision (TTC), comfort (Comf.), and ego progress (EP).",
+        "bbox": [
+            88,
+            594,
+            485,
+            703
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "4.2. Implementation Detail",
+        "text_level": 2,
+        "bbox": [
+            89,
+            712,
+            302,
+            728
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "We adopt the same perception modules and ResNet-34 backbone [13] as Transfuser for fair comparison. In the diffusion decoder layer, we employ spatial cross-attention to only interact with BEV features following Transfuser’s BEV-based setting. We only perform agent cross-attention, since the perception module of Transfuser does not include vectorized map construction. We stack 2 cascade diffusion decoder layers and apply truncated diffusion policy with 20 clustered anchors. The training diffusion schedule is truncated by 50/1000 to diffuse the anchors, while during inference, we use only 2 denoising steps and select the top-",
+        "bbox": [
+            88,
+            734,
+            485,
+            901
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "1 scoring predicted trajectory for evaluation. The training and inference recipe directly follows Transfuser: We use three cropped and downscaled forward-facing camera images, concatenated as a 1024×256 image, and a rasterized BEV LiDAR as input; DiffusionDrive is trained on navtrain split from scratch for 100 epochs with AdamW optimizer on 8 NVIDIA 4090 GPUs with total batch size of 512, setting the learning rate to $6 \\times 1 0 ^ { - 4 }$ . No test-time augmentation is applied and the final output for evaluation on navtest split is 8-waypoint trajectory over 4 seconds.",
+        "bbox": [
+            509,
+            363,
+            908,
+            517
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "4.3. Quantitative Comparison",
+        "text_level": 2,
+        "bbox": [
+            513,
+            563,
+            746,
+            579
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "Tab. 1 compares DiffusionDrive with state-of-the-art methods on NAVSIM navtest split. With the same ResNet-34 backbone, DiffusionDrive achieves 88.1 PDMS score, demonstrating significant superior performance over the previous learning-based methods. Compared to VADv2, DiffusionDrive surpasses it by 7.2 PDMS while reducing the number of anchors from 8192 to 20, representing a 400× reduction. DiffusionDrive also outperforms Hydra-MDP, which follows VADv2’s sampling-from-vocabulary paradigm, with a 5.1 PDMS improvement. Even compared to the Hydra- $\\mathrm { M D P - } \\mathcal { V } _ { 8 1 9 2 } \\mathrm { - W - E P } ,$ which is a variant of Hydra-MDP [25] by further training to fit the EP evaluation metric with additional supervision and using weighted confidence post-processing, DiffusionDrive still outperforms it by 3.5 EP and 1.6 overall PDMS, relying solely on a straightforward learning-from-human approach without any post-processing. Compared to the Transfuser baseline, where we only differ in the planning module, Diffusion-Drive delivers a notable 4.1 PDMS improvement, outperforming it across all sub-scores.",
+        "bbox": [
+            509,
+            598,
+            908,
+            901
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "table",
+        "img_path": "images/c7ca255b7e93a18a91cd01297eb27e265bdeb16c11e19af9133fd2431d187bd8.jpg",
+        "table_caption": [
+            "Table 7. Comparison on nuScenes dataset with open-loop metrics. FPS is measured on a single NVIDIA 4090 GPU following the recipe of SparseDrive [39]. Metric calculation follows ST-P3 [15]."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">Method</td><td rowspan=\"2\">Input</td><td rowspan=\"2\">Img. Backbone</td><td colspan=\"4\">L2 (m)↓</td><td colspan=\"4\">Collision Rate (%) ↓</td><td rowspan=\"2\">FPS↑</td></tr><tr><td>1s</td><td>2s</td><td>3s$</td><td>Avg.</td><td>1s</td><td>2s</td><td>3s</td><td>Avg.</td></tr><tr><td>ST-P3 [15]</td><td>Camera</td><td>EffNet-b4 [40]</td><td>1.33</td><td>2.11</td><td>2.90</td><td>2.11</td><td>0.23</td><td>0.62</td><td>1.27</td><td>0.71</td><td>1.6</td></tr><tr><td>UniAD [16]</td><td>Camera</td><td>ResNet-101 [13]</td><td>0.45</td><td>0.70</td><td>1.04</td><td>0.73</td><td>0.62</td><td>0.58</td><td>0.63</td><td>0.61</td><td>1.8</td></tr><tr><td>OccNet [41]</td><td>Camera</td><td>ResNet-50 [13]</td><td>1.29</td><td>2.13</td><td>2.99</td><td>2.14</td><td>0.21</td><td>0.59</td><td>1.37</td><td>0.72</td><td>2.6</td></tr><tr><td>VAD [20]</td><td>Camera</td><td>ResNet-50 [13]</td><td>0.41</td><td>0.70</td><td>1.05</td><td>0.72</td><td>0.07</td><td>0.17</td><td>0.41</td><td>0.22</td><td>4.5</td></tr><tr><td>SparseDrive [39]</td><td>Camera</td><td>ResNet-50 [13]</td><td>0.29</td><td>0.58</td><td>0.96</td><td>0.61</td><td>0.01</td><td>0.05</td><td>0.18</td><td>0.08</td><td>9.0</td></tr><tr><td>DiffusionDrive (Ours)</td><td>Camera</td><td>ResNet-50 [13]</td><td>0.27</td><td>0.54</td><td>0.90</td><td>0.57</td><td>0.03</td><td>0.05</td><td>0.16</td><td>0.08</td><td>8.2</td></tr></table>",
+        "bbox": [
+            93,
+            89,
+            901,
+            229
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "4.4. Roadmap",
+        "text_level": 2,
+        "bbox": [
+            89,
+            266,
+            204,
+            282
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "In Tab. 2, converting Transfuser into the generative Transfuser<sub>DP</sub> using vanilla diffusion policy improves the PDMS score by 0.6 and the mode diversity score D by 11%. However, it also significantly increases the overhead of the planning module, requiring 20× more denoising steps and 32× the step time, resulting in a total 650× increase in runtime overhead. With the proposed truncated diffusion policy, Transfuser<sub>TD</sub> reduces the number of denoising steps from 20 to 2 while improving PDMS by 1.1 and mode diversity by 59%. By further incorporating the proposed diffusion decoder, the final model, DiffusionDrive, reaches 88.1 PDMS and 74% mode diversity score D. Compared to the Transfuser<sub>DP</sub>, DiffusionDrive shows improvements in 3.5 PDMS and 64% mode diversity, and a 10× reduction in denoising steps, resulting in a 6× speedup in FPS. This enables real-time, high-quality, multi-mode planning.",
+        "bbox": [
+            88,
+            287,
+            485,
+            532
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "4.5. Ablation Study",
+        "text_level": 2,
+        "bbox": [
+            89,
+            542,
+            245,
+            559
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "Effect of designs in diffusion decoder. Tab. 3 shows the effectiveness of our design choices in the diffusion decoder. ID-1 is the Transfuser<sub>TD</sub> in the Tab. 2. By comapring ID-6 and ID-1, we can see that the proposed diffusion decoder reduce the 39% parameters and significantly improves the planning quality by 2.4 PDMS. ID-2 shows severe performance degeneration due to the lack of rich and hierarchical interaction with the environment. By comparing ID-2 and ID-3, we show that spatial cross-attention is vital for accurate planning. ID-5 shows that the proposed cascade mechanism is effective and can further improve the performance.",
+        "bbox": [
+            88,
+            569,
+            485,
+            737
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "Denoising step number. Tab. 4 shows that due to a reasonable start point, DiffusionDrive achieves good planning quality even with only 1 step, and further denoising steps offer quality improvement and inference flexibility for complex environments.",
+        "bbox": [
+            89,
+            741,
+            485,
+            816
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "Cascade stages. Tab. 5 ablates the impact of cascade stage number. Increasing the stage number can improve the planning quality but saturate at the 4 stages and cost more parameters and inference time at each step.",
+        "bbox": [
+            89,
+            820,
+            485,
+            882
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "Number of sampled noises $N _ { \\mathrm { i n f e r } }$ . As stated in Sec. 3.3,",
+        "bbox": [
+            89,
+            885,
+            483,
+            901
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "DiffusionDrive can generate varied trajectories by simply sampling a variable number of noises from anchored Gaussian distribution. Tab. 6 shows that 10 sampled noises can already achieve a decent planning quality. By sampling more noises, DiffusionDrive can cover potential planning action space and lead to improved planning quality.",
+        "bbox": [
+            509,
+            266,
+            908,
+            359
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "4.6. Qualitative Comparison",
+        "text_level": 2,
+        "bbox": [
+            513,
+            375,
+            736,
+            392
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "Since the PDMS planning metric calculates based on the top-1 scoring trajectory and our proposed D score evaluates mode diversity, these metrics alone cannot fully capture the quality of diverse trajectories. To further validate the quality of multi-mode trajectories, we visualize the planning results of Transfuser, Transfuser<sub>DP</sub> and DiffusionDrive on challenging scenarios of NAVSIM navtest split in Fig. 2. The results indicate that the multi-mode trajectories generated by DiffusionDrive are not only diverse but also of high quality. In Fig. 2a, the top-1 scoring trajectory generated by DiffusionDrive closely resembles the ground-truth trajectory, while the highlighted top-10 scoring trajectory surprisingly tries to perform high-quality lane changing. In Fig. 2b, the highlighted top-10 scoring trajectory also performs a lane change, and a neighboring low-scoring trajectory further interacts with surrounding agents to effectively avoid collisions.",
+        "bbox": [
+            509,
+            400,
+            908,
+            659
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "4.7. Quantitative Comparison on nuScenes dataset",
+        "text_level": 2,
+        "bbox": [
+            511,
+            676,
+            906,
+            693
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "The nuScenes dataset is previously popular benchmark for end-to-end planning. Since the major scenarios of nuScenes are simple and trivial situations, we only perform comparison in Tab. 7. We implement DiffusionDrive on top of SparseDrive [39] following its training and inference recipe using open-loop metrics proposed in ST-P3 [15]. We stack 2 cascade diffusion decoder layers and apply the truncated diffusion policy with 18 clustered anchors.",
+        "bbox": [
+            511,
+            700,
+            908,
+            823
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "As shown in Tab. 7, DiffusionDrive reduces the average L2 error of SparseDrive by 0.04m, achieving the lowest L2 error and average collision rate. While DiffusionDrive is also efficient and runs 1.8× faster than VAD with 20.8% lower L2 error and 63.6% lower collision rate.",
+        "bbox": [
+            511,
+            824,
+            908,
+            901
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "5. Conclusion",
+        "text_level": 2,
+        "bbox": [
+            91,
+            90,
+            210,
+            106
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "In this work, we propose a novel generative driving decision-making model, DiffusionDrive, for end-to-end autonomous driving by incorporating the proposed truncated diffusion policy and efficient cascade diffusion decoder. DiffusionDrive can denoise a variable number of samples from an anchored Gaussian distribution to generate diverse planning trajectories at real-time speeds. Comprehensive experiments and qualitative comparisons validate the superiority of DiffusionDrive in planning quality, running efficiency, and mode diversity.",
+        "bbox": [
+            89,
+            116,
+            485,
+            267
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "Acknowledgement",
+        "text_level": 2,
+        "bbox": [
+            91,
+            279,
+            251,
+            295
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "We would like to acknowledge Tianheng Cheng for helpful feedback on the draft.",
+        "bbox": [
+            89,
+            304,
+            483,
+            333
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "References",
+        "text_level": 2,
+        "bbox": [
+            91,
+            345,
+            187,
+            362
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "list",
+        "sub_type": "ref_text",
+        "list_items": [
+            "[1] Anurag Ajay, Yilun Du, Abhi Gupta, Joshua B. Tenenbaum, Tommi S. Jaakkola, and Pulkit Agrawal. Is conditional generative modeling all you need for decision making? In ICLR, 2023. 4",
+            "[2] Holger Caesar, Varun Bankiti, Alex H Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Giancarlo Baldan, and Oscar Beijbom. nuscenes: A multimodal dataset for autonomous driving. In CVPR, 2020. 2, 1",
+            "[3] Shaoyu Chen, Bo Jiang, Hao Gao, Bencheng Liao, Qing Xu, Qian Zhang, Chang Huang, Wenyu Liu, and Xinggang Wang. Vadv2: End-to-end vectorized autonomous driving via probabilistic planning. arXiv preprint arXiv:2402.13243, 2024. 1, 2, 6",
+            "[4] Shaoyu Chen, Xinggang Wang, Tianheng Cheng, Qian Zhang, Chang Huang, and Wenyu Liu. Polardetr: Polar parametrization for vision-based surround-view 3d detection. Image and Vision Computing, 156:105438, 2025. 1",
+            "[5] Zhili Chen, Maosheng Ye, Shuangjie Xu, Tongyi Cao, and Qifeng Chen. Ppad: Iterative interactions of prediction and planning for end-to-end autonomous driving. In ECCV, 2024. 2",
+            "[6] Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song. Diffusion policy: Visuomotor policy learning via action diffusion. In RSS, 2023. 1, 3, 5, 6",
+            "[7] Kashyap Chitta, Aditya Prakash, Bernhard Jaeger, Zehao Yu, Katrin Renz, and Andreas Geiger. Transfuser: Imitation with transformer-based sensor fusion for autonomous driving. TPAMI, 2022. 1, 2, 5, 6",
+            "[8] Younwoo Choi, Ray Coden Mercurius, Soheil Mohamad Alizadeh Shabestary, and Amir Rasouli. Dice: Diverse diffusion model with scoring for trajectory prediction. In IV, 2024. 3",
+            "[9] OpenScene Contributors. Openscene: The largest up-todate 3d occupancy prediction benchmark in autonomous driving. https://github.com/OpenDriveLab/ OpenScene, 2023. 7",
+            "[10] Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo Weng, Zhiyu Huang, Zetong Yang, Hongyang Li, Igor Gilitschenski, Boris Ivanovic, Marco Pavone, Andreas Geiger, and Kashyap Chitta. Navsim: Data-driven nonreactive autonomous vehicle simulation and benchmarking. In NeurIPS, 2024. 2, 7, 1",
+            "[11] Alexey Dosovitskiy, German Ros, Felipe Codevilla, Antonio Lopez, and Vladlen Koltun. Carla: An open urban driving simulator. In Conference on robot learning, pages 1–16. PMLR, 2017. 1",
+            "[12] Xunjiang Gu, Guanyu Song, Igor Gilitschenski, Marco Pavone, and Boris Ivanovic. Producing and leveraging online map uncertainty in trajectory prediction. In CVPR, 2024. 2",
+            "[13] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition. In CVPR, 2016. 6, 7, 8, 1",
+            "[14] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffusion probabilistic models. Advances in neural information processing systems, 33:6840–6851, 2020. 4",
+            "[15] Shengchao Hu, Li Chen, Penghao Wu, Hongyang Li, Junchi Yan, and Dacheng Tao. St-p3: End-to-end vision-based autonomous driving via spatial-temporal feature learning. In ECCV, 2022. 8",
+            "[16] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima, Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai Wang, et al. Planning-oriented autonomous driving. In CVPR, 2023. 1, 2, 6, 8",
+            "[17] Junjie Huang, Guan Huang, Zheng Zhu, Yun Ye, and Dalong Du. Bevdet: High-performance multi-camera 3d object detection in bird-eye-view. arXiv preprint arXiv:2112.11790, 2021. 1",
+            "[18] Zhiyu Huang, Zixu Zhang, Ameya Vaidya, Yuxiao Chen, Chen Lv, and Jaime Fernandez Fisac. Versatile scene-´ consistent traffic scenario generation as optimization with diffusion. arXiv preprint arXiv:2404.02524, 2024. 3",
+            "[19] Michael Janner, Yilun Du, Joshua B. Tenenbaum, and Sergey Levine. Planning with diffusion for flexible behavior synthesis. In ICLR, 2022. 1, 3",
+            "[20] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang, and Xinggang Wang. Vad: Vectorized scene representation for efficient autonomous driving. In ICCV, 2023. 1, 2, 6, 8",
+            "[21] Chiyu Jiang, Andre Cornman, Cheolho Park, Benjamin Sapp, Yin Zhou, Dragomir Anguelov, et al. Motiondiffuser: Controllable multi-agent motion prediction using diffusion. In CVPR, 2023. 3",
+            "[22] Napat Karnchanachari, Dimitris Geromichalos, Kok Seang Tan, Nanxiang Li, Christopher Eriksen, Shakiba Yaghoubi, Noushin Mehdipour, Gianmarco Bernasconi, Whye Kit Fong, Yiluan Guo, et al. Towards learning-based planning: The nuplan benchmark for real-world autonomous driving. In ICRA, 2024. 7",
+            "[23] Yingyan Li, Lue Fan, Jiawei He, Yuqi Wang, Yuntao Chen, Zhaoxiang Zhang, and Tieniu Tan. Enhancing end-to-end autonomous driving with latent world model. arXiv preprint arXiv:2406.08481, 2024. 2",
+            "[24] Zhiqi Li, Wenhai Wang, Hongyang Li, Enze Xie, Chonghao Sima, Tong Lu, Yu Qiao, and Jifeng Dai. Bevformer:"
+        ],
+        "bbox": [
+            99,
+            372,
+            482,
+            424
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "list",
+        "sub_type": "ref_text",
+        "list_items": [
+            "Learning bird’s-eye-view representation from multi-camera images via spatiotemporal transformers. In ECCV, 2022. 1",
+            "[25] Zhenxin Li, Kailin Li, Shihao Wang, Shiyi Lan, Zhiding Yu, Yishen Ji, Zhiqi Li, Ziyue Zhu, Jan Kautz, Zuxuan Wu, et al. Hydra-mdp: End-to-end multimodal planning with multitarget hydra-distillation. arXiv preprint arXiv:2406.06978, 2024. 1, 2, 6, 7",
+            "[26] Zhiqi Li, Zhiding Yu, Shiyi Lan, Jiahan Li, Jan Kautz, Tong Lu, and Jose M Alvarez. Is ego status all you need for openloop end-to-end autonomous driving? In CVPR, 2024. 2",
+            "[27] Bencheng Liao, Shaoyu Chen, Xinggang Wang, Tianheng Cheng, Qian Zhang, Wenyu Liu, and Chang Huang. MapTR: Structured modeling and learning for online vectorized HD map construction. In ICLR, 2023. 1",
+            "[28] Bencheng Liao, Shaoyu Chen, Yunchi Zhang, Bo Jiang, Qian Zhang, Wenyu Liu, Chang Huang, and Xinggang Wang. Maptrv2: An end-to-end framework for online vectorized hd map construction. IJCV, 2024. 1",
+            "[29] Xuewu Lin, Tianwei Lin, Zixiang Pei, Lichao Huang, and Zhizhong Su. Sparse4d: Multi-view 3d object detection with sparse spatial-temporal fusion. arXiv preprint arXiv:2211.10581, 2022. 6",
+            "[30] Yaron Lipman, Ricky T. Q. Chen, Heli Ben-Hamu, Maximilian Nickel, and Matthew Le. Flow matching for generative modeling. In The Eleventh International Conference on Learning Representations, 2023. 4",
+            "[31] Xingchao Liu, Chengyue Gong, and Qiang Liu. Flow straight and fast: Learning to generate and transfer data with rectified flow. arXiv preprint arXiv:2209.03003, 2022. 4",
+            "[32] Yicheng Liu, Tianyuan Yuan, Yue Wang, Yilun Wang, and Hang Zhao. Vectormapnet: End-to-end vectorized hd map learning. In ICML, 2023. 1",
+            "[33] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Bjorn Ommer. High-resolution image ¨ synthesis with latent diffusion models. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, pages 10684–10695, 2022. 4",
+            "[34] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-net: Convolutional networks for biomedical image segmentation. In MICCAI, 2015. 2",
+            "[35] Jiaming Song, Chenlin Meng, and Stefano Ermon. Denoising diffusion implicit models. In ICLR, 2021. 4, 5, 6",
+            "[36] Yang Song, Jascha Sohl-Dickstein, Diederik P Kingma, Abhishek Kumar, Stefano Ermon, and Ben Poole. Score-based generative modeling through stochastic differential equations. In International Conference on Learning Representations, 2021. 4",
+            "[37] Ajay Sridhar, Dhruv Shah, Catherine Glossop, and Sergey Levine. Nomad: Goal masked diffusion policies for navigation and exploration. In ICRA, 2024. 4",
+            "[38] Maria Stamatopoulou, Jianwei Liu, and Dimitrios Kanoulas. Dippest: Diffusion-based path planner for synthesizing trajectories applied on quadruped robots. arXiv preprint arXiv:2405.19232, 2024. 4",
+            "[39] Wenchao Sun, Xuewu Lin, Yining Shi, Chuang Zhang, Haoran Wu, and Sifa Zheng. Sparsedrive: End-to-end autonomous driving via sparse scene representation. arXiv preprint arXiv:2405.19620, 2024. 2, 6, 8, 1",
+            "[40] Mingxing Tan and Quoc Le. Efficientnet: Rethinking model scaling for convolutional neural networks. In ICML, 2019. 8",
+            "[41] Wenwen Tong, Chonghao Sima, Tai Wang, Li Chen, Silei Wu, Hanming Deng, Yi Gu, Lewei Lu, Ping Luo, Dahua Lin, et al. Scene as occupancy. In ICCV, 2023. 8",
+            "[42] Yue Wang, Vitor Campagnolo Guizilini, Tianyuan Zhang, Yilun Wang, Hang Zhao, and Justin Solomon. Detr3d: 3d object detection from multi-view images via 3d-to-2d queries. In CoRL, 2022. 1, 6",
+            "[43] Yuqi Wang, Jiawei He, Lue Fan, Hongxin Li, Yuntao Chen, and Zhaoxiang Zhang. Driving into the future: Multiview visual forecasting and planning with world model for autonomous driving. In CVPR, 2024. 2",
+            "[44] Yixiao Wang, Chen Tang, Lingfeng Sun, Simone Rossi, Yichen Xie, Chensheng Peng, Thomas Hannagan, Stefano Sabatini, Nicola Poerio, Masayoshi Tomizuka, et al. Optimizing diffusion models for joint trajectory prediction and controllable generation. In ECCV, 2024. 3",
+            "[45] Xinshuo Weng, Boris Ivanovic, Yan Wang, Yue Wang, and Marco Pavone. Para-drive: Parallelized architecture for realtime autonomous driving. In CVPR, 2024. 2, 6",
+            "[46] Zehang Weng, Haofei Lu, Danica Kragic, and Jens Lundell. Dexdiffuser: Generating dexterous grasps with diffusion models. arXiv preprint arXiv:2402.02989, 2024. 4",
+            "[47] Sixu Yan, Zeyu Zhang, Muzhi Han, Zaijin Wang, Qi Xie, Zhitian Li, Zhehan Li, Hangxin Liu, Xinggang Wang, and Song-Chun Zhu. M2diffuser: Diffusion-based trajectory optimization for mobile manipulation in 3d scenes. arXiv preprint arXiv:2410.11402, 2024. 4",
+            "[48] Brian Yang, Huangyuan Su, Nikolaos Gkanatsios, Tsung-Wei Ke, Ayush Jain, Jeff Schneider, and Katerina Fragkiadaki. Diffusion-es: Gradient-free planning with diffusion for autonomous driving and zero-shot instruction following. In CVPR, 2024. 3",
+            "[49] Jingfeng Yao and Xinggang Wang. Reconstruction vs. generation: Taming optimization dilemma in latent diffusion models. arXiv preprint arXiv:2501.01423, 2025. 4",
+            "[50] Jingfeng Yao, Cheng Wang, Wenyu Liu, and Xinggang Wang. Fasterdit: Towards faster diffusion transformers training without architecture modification. arXiv preprint arXiv:2410.10356, 2024. 4",
+            "[51] Wenhao Yu, Jie Peng, Huanyu Yang, Junrui Zhang, Yifan Duan, Jianmin Ji, and Yanyong Zhang. Ldp: A local diffusion planner for efficient robot navigation and collision avoidance. arXiv preprint arXiv:2407.01950, 2024. 4",
+            "[52] Chengran Yuan, Zhanqi Zhang, Jiawei Sun, Shuo Sun, Zefan Huang, Christina Dao Wen Lee, Dongen Li, Yuhang Han, Anthony Wong, Keng Peng Tee, et al. Drama: An efficient end-to-end motion planner for autonomous driving with mamba. arXiv preprint arXiv:2408.03601, 2024. 6",
+            "[53] Yanjie Ze, Gu Zhang, Kangning Zhang, Chenyuan Hu, Muhan Wang, and Huazhe Xu. 3d diffusion policy. In RSS, 2024. 4",
+            "[54] Fangao Zeng, Bin Dong, Yuang Zhang, Tiancai Wang, Xiangyu Zhang, and Yichen Wei. Motr: End-to-end multipleobject tracking with transformer. In ECCV, 2022. 1"
+        ],
+        "bbox": [
+            122,
+            93,
+            482,
+            119
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "list",
+        "sub_type": "ref_text",
+        "list_items": [
+            "[55] Yifu Zhang, Chunyu Wang, Xinggang Wang, Wenjun Zeng, and Wenyu Liu. Fairmot: On the fairness of detection and re-identification in multiple object tracking. IJCV, 2021.",
+            "[56] Yifu Zhang, Peize Sun, Yi Jiang, Dongdong Yu, Fucheng Weng, Zehuan Yuan, Ping Luo, Wenyu Liu, and Xinggang Wang. Bytetrack: Multi-object tracking by associating every detection box. In ECCV, 2022. 1",
+            "[57] Huangjie Zheng, Pengcheng He, Weizhu Chen, and Mingyuan Zhou. Truncated diffusion probabilistic models and diffusion-based adversarial auto-encoders. In The Eleventh International Conference on Learning Representations, 2023. 4",
+            "[58] Wenzhao Zheng, Ruiqi Song, Xianda Guo, Chenming Zhang, and Long Chen. Genad: Generative end-to-end autonomous driving. In ECCV, 2024. 2",
+            "[59] Ziyuan Zhong, Davis Rempe, Yuxiao Chen, Boris Ivanovic, Yulong Cao, Danfei Xu, Marco Pavone, and Baishakhi Ray. Language-guided traffic simulation via scene-level diffusion. In CoRL, 2023. 3",
+            "[60] Ziyuan Zhong, Davis Rempe, Danfei Xu, Yuxiao Chen, Sushant Veer, Tong Che, Baishakhi Ray, and Marco Pavone. Guided conditional diffusion for controllable traffic simulation. In ICRA, 2023. 3",
+            "[61] Lianghui Zhu, Zilong Huang, Bencheng Liao, Jun Hao Liew, Hanshu Yan, Jiashi Feng, and Xinggang Wang. Dig: Scalable and efficient diffusion models with gated linear attention. arXiv preprint arXiv:2405.18428, 2024. 4",
+            "[62] Xizhou Zhu, Weijie Su, Lewei Lu, Bin Li, Xiaogang Wang, and Jifeng Dai. Deformable detr: Deformable transformers for end-to-end object detection. In ICLR, 2021. 2, 6"
+        ],
+        "bbox": [
+            93,
+            93,
+            482,
+            133
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "text",
+        "text": "DiffusionDrive: Truncated Diffusion Model for End-to-End Autonomous Driving",
+        "text_level": 1,
+        "bbox": [
+            89,
+            85,
+            906,
+            108
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "Supplementary Material",
+        "text_level": 1,
+        "bbox": [
+            380,
+            118,
+            616,
+            138
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "A. Further Implementation Detail",
+        "text_level": 2,
+        "bbox": [
+            89,
+            155,
+            382,
+            172
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "We provide additional implementation details for our method on the NAVSIM [10] and nuScenes [2] datasets.",
+        "bbox": [
+            89,
+            180,
+            483,
+            213
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "NAVSIM Dataset. We initialize the ResNet-34 [13] backbone with ImageNet pre-trained weights, and the LiDAR range is 32m to the front, back, left, and right following Transfuser baseline [10]. We also perform auxiliary perception tasks following Transfuser baseline [10], which include 3D object detection, 2D BEV semantic segmentation. The object queries and BEV features are taken as input of the proposed diffusion decoder.",
+        "bbox": [
+            88,
+            228,
+            485,
+            352
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "nuScenes Dataset. We follow the SparseDrive baseline [39] to perform two-stage training. The model is directly initialized with the stage-1 pre-trained weight, which is trained solely on perception tasks (3D object detection/tracking, vectorized HD map construction, and motion prediction) and provided by the official open-source implementation. We train the stage-2 model on the nuScenes dataset for 10 epochs, replacing the planning module of SparseDrive with our proposed diffusion decoder and truncated diffusion mechanism. Object queries, map queries, and PV features are taken as inputs to the diffusion decoder.",
+        "bbox": [
+            88,
+            366,
+            485,
+            535
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "B. Further Ablation Study",
+        "text_level": 2,
+        "bbox": [
+            89,
+            544,
+            318,
+            561
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "table",
+        "img_path": "images/55efcba385c756cff639bebc6c125a6a287d61df5668857fe773a2b1a3af8cdc.jpg",
+        "table_caption": [
+            "Table 8. Comparison on driving priors. “Anchored Dist.” denotes anchored Gaussian distribution. “Extra. Traj.” denotes extrapolated trajectory based on current status. Row-1 marked in blue denotes the DiffusioDrive baseline of the main paper."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Train</td><td>Infer</td><td>|NC↑ DAC↑ TTC↑ Comf.↑ EP↑ |</td><td></td><td></td><td></td><td></td><td>| DMS↑</td></tr><tr><td rowspan=\"2\">Anchored Dist.</td><td>Anchored. Dist.98.2</td><td></td><td>96.2</td><td>94.7</td><td>100</td><td>82.2</td><td>88.1</td></tr><tr><td>Extra. Traj.</td><td>96.3</td><td>91.7</td><td>90.4</td><td>100</td><td>76.8</td><td>81.3</td></tr><tr><td>Extra. Traj.</td><td>Extra. Traj.</td><td>( 7.d:3</td><td>94.0</td><td>92.6</td><td>100</td><td>79.6i</td><td>84.7</td></tr></table>",
+        "bbox": [
+            94,
+            566,
+            475,
+            621
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "Comparison on driving priors. In Tab. 8, we validate the superiority of prior anchors over the prior extrapolated trajectory based on the current status. Row-1 is DiffusionDrive baseline. Row-2 uses the DiffusionDrive baseline model to infer from an extrapolated trajectory instead of sampled $N _ { \\mathrm { i n f e r } }$ trajectories. Row-3 represents DiffusionDrive trained with a single anchor, i.e., the extrapolated trajectory, and infers by sampling around it. The results demonstrate the superiority of the proposed anchored Gaussian distribution over extrapolated prior, which fails to cover the potential action space and can not effectively handle challenging scenarios (e.g., obstacle avoidance and turning) in real-world application (consistent with comparisons to egostatus-based planners in Tab. 1 of NAVSIM paper [10]).",
+        "bbox": [
+            88,
+            689,
+            485,
+            902
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "table",
+        "img_path": "images/ea55caff2479ce6a8206005cc12ed6976bf9b564809a9d86b443e77a48e0d507.jpg",
+        "table_caption": [],
+        "table_footnote": [
+            "Table 9. Generalization of anchor source. We test Diffusion-Drive on Carla Longest6 benchmark with clustered anchors from NAVSIM dataset. † denotes that the result is taken from Transfuser paper [7]."
+        ],
+        "table_body": "<table><tr><td>Method</td><td>Anchor Source</td><td>DS↑</td><td>RC↑$</td><td>IS↑</td></tr><tr><td>Transfusert</td><td>-</td><td> $4 7 . 3 0 _ { \\pm 5 . 7 2 }$ </td><td> $9 3 . 3 8 _ { \\pm 1 . 2 0 }$ </td><td> $0 . 5 0 _ { \\pm 0 . 0 6 }$ </td></tr><tr><td>DiffusionDrive</td><td>NAVSIM</td><td> ${ \\bf 6 4 . 2 7 _ { \\pm 2 . 4 3 } }$ </td><td> $\\mathbf { 9 4 . 1 6 _ { \\pm 1 . 4 6 } }$ </td><td> ${ \\bf 0 . 6 9 } _ { \\pm 0 . 0 2 }$ </td></tr></table>",
+        "bbox": [
+            517,
+            141,
+            903,
+            189
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "Generalization of anchor source. To further investigate the generalization of anchor source, we train DiffusionDrive on CARLA [11] with NAVSIM-clustered anchored Gaussian distribution (Row-2 in Tab. 9). Since the CARLA dataset is totally different from NAVSIM, the superior results validate the generalization capability of our anchored Gaussian distribution, which is designed to cover potential multi-mode driving action space instead of train/val information leakage.",
+        "bbox": [
+            509,
+            253,
+            908,
+            391
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "C. Further Qualitative Comparison",
+        "text_level": 2,
+        "bbox": [
+            511,
+            402,
+            816,
+            421
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "In this section, we provide additional qualitative comparisons on challenging scenarios from the planning-oriented NAVSIM dataset navtest split [10].",
+        "bbox": [
+            511,
+            428,
+            908,
+            476
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "Going straight. Fig. 5a and Fig. 5b show that the top-1 scoring trajectories of DiffusionDrive are similar to the ground truth trajectories, while the highlighted top-10 scoring trajectories can perform robust lane changes. Notably, Fig. 5c demonstrates that the diverse and highlighted top-10 trajectories can further recognize the traffic light, enabling reasonable lane changes and stopping at the stop line.",
+        "bbox": [
+            511,
+            492,
+            908,
+            601
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "Turning left. Fig. 6 shows that the denoised diverse trajectories are dynamically adjusted based on the traffic conditions. The highlighted top-10 scoring trajectories are robust and reasonable, effectively performing lane changes.",
+        "bbox": [
+            511,
+            616,
+            908,
+            679
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "text",
+        "text": "Turning right. Fig. 7a and Fig. 7b show that the top-1 scoring trajectories of DiffusionDrive are going to perform car-following like the ground truth trajectories, while the highlighted top-10 scoring trajectories tend to overtake the leading vehicle. These results validate that DiffusionDrive can robustly generate diverse and plausible driving actions.",
+        "bbox": [
+            511,
+            694,
+            908,
+            789
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "image",
+        "img_path": "images/bc8d4a590b3b44b50b3eee0fefe101e8f842a2e156bcf868e01ca8f4fd656fe8.jpg",
+        "image_caption": [
+            "Figure 5. Qualitative comparison of Transfuser, Transfuser<sub>DP</sub> and DiffusionDrive on going straight scenarios of NAVSIM navtest split."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            161,
+            87,
+            834,
+            859
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "image",
+        "img_path": "images/3aa9b0069ba1cb3e6a75717b19da0719765edf499ccb1dd6bf811191bef954c1.jpg",
+        "image_caption": [
+            "Figure 6. Qualitative comparison of Transfuser, Transfuser<sub>DP</sub> and DiffusionDrive on turning left scenarios of NAVSIM navtest split."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            161,
+            87,
+            834,
+            859
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "image",
+        "img_path": "images/17bbc380369dbc264a9c125f6f6f880a04c398200e367b04e92ff4e58c037d22.jpg",
+        "image_caption": [
+            "Figure 7. Qualitative comparison of Transfuser, Transfuser<sub>DP</sub> and DiffusionDrive on turning right scenarios of NAVSIM navtest split."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            163,
+            87,
+            833,
+            859
+        ],
+        "page_idx": 14
+    }
+]

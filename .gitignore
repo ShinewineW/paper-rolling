@@ -6,8 +6,9 @@
 corpus/**/*.pdf
 # Full MinerU image dumps (the curated subset is copied into vault figures/).
 corpus/**/images/
-# MinerU structured intermediate.
-corpus/**/content_list.json
+# MinerU content_list.json is now TRACKED (small product; G3's equation gate needs it AND
+# it must survive worktree removal / fresh checkout — it is NOT cheaply regenerable here,
+# a MinerU re-run needs a high-RAM pod). See 基调-D2. Intentionally NOT ignored.
 # MinerU per-paper work dir (paper.md + intermediates); the canonical {ID}.md
 # product is written at the paper-dir root, not inside mineru/.
 corpus/**/mineru/

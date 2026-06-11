@@ -125,9 +125,13 @@ seams to an `openai_compatible` provider, keys from `.env` (gitignored).
   never race. Idempotency keys come from `ledger/naming.py`; vault keys come from
   `output/naming.py` — different concerns.
 - **Tracked = products, ignored = regenerable inputs** (基调-D2): converted
-  `corpus/{ID}/{ID}.md` + `.md_contract.json`, `person_vault/`, `ai_package/`,
-  `_ledger/`, `landscapes/`, engine + `config/` are tracked; original `*.pdf`,
-  MinerU `images/`, `content_list.json`, `.env`, `.venv` are ignored.
+  `corpus/{ID}/{ID}.md` + `.md_contract.json` + `content_list.json`, `person_vault/`,
+  `ai_package/`, `_ledger/`, `landscapes/`, engine + `config/` are tracked; original
+  `*.pdf`, MinerU `images/`, `.env`, `.venv` are ignored. (`content_list.json` moved to
+  TRACKED: it is a small but real product — G3's equation gate needs it and it is NOT
+  cheaply regenerable here (a MinerU re-run needs a high-RAM pod), so tracking it lets it
+  survive worktree removal / fresh checkout. `images/` stay ignored — ~1.2 G for 24 papers
+  would make the repo undistributable; figure durability is a separate out-of-repo backup.)
 - **Tier-1 equation fidelity is trusted, not verified** — only Tier-2 (MinerU)
   gets a real mechanical equation check; the pandoc path synthesizes a passing
   `content_list.json` by construction.

@@ -1,8 +1,8 @@
 {
-  "source_pdf_sha256": "af2a3f152fbdb2d78ab82a96bc3d6f017912b94238c9153a2d1f6383de12ca73",
+  "source_pdf_sha256": "06e40c033aee2717d07f10387beb72c0be6fc93fc7a5bae76d7905b7154c58e1",
   "converter": "mineru",
   "converter_version": "3.2.3",
-  "md_sha256": "1de035008cc97da1cf90b14f898314ea938d6788cc0c116eeca9b623ac9311b9",
+  "md_sha256": "9aa0d6f09d31e636e939b47804f0f79602a452ee6d2e9a616afde069f52028ab",
   "image_count": 32,
   "equation_block_count": 12
 }

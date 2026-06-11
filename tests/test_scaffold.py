@@ -115,7 +115,6 @@ def test_gitignore_tracks_products_and_ignores_inputs():
     for pat in (
         "corpus/**/*.pdf",
         "corpus/**/images/",
-        "corpus/**/content_list.json",
         ".cache/",
         ".env",
         ".venv/",
@@ -123,8 +122,19 @@ def test_gitignore_tracks_products_and_ignores_inputs():
         assert pat in gi, f"expected ignore pattern: {pat}"
     # Products NOT blanket-ignored: there is no bare line that ignores all of
     # person_vault/ or ai_package/ or _ledger/ or landscapes/ or config/.
+    # content_list.json moved to TRACKED (基调-D2): a small product G3's equation gate
+    # needs and that must survive worktree removal — it is NOT a cheaply-regenerable input
+    # here (a MinerU re-run needs a high-RAM pod), so it must NOT be an ignore line.
     lines = {ln.strip() for ln in gi.splitlines()}
-    for product in ("person_vault/", "ai_package/", "_ledger/", "landscapes/", "config/", "*.md"):
+    for product in (
+        "person_vault/",
+        "ai_package/",
+        "_ledger/",
+        "landscapes/",
+        "config/",
+        "*.md",
+        "corpus/**/content_list.json",
+    ):
         assert product not in lines, f"product must not be ignored: {product}"
 
 

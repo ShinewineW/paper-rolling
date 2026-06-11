@@ -1,0 +1,1404 @@
+[
+    {
+        "type": "text",
+        "text": "World4Drive: End-to-End Autonomous Driving via Intention-aware Physical Latent World Model",
+        "text_level": 1,
+        "bbox": [
+            111,
+            128,
+            885,
+            174
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Yupeng Zheng<sup>1,2,3</sup>, Pengxuan Yang<sup>1,2</sup>, Zebin Xing<sup>1</sup>, Qichao Zhang<sup>1\\*</sup>, Yuhang Zheng<sup>4</sup>, Yinfeng Gao<sup>1</sup>, Pengfei Li<sup>5</sup>, Teng Zhang<sup>2</sup>, Zhongpu Xia<sup>1</sup>, Peng Jia<sup>2</sup>, and Dongbin Zhao<sup>1</sup> <sup>1</sup>CASIA, <sup>2</sup>Li Auto, <sup>3</sup>PCL, <sup>4</sup>NUS, <sup>5</sup>Tsinghua,",
+        "bbox": [
+            151,
+            203,
+            843,
+            257
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Abstract",
+        "text_level": 2,
+        "bbox": [
+            248,
+            290,
+            326,
+            308
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "End-to-end autonomous driving directly generates planning trajectories from raw sensor data, yet it typically relies on costly perception supervision to extract scene information. A critical research challenge arises: constructing an informative driving world model to enable perception annotation-free, end-to-end planning via self-supervised learning. In this paper, we present World4Drive, an endto-end autonomous driving framework that employs vision foundation models to build latent world models for generating and evaluating multi-modal planning trajectories. Specifically, World4Drive first extracts scene features, including driving intention and world latent representations enriched with spatial-semantic priors provided by vision foundation models. It then generates multi-modal planning trajectories based on current scene features and driving intentions and predicts multiple intention-driven future states within the latent space. Finally, it introduces a world model selector module to evaluate and select the best trajectory. We achieve perception annotation-free, endto-end planning through self-supervised alignment between actual future observations and predicted observations reconstructed from the latent space. World4Drive achieves state-of-the-art performance without manual perception annotations on both the open-loop nuScenes and closed-loop NavSim benchmarks, demonstrating an 18.1% relative reduction in L2 error, 46.7% lower collision rate, and 3.75× faster training convergence. Codes will be accessed at https://github.com/ucaszyp/World4Drive.",
+        "bbox": [
+            89,
+            321,
+            485,
+            748
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "1. Introduction",
+        "text_level": 2,
+        "bbox": [
+            91,
+            775,
+            222,
+            791
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "End-to-end autonomous driving integrates perception and planning into a unified, fully differentiable network. Given the complexity of the physical world and the uncertainty in planning intentions [3], modeling multi-modal motion planning based on a holistic understanding of physical scenes (i.e., understanding spatial, semantic, and temporal information) is a critical challenge in the field.",
+        "bbox": [
+            89,
+            801,
+            485,
+            878
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "chart",
+        "img_path": "images/6a917d99ff3f64ea543eb84ea23e197c9eb32b5abacdb0c3c9b24c0e97ffd540.jpg",
+        "content": "",
+        "chart_caption": [
+            "Figure 1. Our proposed World4Drive demonstrates superior convergence efficiency and performance compared to PerAct on the nuScenes dataset. As shown in the figure, where the x-axis represents training epochs (same iterations) and the y-axis shows normalized performance (calculated as the ratio of our minimum L2 error to the L2 error at each epoch). World4Drive achieves equivalent performance in 3.75× fewer training epochs and ultimately delivers a 1.18× improvement in peak performance."
+        ],
+        "chart_footnote": [],
+        "bbox": [
+            519,
+            297,
+            900,
+            472
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            511,
+            627,
+            906,
+            659
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "To enhance scene understanding, existing end-to-end approaches have explored diverse scene representations, including BEV-centric [13, 39], vector-based [16, 42], and sparse-centric representation [33]. Some works [17, 27, 32] leverage multi-modal large language models to enhance scene comprehension capabilities. Additionally, methods like VADv2 [3] and Hydra-MDP [19] model driving intentions through probabilistic planning. However, these approaches typically require perception annotations such as 3D bounding boxes and HD maps, which limits their scalability. Recently, VaVAM [1] leverages the learned representations of an auto-regressive video model to generate the driving trajectory directly. LAW [18] proposes a latent world model that constructs uni-modal latent features from raw images and acquires scene representations through temporal self-supervised learning, reducing dependence on perception annotations. However, extracting single-modal latent features from images struggles to capture the spatialsemantic information of the physical world and multi-modal driving intentions, resulting in slow training convergence and suboptimal performance, as shown in Fig. 1.",
+        "bbox": [
+            511,
+            659,
+            908,
+            902
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "aside_text",
+        "text": "arXiv:2507.00603v1 [cs.CV] 1 Jul 2025",
+        "bbox": [
+            22,
+            286,
+            57,
+            708
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "page_footnote",
+        "text": "<sup>\\*</sup>Corresponding author",
+        "bbox": [
+            107,
+            887,
+            235,
+            901
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            89,
+            92,
+            485,
+            167
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "To address these critical issues, we introduce World4Drive, an end-to-end framework that integrates multi-modal driving intentions with a latent world model to enable rational planning. This is achieved by subconsciously simulating how the physical world evolves under different driving intentions, closely mirroring the decision-making process of human drivers.",
+        "bbox": [
+            89,
+            169,
+            485,
+            275
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "Given multi-view images and a trajectory vocabulary input, World4Drive extracts the driving intentions and world latent representations through its driving world encoding module. Specifically, the driving world encoding module incorporates two key components: a physical latent encoder and an intention encoder. The physical latent encoder consists of a context encoder that leverages spatial and semantic priors from a metric depth estimation model and a vision-language model and a temporal module that aggregates temporal information to construct world latent representations enriched with physical scene context. Concurrently, the intention encoder extracts multi-modal driving intention features from a predefined trajectory vocabulary, enabling comprehensive representation of possible driving behaviors. Subsequently, World4Drive predicts future latent representations across multi-modal driving intentions and proposes a world model selector to select the most plausible one for self-supervised alignment training with actual world latent representations extracted from future frames. During inference, we fully leverage World4Drive’s latent world model to evaluate and rank multi-modal trajectory candidates, enabling robust decision-making that guides the autonomous vehicle’s planning process in complex driving scenarios.",
+        "bbox": [
+            89,
+            276,
+            485,
+            638
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "World4Drive achieves state-of-the-art (SOTA) end-toend planning performance without requiring perception annotations on the challenging nuScenes [2] and NavSim [14] benchmarks and is comparable to advanced perceptionbased models. Compared to LAW [18], a previous SOTA unsupervised method, our method significantly reduces average planning displacement error by 18.2% (from 0.61m to 0.50m) and average collision rate by 46.7% (from 0.30% to 0.16%). More remarkably, our approach achieves more than three times faster convergence speed by appropriately incorporating spatial-semantic priors from vision foundation models.",
+        "bbox": [
+            89,
+            640,
+            485,
+            821
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "Our key contributions are summarized as follows:",
+        "bbox": [
+            109,
+            823,
+            442,
+            838
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "• Inspired by human driver decision processes, we propose an intention-aware latent world model that innovatively uses the world model to generate and evaluate multimodal trajectories under different intentions.",
+        "bbox": [
+            89,
+            840,
+            485,
+            901
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "• To enhance the world model’s understanding of the physical world without perception annotations, we design a novel driving world encoding module that leverages prior knowledge of vision foundation models to extract physical latent representations of the driving environment.",
+        "bbox": [
+            513,
+            92,
+            908,
+            166
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "• Our method achieves SOTA planning performance without perception annotations on open-loop nuScenes and closed-loop NavSim benchmarks while significantly accelerating convergence speed.",
+        "bbox": [
+            513,
+            167,
+            908,
+            228
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "2. Related Works",
+        "text_level": 2,
+        "bbox": [
+            513,
+            243,
+            665,
+            260
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "2.1. End-to-End Autonomous Driving",
+        "text_level": 2,
+        "bbox": [
+            513,
+            268,
+            807,
+            285
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "In recent years, with advancements in perception technologies using BEV-centric [20, 41], vector-based [22], and sparse-centric [24] scene representations, vision-based end-to-end autonomous driving has garnered increasing attention. Models such as UniAD [13], VAD [16], and SparseDrive [33] have explored those diverse representations, establishing end-to-end architectures including perception, prediction, and planning. GenAD [47] leverages generative models to produce trajectories, while some methods [15, 39, 48] implement parallelized end-to-end structures. To consider the intention uncertainty in planning, VADv2 [3] and Hydra-MDP [19] model driving intentions through probabilistic planning. DiffusionDrive and GoalFlow [23, 40] explores end-to-end methodologies based on diffusion models [9]. Furthermore, with the evolution of large language models (LLMs), several approaches [27, 32] enhance scene information through language models. For instance, VLP [29] incorporates linguistic understanding into scene information via contrastive learning. DriveVLM [35] constructs a dual slow-fast system that integrates vision-language model capabilities into the decision space. TOKEN [34] utilizes large language models to enhance object-level perception, improving planning capabilities in long-tail scenarios. These methods typically require extensive and costly perception or QAs annotations, which limits their scalability.",
+        "bbox": [
+            509,
+            291,
+            908,
+            685
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "2.2. Autonomous Driving World Models",
+        "text_level": 2,
+        "bbox": [
+            513,
+            696,
+            825,
+            713
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "World models in autonomous driving aim to predict scene evolution following various actions. These include imagebased video generation, 3D world models based on representations such as point clouds and occupancy grids, and latent feature-based future world generation. Image-based video generation encompasses driving video approaches using diffusion models like DriveDreamer [37, 45], Vista [6], and Drive-WM [38], as well as driving video generation methods based on autoregressive models such as Drive-World [28] and GAIA[10]. 3D world models include point cloud-based world models [44] and occupancy-based world models [7, 46]. These construct models in 3D space to better capture dynamic changes in 3D scenes. Recently, approaches like VaVAM [1] and LAW [18] have employed video generation techniques to learn scene representations through self-supervised learning, eliminating the dependency on perception annotations. Specifically, LAW proposes latent world models that predict a single future scene latent feature through self-supervision learning, achieves SOTA end-to-end planning performance. However, constructing single-modal latent features from raw images often struggles to capture the spatial-semantic scene information and the uncertainty of multi-modal driving intentions, resulting in suboptimal performance.",
+        "bbox": [
+            511,
+            719,
+            908,
+            902
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "image",
+        "img_path": "images/20f0c662b728e34a8f7d87003c14816d84444a0eb0653c3d2c82f09ac474e74c.jpg",
+        "image_caption": [
+            "Figure 2. We propose World4Drive, a novel approach that constructs an intention-aware latent world model to generate, evaluate, and rank multi-modal trajectories under multi-modal driving intentions."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            93,
+            90,
+            903,
+            330
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            88,
+            397,
+            485,
+            580
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "3. Method",
+        "text_level": 2,
+        "bbox": [
+            89,
+            593,
+            183,
+            609
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "3.1. Overview",
+        "text_level": 2,
+        "bbox": [
+            89,
+            618,
+            202,
+            633
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "The overall pipeline of World4Drive is illustrated in Fig. 2. World4Drive comprises two key modules: 1) Driving World Encoding (Sec. 3.2), which extracts driving intention and physical world latent representations from RGB images and trajectory vocabulary, and 2) Intention-aware World Model (Sec. 3.3), which predicts the latent representation of the future world according to multi-modal driving intentions and scores multi-modal planning trajectories via the world model selector. The two key modules are tightly coupled, enabling autonomous driving vehicles to imagine the future world under various intentions while achieving visionbased end-to-end planning without requiring perception annotations.",
+        "bbox": [
+            88,
+            641,
+            485,
+            838
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "3.2. Driving World Encoding",
+        "text_level": 2,
+        "bbox": [
+            89,
+            847,
+            318,
+            864
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "In the Driving World Encoding module, we introduce an intention encoder that takes vocabulary as input to extract driving intentions and a physical latent encoder that utilizes a vision-language model and a metric depth estimation model to extract world latent representations that are aware of spatial, semantic and temporal context.",
+        "bbox": [
+            89,
+            869,
+            483,
+            901
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            511,
+            397,
+            906,
+            459
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "3.2.1. Intention Encoder",
+        "text_level": 2,
+        "bbox": [
+            513,
+            465,
+            687,
+            481
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Given a randomly initialized ego query $Q _ { e g o }$ and a trajectory vocabulary $\\dot { \\boldsymbol { \\nu } } \\in \\mathbb { R } ^ { N \\times S \\times \\overline { { 2 } } }$ input [3], we first obtain the intention point $P _ { I } \\in \\mathbb { R } ^ { 3 \\times K \\times 2 }$ by adopting the k-means clustering algorithm on the endpoints of V. Among them, N represents the number of trajectories in the trajectory vocabulary, 3 represents the three commands type(e.g., left, right, straight), K represents the number of intentions for each command type, and S represents the number of waypoints in each trajectory. Then we obtain the intention query $Q _ { I }$ with sinusoidal position encoding. Finally, we utilize a self-attention layer to obtain the intention-aware multimodal planning query $Q _ { p l a n }$ . Formally,",
+        "bbox": [
+            511,
+            484,
+            908,
+            667
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "equation",
+        "img_path": "images/4bc7c5e8915ea7afae0ac4d56f7a6afbda242c57162f125d2117a0ce7bcc123b.jpg",
+        "text": "$$\nQ _ { p l a n } = \\mathrm { S e l f A t t e n t i o n } ( ( Q _ { e g o } + Q _ { I } ) ) .\\tag{1}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            576,
+            678,
+            841,
+            695
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "By default, N is set to 8192, and K is set to 6.",
+        "bbox": [
+            513,
+            707,
+            821,
+            723
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "3.2.2. Physical World Latent Encoding",
+        "text_level": 2,
+        "bbox": [
+            513,
+            729,
+            787,
+            746
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "We introduce the Physical World Latent Encoding module to extract the world latent representations with a holistic understanding (i.e., spatial and semantic perception capabilities) of the 3D physical world. The module consists of a context encoder (see Fig. 3 for details) to incorporate spatial and semantic prior and a temporal aggregation module to enhance temporal context.",
+        "bbox": [
+            511,
+            750,
+            906,
+            854
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Context Encoder. Given a frame of multi-view images ${ { I } _ { t } } ~ \\in ~ \\mathbb { R } ^ { M \\times H \\times W \\times 3 }$ at timestep t as input, we first extract the corresponding image features $F _ { t } \\in \\mathbb { R } ^ { M \\times h \\times w \\times D }$ with an image backbone, where D is the feature dimension and M represents the number of camera views. Previous work, LAW [18], directly extracts camera features as world latent representation, lacking spatial and semantic understanding of driving scenarios. To address this issue, we introduce spatial-semantic priors with open-vocabulary semantic supervision and 3D geometry-aware positional encoding.",
+        "bbox": [
+            511,
+            854,
+            906,
+            901
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "image",
+        "img_path": "images/c31963ffa31b50a39ef9384becbf3267f794597d611fcb190b16722cc6789c99.jpg",
+        "image_caption": [
+            "Figure 3. Detailed pipeline of context encoder. It consists of a 3D spatial encoding module and a semantic understanding module, achieving a holistic understanding of the physical world."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            96,
+            89,
+            480,
+            316
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            89,
+            392,
+            483,
+            498
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Semantic Understanding. We utilize the vision-language model Grouded-SAM [31] to produce pseudo semantic labels. Given the prompt for the object of interest, we obtain 2D bounding boxes and the corresponding semantic mask $S _ { t } \\in \\mathbb { R } ^ { H \\times W \\times C }$ via the Grouded-SAM model. Formally,",
+        "bbox": [
+            89,
+            498,
+            483,
+            574
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "equation",
+        "img_path": "images/ed91267944368e7681c05009aed39da8dd95147444dc54d7760b1720d5e0124f.jpg",
+        "text": "$$\nS _ { t } = \\mathrm { G r o u n d e d S A M } ( F _ { t } ) ,\\tag{2}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            194,
+            585,
+            377,
+            602
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "we only keep labels with high confidence to reduce incorrect labeling. Finally, we leverage cross-entropy loss $\\mathcal { L } _ { s e m }$ to enhance the semantic understanding of the latent representations.",
+        "bbox": [
+            89,
+            613,
+            482,
+            672
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "3D Spatial Encoding. 3D Spatial Encoding aims to provide the model with accurate positional information in the physical world. Previous work, PETR [25], utilizes a postprojection approach by generating 3D meshgrids to provide different 3D positional encodings for each pixel. Inspired by this concept, we provide the scale-aware depth for each pixel to represent 3D space, offering accurate spatial understanding for end-to-end planning. Specifically, we employ a metric depth model [11, 43] to estimate multi-view depth maps $D _ { t } \\in \\mathbb { R } ^ { M \\times h \\times w }$ . In contrast to PETR, we adopt a forward projection approach, obtaining the 3D position in the ego coordinate system $p = \\{ x , y , z \\}$ of each pixel $( u , v )$ through depth maps and the camera intrinsic matrix. Thus, we can generate 3D position maps $P _ { t } \\in \\mathbb { R } ^ { M \\times h \\times w \\times 3 }$ Subsequently, we encode these 3D positions using sinusoidal positional encoding and obtain corresponding positional embedding $E _ { t } \\in \\overline { { \\mathbb { R } } } ^ { M \\times h \\times w \\times D }$ through a learnable MLP. Formally,",
+        "bbox": [
+            88,
+            674,
+            485,
+            901
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            511,
+            90,
+            906,
+            136
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "equation",
+        "img_path": "images/75bef8c39b04bb49e39c051429e497b4fe011a67911a60dec8e75aed5e593d6c.jpg",
+        "text": "$$\nE _ { t } = \\mathrm { M L P } ( \\operatorname { S P E } ( P _ { t } ) ) ,\\tag{3}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            630,
+            143,
+            789,
+            160
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "where SPE(·) is the sinusoidal position encoding. Finally, by adding positional embedding $E _ { t }$ to the image features $F _ { t } .$ , we obtain the semantic-spatial-aware visual feature $\\hat { F } _ { t }$",
+        "bbox": [
+            513,
+            167,
+            905,
+            214
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Temporal Aggregation. Different from previous work [18] that uses randomly initialized queries to obtain latent representation. We employ a temporal aggregation module to obtain latent representation enriched with the temporal context. In particular, we preserve the visual feature $\\hat { F } _ { t - 1 }$ at the prior timestamp $t - 1$ . To enhance the temporal information in the world latent representation, we aggregate historical information into the current visual features through cross-attention mechanisms to obtain world latent representations $L _ { t } \\in \\mathbb { R } ^ { M \\times h \\times w \\times D }$ . Formally,",
+        "bbox": [
+            511,
+            214,
+            906,
+            366
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "equation",
+        "img_path": "images/907748477e3df785eff810f71c1bb4f9594c1471a3268df8e9c9791d3d1e6161.jpg",
+        "text": "$$\nL _ { t } = \\mathrm { C r o s s A t t e n t i o n } ( \\hat { F } _ { t } , \\hat { F } _ { t - 1 } ) .\\tag{4}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            596,
+            371,
+            821,
+            388
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "The proposed Physical World Latent Encoder enriches the world latent representations with spatial, semantic, and temporal information, providing a holistic understanding of the dynamic driving environment, which is crucial for imagining the future world.",
+        "bbox": [
+            511,
+            397,
+            906,
+            473
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "3.3. Planning with Intention-aware World Model",
+        "text_level": 2,
+        "bbox": [
+            513,
+            479,
+            892,
+            497
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "In this section, we propose the intention-aware world model to predict the latent representation of the future world according to multi-modal driving intentions (Sec. 3.3.1) and score multi-modal planning trajectories via the world model selector (Sec. 3.3.2).",
+        "bbox": [
+            511,
+            502,
+            906,
+            579
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "3.3.1. Intention-aware World Model Dreamer",
+        "text_level": 2,
+        "bbox": [
+            513,
+            583,
+            836,
+            598
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Action Encoding. Given the intention-aware multi-modal planning query $Q _ { p l a n } ,$ , we first employ a cross-attention layer to aggregate scene context into $Q _ { p l a n } . \\quad \\mathrm { T h e n } ,$ we obtain the multi-modal trajectories $T = \\mathsf { \\bar { \\{ T ^ { 1 } , . . . , T ^ { K } \\} } } \\in$ $\\mathbb { R } ^ { K \\times S \\times 2 }$ with an MLP layer. Formally,",
+        "bbox": [
+            511,
+            603,
+            906,
+            678
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "equation",
+        "img_path": "images/df8489fad2d9880fda358984de298cbd82fc317c2ae47aed3f7dc5277c324e99.jpg",
+        "text": "$$\nT = \\mathrm { M L P } ( \\mathrm { C r o s s A t t e n t i o n } ( Q _ { p l a n } , L _ { t } ) ) .\\tag{5}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            568,
+            686,
+            846,
+            703
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Finally, we employ an action encoder (an MLP layer) to acquire intention-aware action tokens $A \\in \\mathbb { R } ^ { K \\times D }$ , where $K$ is the number of intentions.",
+        "bbox": [
+            511,
+            712,
+            906,
+            756
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Intention-aware World Model Prediction. Our objective is to predict future world latents $L _ { t + n } = \\{ L _ { t + n } ^ { 1 } , . . . , L _ { t + n } ^ { K } \\}$ following actions corresponding to each driving intention, where n is the timestamp interval. We concatenate action tokens A and world latent $L$ along the dimension channel. Different from the previous work, we randomly initialize a learnable query $Q _ { f u t u r e }$ and adopt multi-layer crossattention as the predictor. Formally,",
+        "bbox": [
+            511,
+            756,
+            906,
+            877
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "equation",
+        "img_path": "images/3c51fab2327d5c54df6499b85cb9727368a9336f263ac859e6b46bc81f9a15b4.jpg",
+        "text": "$$\nL _ { t + n } = \\operatorname { C r o s s A t t e n t i o n } ( Q _ { f u t u r e } , \\operatorname { C o n c a t } ( A , L ) ) .\\tag{6}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            529,
+            885,
+            867,
+            901
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "image",
+        "img_path": "images/a269c086d9577cf4ec1725213750b66463a503702635f9a7d8757bf5b95d5e34.jpg",
+        "image_caption": [
+            "Figure 4. Detailed pipeline of World Model Selector. By computing and comparing feature distances between predicted latents and actual latent, the model selects the most plausible latent and its corresponding trajectory as output. The selector employs reconstruction loss between the selected latent and the actual latent to self-supervised learn scene representations while simultaneously training the world model scoring network using focal loss between predicted scores and the index of the selected latent."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            93,
+            89,
+            482,
+            232
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "By default, we set $n = 3 ,$ the ablation study of timestamp interval n can be seen in the supplementary material.",
+        "bbox": [
+            89,
+            372,
+            483,
+            404
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "3.3.2. World Model Selector",
+        "text_level": 2,
+        "bbox": [
+            89,
+            409,
+            290,
+            424
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "We propose a World Model Selector module that evaluates trajectories under K different intentions through the latent world model and selects the reasonable trajectory from among them. The detailed architecture is illustrated in Fig. 4. In particular, given the predicted intention-aware future latent $L _ { t + n }$ and the actual future latent $\\hat { L _ { t + n } } ,$ we compute the feature distance between the predicted latent representation and the actual latent representation for each modality. The modality with the minimum distance is selected as the final selected modality (assume the index of this modality is $j )$ , the corresponding latent distance is used as the reconstruction loss $\\mathcal { L } _ { r e c o n }$ for optimization, and the corresponding trajectory $T ^ { j }$ is selected as the final planning trajectory. Simultaneously, we employ a classification network as the ScoreNet, C, to predict scores $\\mathbb { S } = \\{ \\mathbb { S } ^ { 1 } , . . . \\mathbb { S } ^ { K } \\}$ corresponding to the K modalities. Formally,",
+        "bbox": [
+            88,
+            428,
+            485,
+            671
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "equation",
+        "img_path": "images/714ad585b48d510cb2880beddeb5298841c199186c2e190d8bf23d62a78ae25d.jpg",
+        "text": "$$\n\\mathbb { S } = \\operatorname { S o f t m a x } ( \\mathcal { C } ( L _ { t + n } ) )\\tag{7}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            202,
+            678,
+            369,
+            695
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "We utilize a focal loss between scores <sup>S</sup> and the selected modality index j to optimize the world model scoring network.",
+        "bbox": [
+            89,
+            704,
+            483,
+            748
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Notably, 1) during inference, we directly select the trajectory corresponding to the world model with the highest score as the final trajectory, and 2) we employ the MSE loss to compute the latent distance. We do ablation on other losses in the supplementary material.",
+        "bbox": [
+            88,
+            750,
+            485,
+            825
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "3.4. Training Loss",
+        "text_level": 2,
+        "bbox": [
+            89,
+            833,
+            235,
+            849
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Following previous works, we apply the $L _ { 1 }$ loss $\\mathcal { L } _ { t r a j }$ to guide the final planning trajectory $T ^ { j }$ with the expert trajectory T<sup>ˆ</sup>. World4Drive is end-to-end trainable. Therefore,",
+        "bbox": [
+            89,
+            854,
+            485,
+            901
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "the final loss for end-to-end training is",
+        "bbox": [
+            513,
+            92,
+            771,
+            106
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "equation",
+        "img_path": "images/49dadd95a18c7136e770059efb4f8cda32589f1630ea8f313cd098854bab5d62.jpg",
+        "text": "$$\n\\mathcal { L } = \\alpha \\mathcal { L } _ { s e m } + \\beta \\mathcal { L } _ { r e c o n } + \\gamma \\mathcal { L } _ { s c o r e } + \\eta \\mathcal { L } _ { t r a j } ,\n$$",
+        "text_format": "latex",
+        "bbox": [
+            557,
+            112,
+            861,
+            130
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "we set α = 0.2, β = 0.2, γ = 0.5, η = 1.0 by default.",
+        "bbox": [
+            511,
+            135,
+            869,
+            150
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "(8)",
+        "bbox": [
+            883,
+            113,
+            903,
+            127
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "4. Experiments",
+        "text_level": 2,
+        "bbox": [
+            513,
+            161,
+            647,
+            179
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "4.1. Benchmarks",
+        "text_level": 2,
+        "bbox": [
+            513,
+            185,
+            648,
+            202
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Open-loop nuScenes Benchmark. The nuScenes [2] benchmark is an open-loop evaluation framework developed for the real-world nuScenes dataset. The nuScenes dataset comprises 1000 driving videos captured across diverse environments. In line with previous methodologies [13, 16], we employ displacement error (L2) and collision rate (CR) as evaluation metrics for the predicted trajectories, which are sampled at 2Hz over a 3-second horizon. Closed-loop NavSim Benchmark. The NavSim [14] benchmark is built upon the OpenScene [5] dataset, encompassing 1192 training scenarios and 136 test scenarios, with a total of over 100,000 keyframes. In alignment with the officially provided baseline, we interpolate the predicted trajectories (sampled at 2Hz over a 4-second horizon) using an LQR controller. The model performance is evaluated through closed-loop PDM scores (PDMS), which are calculated based on five key factors: no at-fault collision (NC), drivable area compliance (DAC), time-to-collision (TTC), comfort (Comf.), and ego progress (EP).",
+        "bbox": [
+            509,
+            208,
+            908,
+            496
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "4.2. Implementation Details",
+        "text_level": 2,
+        "bbox": [
+            513,
+            502,
+            732,
+            517
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "nuScenes Benchmark. Following the VAD-Tiny [16] configuration, we employ ResNet-50 [8] as the image backbone, processing 6 surround-view images with a resolution of 360 × 640. The driving commands align with previous works [13], comprising three types: left, right, and straight. For each command, we predict 6 planning trajectories and select the one with the highest score corresponding to the world model as the final planning trajectory. We train the model for 12 epochs on 8 NVIDIA 3090 GPUs with a total batch size of 8 and an initial learning rate of 5e-5.",
+        "bbox": [
+            511,
+            523,
+            908,
+            675
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "NavSim Benchmark. Consistent with the NavSim benchmark, our closed-loop model takes a concatenated image formed by stitching front, front-left, and front-right camera views as input, which is then resized to 256×1024. We employ ResNet-34 [8] to extract image features. We train the model for 60 epochs on 8 NVIDIA 3090 GPUs with a total batch size of 64. Since LAW [18] is not open-sourced, we reimplement and evaluate it under settings identical to ours. For vision foundation models, we utilize the giant model from Metric3D v2 [11] for depth estimation and Grounded-SAM [31] for semantic segmentation.",
+        "bbox": [
+            511,
+            675,
+            908,
+            842
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "4.3. Main Results",
+        "text_level": 2,
+        "bbox": [
+            513,
+            848,
+            655,
+            863
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "As demonstrated in Tab. 1, we compare our proposed framework with several SOTA methods. Methods highlighted with blue background in the table require manual perception annotations, whereas methods highlighted with red background do not require manual perception annotations for training and inference. World4Drive achieves SOTA performance among perception annotation-free approaches, demonstrating an 18.0% reduction in L2 error and a 46.7% reduction in collision rate compared to strong baselines. Furthermore, World4Drive achieves the lowest collision rate among all methods. Compared to LAW, the SOTA perception-based approach, our method shows only a modest increase of less than 2% in L2 error while significantly improving safety metrics.",
+        "bbox": [
+            511,
+            869,
+            906,
+            901
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "table",
+        "img_path": "images/1ddc20e8a0a10fe61cea926acd5619ec44bdb47b7e3353a87c026b36e2576b3c.jpg",
+        "table_caption": [
+            "Table 1. End-to-end planning results on nuScenes benchmark [2]",
+            "\\* LAW [18] adopt Swin-Tiny [26] as image backbone while other methods adopt ResNet-50 [8] as image backbone."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">Method</td><td colspan=\"4\">L2 (m)↓</td><td colspan=\"4\">Collision Rate (%) ↓</td></tr><tr><td>1s</td><td>2s</td><td>3s</td><td>Avg.</td><td>1s</td><td>2s</td><td>3s</td><td>Avg.</td></tr><tr><td>ST-P3 [12]</td><td>1.33</td><td>2.11</td><td>2.90</td><td>2.11</td><td>0.23</td><td>0.62</td><td>1.27</td><td>0.71</td></tr><tr><td>OccNet [36]</td><td>1.29</td><td>2.13</td><td>2.99</td><td>2.13</td><td>0.21</td><td>0.59</td><td>1.37</td><td>0.72</td></tr><tr><td>UniAD [13]</td><td>0.48</td><td>0.96</td><td>1.65</td><td>1.03</td><td>0.05</td><td>0.17</td><td>0.71</td><td>0.31</td></tr><tr><td>VAD [16]</td><td>0.41</td><td>0.70</td><td>1.05</td><td>0.72</td><td>0.07</td><td>0.18</td><td>0.43</td><td>0.23</td></tr><tr><td>PPAD [4]</td><td>0.31</td><td>0.56</td><td>0.87</td><td>0.58</td><td>0.08</td><td>0.12</td><td>0.38</td><td>0.19</td></tr><tr><td>GenAD [47]</td><td>0.28</td><td>0.49</td><td>0.78</td><td>0.52</td><td>0.08</td><td>0.14</td><td>0.34</td><td>0.19</td></tr><tr><td>LAW* [18] (Perception-based)</td><td>0.24</td><td>0.46</td><td>0.76</td><td>0.49</td><td>0.08</td><td>0.10</td><td>0.39</td><td>0.19</td></tr><tr><td>BEV-Planner [21]</td><td>0.30</td><td>0.52</td><td>0.83</td><td>0.55</td><td>0.10</td><td>0.37</td><td>1.30</td><td>0.59</td></tr><tr><td>LAW* [18] (Perception-free)</td><td>0.26</td><td>0.57</td><td>1.01</td><td>0.61</td><td>0.14</td><td>0.21</td><td>0.54</td><td>0.30</td></tr><tr><td>World4Drive (Ours)</td><td>0.23</td><td>0.47</td><td>0.81</td><td>0.50</td><td>0.02</td><td>0.12</td><td>0.33</td><td>0.16</td></tr></table>",
+        "bbox": [
+            135,
+            108,
+            857,
+            295
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "table",
+        "img_path": "images/9a3500864400e03662a46ab58f5e07e74755d66907f508926a28de4c36c5535a.jpg",
+        "table_caption": [
+            "Table 2. End-to-end planning results on NavSim benchmark [2]",
+            "In the Input column, C represents camera modality, L represents lidar modality, and E represents ego status."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Method</td><td>Input</td><td>NC↑</td><td>DAC↑</td><td>TTC↑</td><td>Comf.↑</td><td>EP↑</td><td>PDMS↑</td></tr><tr><td>UniAD [13]</td><td>C</td><td>97.8</td><td>91.9</td><td>92.9</td><td>100.0</td><td>78.8</td><td>83.4</td></tr><tr><td>PARA-Drive [33]</td><td>C</td><td>97.9</td><td>92.4</td><td>93.0</td><td>99.8</td><td>79.3</td><td>84.0</td></tr><tr><td>LTF [30]</td><td>C</td><td>97.4</td><td>92.8</td><td>92.4</td><td>100.0</td><td>79.0</td><td>83.8</td></tr><tr><td>Transfuser [30]</td><td>C&amp;L</td><td>97.7</td><td>92.8</td><td>92.8</td><td>100.0</td><td>79.2</td><td>84.0</td></tr><tr><td>VADv2 [3]</td><td>C&amp;L</td><td>97.2</td><td>89.1</td><td>91.6</td><td>100.0</td><td>76.0</td><td>80.9</td></tr><tr><td>Hydra-MDP [19]</td><td>C&amp;L</td><td>97.9</td><td>91.7</td><td>92.9</td><td>100.0</td><td>77.6</td><td>83.0</td></tr><tr><td>DiffusionDrive [23]</td><td>C&amp;L</td><td>98.2</td><td>96.2</td><td>94.7</td><td>100.0</td><td>82.2</td><td>88.1</td></tr><tr><td>Ego-MLP</td><td>E</td><td>93.0</td><td>77.3</td><td>83.6</td><td>100.0</td><td>62.8</td><td>65.6</td></tr><tr><td>LAW (Perception-free) [18]</td><td>C</td><td>97.2</td><td>93.3</td><td>91.9</td><td>100.0</td><td>78.8</td><td>83.8</td></tr><tr><td> World4Drive (Ours)</td><td>C</td><td>97.4</td><td>94.3</td><td>92.8</td><td>100.0</td><td>79.9</td><td>85.1</td></tr></table>",
+        "bbox": [
+            135,
+            347,
+            862,
+            536
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            88,
+            580,
+            485,
+            762
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "As demonstrated in Tab. 2, World4Drive also achieves competitive performance in closed-loop metric PDMS. Compared to the baseline, our approach demonstrates significant improvements in Time-to-Collision (TTC) and Drivable Area Compliance (DAC) metrics. These metrics specifically evaluate an autonomous vehicle’s spatial awareness and understanding of the drivable area. The result indicates that incorporating the vision foundation model priors substantially enhances the model’s comprehensive understanding of the physical world. Moreover, our closed-loop metrics surpass those of other methods requiring perception annotations, with the exception of DiffusionDrive [23].",
+        "bbox": [
+            89,
+            765,
+            485,
+            901
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            511,
+            580,
+            906,
+            627
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "4.4. Ablation Study",
+        "text_level": 2,
+        "bbox": [
+            513,
+            637,
+            668,
+            654
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "In this section, we conduct several ablation studies to explore the effectiveness, robustness, and stability of our proposed World4Drive. All of the ablation experiments are conducted on the nuScenes [2] benchmark. All L2 errors and collision rates are averaged over a 3-second prediction horizon.",
+        "bbox": [
+            511,
+            660,
+            908,
+            751
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "4.4.1. Effectiveness of Each Component",
+        "text_level": 2,
+        "bbox": [
+            511,
+            760,
+            795,
+            775
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "In this section, we assess the effectiveness of each component in our method. Detailed results are demonstrated in Tab. 3. Row 1 demonstrates the result of our baseline, LAW, which only has a single-modal world model. Comparing row 1 and row 2, we observe that incorporating vehicle intention significantly reduces L2 error and collision rate. Further, the comparison between row 1 and row 4 demonstrates substantial planning performance improvements when integrating priors from vision foundation models and vision language models, highlighting the critical importance of comprehensive physical world understanding.",
+        "bbox": [
+            509,
+            780,
+            908,
+            901
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "table",
+        "img_path": "images/7aebf6e3945155f959ccdc09d5276957a33f91d614a1dd944af3a4c50db66a9c.jpg",
+        "table_caption": [
+            "Table 3. Ablation study of each proposed component"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">ID</td><td colspan=\"2\">Physical Latent Encoder</td><td colspan=\"2\">Intention-aware WM</td><td rowspan=\"2\">L2</td><td rowspan=\"2\">Collision</td></tr><tr><td>Depth</td><td>Semantic</td><td>WM</td><td>Intentions</td></tr><tr><td>1</td><td></td><td></td><td>√</td><td></td><td>0.61</td><td>0.30</td></tr><tr><td>2</td><td></td><td></td><td>√</td><td>√</td><td>0.55</td><td>0.25</td></tr><tr><td>3</td><td>√</td><td></td><td>√</td><td>√</td><td>0.51</td><td>0.29</td></tr><tr><td>4</td><td>√</td><td>√</td><td>√</td><td></td><td>0.49</td><td>0.26</td></tr><tr><td>5</td><td>√</td><td>√</td><td></td><td>√</td><td>0.61</td><td>0.36</td></tr><tr><td>6</td><td>√</td><td>√</td><td>√</td><td>√</td><td>0.50</td><td>0.16</td></tr></table>",
+        "bbox": [
+            98,
+            108,
+            473,
+            263
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "table",
+        "img_path": "images/a029c34828368a5c86fb18c74cff431a51d61261b1b3de855b3e6b77a9f1a8f3.jpg",
+        "table_caption": [
+            "Table 4. Performance under different driving conditions."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">ID</td><td rowspan=\"2\">Condition</td><td rowspan=\"2\">World4Drive (Ours) L2 (m)↓ Collsion (%)↓</td><td colspan=\"2\">LAW [18]</td></tr><tr><td>L2 (m)↓</td><td>Collsion (%) ↓</td></tr><tr><td>1</td><td>All</td><td>0.50</td><td>0.16</td><td>0.61 0.30</td></tr><tr><td>2</td><td>Day</td><td>0.47</td><td>0.16 0.56</td><td>0.26</td></tr><tr><td>3</td><td>Night</td><td>0.76</td><td>0.08 0.67</td><td>0.22</td></tr><tr><td>4</td><td>Sunny</td><td>0.50</td><td>0.18 0.58</td><td>0.29</td></tr><tr><td>5</td><td>Rainy</td><td>0.49</td><td>0.05</td><td>0.54 0.16</td></tr></table>",
+        "bbox": [
+            98,
+            297,
+            473,
+            405
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            89,
+            435,
+            483,
+            481
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "To explore the contribution of different perceptual components, we conducted a more detailed analysis. Comparing rows 2 and 3, we find that introducing spatial priors enhances positional awareness, thereby improving trajectoryfitting capabilities. Similarly, a comparison between rows 3 and 6 reveals that semantic priors significantly reduce collision rates, suggesting better obstacle understanding.",
+        "bbox": [
+            89,
+            481,
+            485,
+            587
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "Finally, we investigate the necessity of combining intentions with world modeling. The comparison between rows 4 and 6 demonstrates that adding intention modeling substantially improves planning quality, which is intuitive as intentions provide multiple planning possibilities, enabling the model to select safer trajectories. However, the comparison between rows 5 and 6 reveals that intentions alone, without world modeling, actually lead to degraded planning performance. This confirms the crucial role of the world model in evaluating and ranking multi-modal intentions.",
+        "bbox": [
+            88,
+            587,
+            485,
+            738
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "4.4.2. Performance In Different Driving Conditions",
+        "text_level": 2,
+        "bbox": [
+            89,
+            744,
+            452,
+            761
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "In this section, we analyze planning performance across diverse driving conditions, including varying weather conditions, illumination settings, and driving maneuvers. Following the official nuScenes scene descriptions, we categorize weather as sunny or rainy, illumination as day or night, and driving maneuvers as left, straight driving, or right.",
+        "bbox": [
+            89,
+            765,
+            485,
+            856
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "Tab. 4 presents a comparative analysis of our method against the baseline, LAW [18], across different weather and lighting conditions. Our approach consistently outperforms LAW across almost all environmental scenarios. Notably, compared to LAW, in challenging nighttime and rainy conditions, our method reduces collision rates by 63.7% and 68.8%, respectively. This significant improvement can be attributed to the integration of priors from vision foundation models, which enables our system to comprehend higher-dimensional spatial and semantic information about the physical environment. Consequently, our approach demonstrates greater robustness to photometric inconsistencies inherent in nighttime and rainy weather conditions, which typically impede the temporal self-supervised training of latent world models in baseline methods.",
+        "bbox": [
+            89,
+            856,
+            485,
+            901
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            511,
+            92,
+            908,
+            272
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "Tab. 5 demonstrates the comparison of planning performance under different driving maneuvers between our method and LAW. Compared to LAW, our method generates significantly safer planning trajectories across a variety of driving maneuvers.",
+        "bbox": [
+            511,
+            272,
+            908,
+            347
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "The superior planning performance under diverse driving conditions demonstrates the effectiveness and robustness of our approach.",
+        "bbox": [
+            511,
+            348,
+            906,
+            393
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "table",
+        "img_path": "images/75efa274a9f38d3b06ac7d4e726acd8f07000a1aaabe05ed844428f0b53e332b.jpg",
+        "table_caption": [
+            "Table 5. Performance under driving maneuvers."
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">Model</td><td colspan=\"3\">L2 (m)↓</td><td rowspan=\"2\"></td><td colspan=\"2\">Collsion (%)↓</td></tr><tr><td>Left Right </td><td>Straight</td><td>All</td><td>Left Right </td><td>Straight All</td></tr><tr><td>LAW World4Drive|</td><td>|0.67d 0.71 0.63d 0.69</td><td>0.58 0.48</td><td>0.61 0.50</td><td>|0.54 0.23 0.40 0.20</td><td>0.29 0.14</td><td>0.30 0.16</td></tr></table>",
+        "bbox": [
+            517,
+            422,
+            911,
+            494
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "4.4.3. Scability of World4Drive",
+        "text_level": 2,
+        "bbox": [
+            513,
+            520,
+            733,
+            535
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "To explore the scalability of our approach, we conduct experiments by varying both the size of the hidden dimension D and the image backbone. As shown in Tab. 6, comparing rows 1, 4, and 5, we scale the image backbone from ResNet34 to ResNet50 and ResNet101, while comparing rows 3, 4, and 5, we scale the size of the hidden dimension from 125 to 256 and 384.",
+        "bbox": [
+            511,
+            539,
+            908,
+            643
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "The ablation results demonstrate that World4Drive exhibits excellent scalability for both image backbone and hidden dimension, which is different from previous methods [15]. In previous methods, increasing hidden dimensions typically yields greater benefits than scaling up the image backbone. Our method shows comparable improvements with both scaling strategies. It is natural because the extracted latent representations are directly utilized for planning tasks, and both caling strategies can effectively incorporate additional scene information that directly benefits vehicle planning.",
+        "bbox": [
+            511,
+            645,
+            908,
+            811
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "4.5. Qualitative Results",
+        "text_level": 2,
+        "bbox": [
+            513,
+            818,
+            697,
+            834
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "In this section, we present the visualization of World4Drive on nuScenes benchmark. The qualitative result is shown in Fig. 5. The upper portion of the visualization demonstrates that World4Drive does safer planning during turning maneuvers compared to LAW. The lower portion shows that the world model selector effectively selects the most reasonable trajectory from multi-modal planning intentions across diverse scenarios. Additional visualizations and failure case analyses are provided in the supplementary material.",
+        "bbox": [
+            511,
+            839,
+            908,
+            901
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "image",
+        "img_path": "images/5fc6a7e3a0e8dd1094399cb243bf65484659d1c5bf84efbef6607f3eec781d93.jpg",
+        "image_caption": [
+            "Figure 5. Visualization of World4Drive. Since World4Drive does not predict explicit perception results, we render the ground truth annotations as the perception results."
+        ],
+        "image_footnote": [],
+        "bbox": [
+            99,
+            92,
+            897,
+            611
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "table",
+        "img_path": "images/1b3019c58689d1051830dec623d9166188b8eb67f0d78ee01e7ffe4237e4c43f.jpg",
+        "table_caption": [
+            "Table 6. Ablation study of scalability"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>ID</td><td>Backbone</td><td>Dimension</td><td>L2 (m)↓</td><td>Collsion (%) ↓</td></tr><tr><td>1</td><td>ResNet-34</td><td>256</td><td>0.52</td><td>0.25</td></tr><tr><td>2</td><td>ResNet-50</td><td>128</td><td>0.55</td><td>0.27</td></tr><tr><td>3</td><td>ResNet-50</td><td>256</td><td>0.50</td><td>0.16</td></tr><tr><td>4</td><td>ResNet-50</td><td>384</td><td>0.49</td><td>0.10</td></tr><tr><td>5</td><td>ResNet-101</td><td>256</td><td>0.47</td><td>0.14</td></tr></table>",
+        "bbox": [
+            99,
+            710,
+            467,
+            803
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            89,
+            825,
+            485,
+            901
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "5. Conclusion",
+        "text_level": 2,
+        "bbox": [
+            514,
+            690,
+            632,
+            707
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "In this paper, we present World4Drive, an intention-aware physical latent world model. World4Drive proposes a novel framework that incorporates driving intentions with a latent world model, innovatively leveraging a latent world model to generate, evaluate, and select multi-modal trajectories. Specifically, World4Drive proposes a physical world latent encoding module, incorporating the spatial and semantic priors from vision foundation models and aggregating temporal information. Extensive experiments on nuScenes and NavSim benchmarks demonstrate World4Drive’s profound and comprehensive understanding of the physical world, as well as the effectiveness of tightly coupling driving intentions with the latent world model.",
+        "bbox": [
+            511,
+            719,
+            908,
+            901
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "References",
+        "text_level": 2,
+        "bbox": [
+            91,
+            118,
+            187,
+            135
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "list",
+        "sub_type": "ref_text",
+        "list_items": [
+            "[1] Florent Bartoccioni, Elias Ramzi, Victor Besnier, Shashanka Venkataramanan, Tuan-Hung Vu, Yihong Xu, Loick Chambon, Spyros Gidaris, Serkan Odabas, David Hurych, et al. Vavim and vavam: Autonomous driving through video generative modeling. arXiv preprint arXiv:2502.15672, 2025. 1, 3",
+            "[2] Holger Caesar, Varun Bankiti, Alex H Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Giancarlo Baldan, and Oscar Beijbom. nuscenes: A multimodal dataset for autonomous driving. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, 2020. 2, 5, 6",
+            "[3] Shaoyu Chen, Bo Jiang, Hao Gao, Bencheng Liao, Qing Xu, Qian Zhang, Chang Huang, Wenyu Liu, and Xinggang Wang. Vadv2: End-to-end vectorized autonomous driving via probabilistic planning. arXiv preprint arXiv:2402.13243, 2024. 1, 2, 3, 6",
+            "[4] Zhili Chen, Maosheng Ye, Shuangjie Xu, Tongyi Cao, and Qifeng Chen. Ppad: Iterative interactions of prediction and planning for end-to-end autonomous driving. In European Conference on Computer Vision. Springer, 2024. 6",
+            "[5] OpenScene Contributors. Openscene: The largest up-todate 3d occupancy prediction benchmark in autonomous driving. https://github.com/OpenDriveLab/ OpenScene, 2023. 5",
+            "[6] Shenyuan Gao, Jiazhi Yang, Li Chen, Kashyap Chitta, Yihang Qiu, Andreas Geiger, Jun Zhang, and Hongyang Li. Vista: A generalizable driving world model with high fidelity and versatile controllability. arXiv preprint arXiv:2405.17398, 2024. 2",
+            "[7] Songen Gu, Wei Yin, Bu Jin, Xiaoyang Guo, Junming Wang, Haodong Li, Qian Zhang, and Xiaoxiao Long. Dome: Taming diffusion model into high-fidelity controllable occupancy world model. arXiv preprint arXiv:2410.10429, 2024. 2",
+            "[8] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition. In Proceedings of the IEEE conference on computer vision and pattern recognition, 2016. 5, 6",
+            "[9] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffusion probabilistic models. Advances in neural information processing systems, 33, 2020. 2",
+            "[10] Anthony Hu, Lloyd Russell, Hudson Yeo, Zak Murez, George Fedoseev, Alex Kendall, Jamie Shotton, and Gianluca Corrado. Gaia-1: A generative world model for autonomous driving. arXiv preprint arXiv:2309.17080, 2023. 2",
+            "[11] Mu Hu, Wei Yin, Chi Zhang, Zhipeng Cai, Xiaoxiao Long, Hao Chen, Kaixuan Wang, Gang Yu, Chunhua Shen, and Shaojie Shen. Metric3d v2: A versatile monocular geometric foundation model for zero-shot metric depth and surface normal estimation. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2024. 4, 5",
+            "[12] Shengchao Hu, Li Chen, Penghao Wu, Hongyang Li, Junchi Yan, and Dacheng Tao. St-p3: End-to-end vision-based au-",
+            "tonomous driving via spatial-temporal feature learning. In European Conference on Computer Vision. Springer, 2022. 6",
+            "[13] Yihan Hu, Jiazhi Yang, Li Chen, Keyu Li, Chonghao Sima, Xizhou Zhu, Siqi Chai, Senyao Du, Tianwei Lin, Wenhai Wang, et al. Planning-oriented autonomous driving. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, 2023. 1, 2, 5, 6",
+            "[14] NAV IM. Navsim: Data-driven non-reactive autonomous vehicle simulation and benchmarking. arXiv preprint arXiv:2406.15349, 2024. 2, 5",
+            "[15] Xiaosong Jia, Junqi You, Zhiyuan Zhang, and Junchi Yan. Drivetransformer: Unified transformer for scalable end-toend autonomous driving. In The Thirteenth International Conference on Learning Representations, 2025. 2, 7",
+            "[16] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang, and Xinggang Wang. Vad: Vectorized scene representation for efficient autonomous driving. ICCV, 2023. 1, 2, 5, 6",
+            "[17] Bu Jin, Yupeng Zheng, Pengfei Li, Weize Li, Yuhang Zheng, Sujie Hu, Xinyu Liu, Jinwei Zhu, Zhijie Yan, Haiyang Sun, et al. Tod3cap: Towards 3d dense captioning in outdoor scenes. In European Conference on Computer Vision. Springer, 2024. 1",
+            "[18] Yingyan Li, Lue Fan, et al. Enhancing end-to-end autonomous driving with latent world model. ICLR, 2025. 1, 2, 3, 4, 5, 6, 7",
+            "[19] Zhenxin Li, Kailin Li, Shihao Wang, Shiyi Lan, Zhiding Yu, Yishen Ji, Zhiqi Li, Ziyue Zhu, Jan Kautz, Zuxuan Wu, et al. Hydra-mdp: End-to-end multimodal planning with multitarget hydra-distillation. arXiv preprint arXiv:2406.06978, 2024. 1, 2, 6",
+            "[20] Zhiqi Li, Wenhai Wang, Hongyang Li, Enze Xie, Chonghao Sima, Tong Lu, Qiao Yu, and Jifeng Dai. Bevformer: learning bird’s-eye-view representation from lidar-camera via spatiotemporal transformers. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2024. 2",
+            "[21] Zhiqi Li, Zhiding Yu, Shiyi Lan, Jiahan Li, Jan Kautz, Tong Lu, and Jose M Alvarez. Is ego status all you need for openloop end-to-end autonomous driving? In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2024. 6",
+            "[22] Bencheng Liao, Shaoyu Chen, Xinggang Wang, Tianheng Cheng, Qian Zhang, Wenyu Liu, and Chang Huang. Maptr: Structured modeling and learning for online vectorized hd map construction. arXiv preprint arXiv:2208.14437, 2022. 2",
+            "[23] Bencheng Liao, Shaoyu Chen, et al. Diffusiondrive: Truncated diffusion model for end-to-end autonomous driving. CVPR, 2025. 2, 6",
+            "[24] Xuewu Lin, Tianwei Lin, Zixiang Pei, Lichao Huang, and Zhizhong Su. Sparse4d: Multi-view 3d object detection with sparse spatial-temporal fusion. arXiv preprint arXiv:2211.10581, 2022. 2",
+            "[25] Yingfei Liu, Tiancai Wang, Xiangyu Zhang, and Jian Sun. Petr: Position embedding transformation for multi-view 3d object detection. In European conference on computer vision. Springer, 2022. 4"
+        ],
+        "bbox": [
+            99,
+            143,
+            483,
+            224
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "list",
+        "sub_type": "ref_text",
+        "list_items": [
+            "[26] Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei, Zheng Zhang, Stephen Lin, and Baining Guo. Swin transformer: Hierarchical vision transformer using shifted windows. In Proceedings of the IEEE/CVF international conference on computer vision, 2021. 6",
+            "[27] Ana-Maria Marcu, Long Chen, Jan Hunermann, Alice Karn- ¨ sund, Benoit Hanotte, Prajwal Chidananda, Saurabh Nair, Vijay Badrinarayanan, Alex Kendall, Jamie Shotton, et al. Lingoqa: Visual question answering for autonomous driving. In European Conference on Computer Vision. Springer, 2024. 1, 2",
+            "[28] Chen Min, Dawei Zhao, Liang Xiao, Jian Zhao, Xinli Xu, Zheng Zhu, Lei Jin, Jianshu Li, Yulan Guo, Junliang Xing, et al. Driveworld: 4d pre-trained scene understanding via world models for autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2024. 2",
+            "[29] Chenbin Pan, Burhaneddin Yaman, Tommaso Nesti, Abhirup Mallik, Alessandro G Allievi, Senem Velipasalar, and Liu Ren. Vlp: Vision language planning for autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2024. 2",
+            "[30] Aditya Prakash, Kashyap Chitta, et al. Multi-modal fusion transformer for end-to-end autonomous driving. In CVPR, 2021. 6",
+            "[31] Tianhe Ren, Shilong Liu, Ailing Zeng, Jing Lin, Kunchang Li, He Cao, Jiayu Chen, Xinyu Huang, Yukang Chen, Feng Yan, et al. Grounded sam: Assembling open-world models for diverse visual tasks. arXiv preprint arXiv:2401.14159, 2024. 4, 5",
+            "[32] Chonghao Sima, Katrin Renz, Kashyap Chitta, Li Chen, Hanxue Zhang, Chengen Xie, Jens Beißwenger, Ping Luo, Andreas Geiger, and Hongyang Li. Drivelm: Driving with graph visual question answering. In European Conference on Computer Vision. Springer, 2024. 1, 2",
+            "[33] Wenchao Sun, Xuewu Lin, Yining Shi, Chuang Zhang, Haoran Wu, and Sifa Zheng. Sparsedrive: End-to-end autonomous driving via sparse scene representation. arXiv preprint arXiv:2405.19620, 2024. 1, 2, 6",
+            "[34] Ran Tian, Boyi Li, Xinshuo Weng, Yuxiao Chen, Edward Schmerling, Yue Wang, Boris Ivanovic, and Marco Pavone. Tokenize the world into object-level knowledge to address long-tail events in autonomous driving. arXiv preprint arXiv:2407.00959, 2024. 2",
+            "[35] Xiaoyu Tian, Junru Gu, Bailin Li, Yicheng Liu, Yang Wang, Zhiyong Zhao, Kun Zhan, Peng Jia, Xianpeng Lang, and Hang Zhao. Drivevlm: The convergence of autonomous driving and large vision-language models. arXiv preprint arXiv:2402.12289, 2024. 2",
+            "[36] Wenwen Tong, Chonghao Sima, Tai Wang, Li Chen, Silei Wu, Hanming Deng, Yi Gu, Lewei Lu, Ping Luo, Dahua Lin, et al. Scene as occupancy. In Proceedings of the IEEE/CVF International Conference on Computer Vision, 2023. 6",
+            "[37] Xiaofeng Wang, Zheng Zhu, Guan Huang, Xinze Chen, Jiagang Zhu, and Jiwen Lu. Drivedreamer: Towards real-worlddrive world models for autonomous driving. In European Conference on Computer Vision. Springer, 2024. 2",
+            "[38] Yuqi Wang, Jiawei He, Lue Fan, Hongxin Li, Yuntao Chen, and Zhaoxiang Zhang. Driving into the future: Multiview visual forecasting and planning with world model for autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2024. 2",
+            "[39] Xinshuo Weng, Boris Ivanovic, Yan Wang, Yue Wang, and Marco Pavone. Para-drive: Parallelized architecture for realtime autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2024. 1, 2",
+            "[40] Zebin Xing, Xingyu Zhang, Yang Hu, Bo Jiang, Tong He, Qian Zhang, Xiaoxiao Long, and Wei Yin. Goalflow: Goaldriven flow matching for multimodal trajectories generation in end-to-end autonomous driving. In Proceedings of the Computer Vision and Pattern Recognition Conference, 2025. 2",
+            "[41] Chenyu Yang, Yuntao Chen, Hao Tian, Chenxin Tao, Xizhou Zhu, Zhaoxiang Zhang, Gao Huang, Hongyang Li, Yu Qiao, Lewei Lu, et al. Bevformer v2: Adapting modern image backbones to bird’s-eye-view recognition via perspective supervision. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2023. 2",
+            "[42] Pengxuan Yang, Yupeng Zheng, Qichao Zhang, Kefei Zhu, Zebin Xing, Qiao Lin, Yun-Fu Liu, Zhiguo Su, and Dongbin Zhao. Uncad: Towards safe end-to-end autonomous driving via online map uncertainty. arXiv preprint arXiv:2504.12826, 2025. 1",
+            "[43] Wei Yin, Chi Zhang, et al. Metric3d: Towards zero-shot metric 3d prediction from a single image. In ICCV, 2023. 4",
+            "[44] Lunjun Zhang, Yuwen Xiong, Ze Yang, Sergio Casas, Rui Hu, and Raquel Urtasun. Copilot4d: Learning unsupervised world models for autonomous driving via discrete diffusion. In The Twelfth International Conference on Learning Representations, 2024. 2",
+            "[45] Guosheng Zhao, Xiaofeng Wang, Zheng Zhu, Xinze Chen, Guan Huang, Xiaoyi Bao, and Xingang Wang. Drivedreamer-2: Llm-enhanced world models for diverse driving video generation. arXiv preprint arXiv:2403.06845, 2024. 2",
+            "[46] Wenzhao Zheng, Weiliang Chen, Yuanhui Huang, Borui Zhang, Yueqi Duan, and Jiwen Lu. Occworld: Learning a 3d occupancy world model for autonomous driving. In European conference on computer vision. Springer, 2024. 2",
+            "[47] Wenzhao Zheng, Ruiqi Song, Xianda Guo, Chenming Zhang, and Long Chen. Genad: Generative end-to-end autonomous driving. In European Conference on Computer Vision. Springer, 2024. 2, 6",
+            "[48] Yupeng Zheng, Zhongpu Xia, Qichao Zhang, Teng Zhang, Ben Lu, Xiaochuang Huo, Chao Han, Yixian Li, Mengjie Yu, Bu Jin, et al. Preliminary investigation into data scaling laws for imitation learning-based end-to-end autonomous driving. arXiv preprint arXiv:2412.02689, 2024. 2"
+        ],
+        "bbox": [
+            91,
+            93,
+            483,
+            161
+        ],
+        "page_idx": 9
+    }
+]
