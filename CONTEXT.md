@@ -76,9 +76,17 @@ number appears in the source MD — the anti-poisoning firewall. Code: `G2`.
 _Avoid_: G2 (code-only name), data-fidelity gate
 
 **锚点门 (anchor gate)**:
-Inside branch1. Mechanical + classifier check that every empirical assertion in
-the human report carries a `<!--ref-->` anchor. Code: three-layer anchor /
-`AnchorGateError`.
+Inside branch1. Verifies the 理解阅读 is **faithful** to its verified ARA (ADR-0012),
+NOT that prose carries anchors — the report MAY contain numbers in prose. Two layers:
+(b) mechanical — every report number grounds in the source MD (tolerant: only
+systematic misses block); (c) a config-routed LLM judge comparing report ↔ ARA for
+material misattribution / overclaim. The engine-anchored 核心结论 block keeps its
+`<!--ref-->` markers (resolved by 最终门). Name kept for continuity (ADR-0008) though
+now a mild misnomer — the gate's job is faithfulness. Code: three-layer anchor /
+`AnchorGateError`. (Per ADR-0012; implementation pending — current code still does the
+old `<!--ref-->`-per-line check.)
+_Avoid_: treating it as a "`<!--ref-->` on every empirical prose line" check (the
+pre-ADR-0012 behavior)
 
 **最终门 (final gate)**:
 After both chains. Composite seal of four sub-checks: anchor resolution,
