@@ -66,9 +66,10 @@ for a complete, copy-pasteable instance.
   claim must be grounded in the MD text. Fabricated or paraphrased-into-existence
   numbers are caught downstream: G2 (`../../scripts/audit/g2_data_fidelity.py`)
   runs ground-truth-isolated skeptic votes over your numbers and **hard-blocks**
-  fabrication before branch1 promotion. A report number that isn't grounded in the
-  MD — or that misattributes a result — later raises `AnchorGateError` in branch1's
-  忠实门 (ADR-0012: (b) grounding + (c) judge; 吸收-D1).
+  fabrication before branch1 promotion. ADR-0012 rev: a branch1 report number that
+  isn't grounded in the ARA — or that misattributes a result — does NOT block
+  (branch1 has no hard gate); it is surfaced to the reader in the report's opening
+  「评价」 note ((b) machine number-check vs the ARA + (c) advisory judge).
 - **Independent invocation [MUST].** A single, isolated Agent-tool call per
   paper. No shared analyzer state across concurrent spokes — `resolve_analysis`
   is injected as a keyword arg precisely so concurrent spokes never share or
@@ -82,5 +83,6 @@ for a complete, copy-pasteable instance.
   in the full pipeline; [`../../examples/sample-ara-bundle.json`](../../examples/sample-ara-bundle.json)
   is the literal target dict.
 - Sibling audit seams back the gates that check this analyzer's output: G2
-  skeptic, G3 rigor reviewer, G3 entailment judge; and the branch1 忠实门
-  `faithfulness_judge` audits the human report derived from this ARA (ADR-0012).
+  skeptic, G3 rigor reviewer, G3 entailment judge; and the branch1 「评价」
+  `faithfulness_judge` writes an advisory note on the human report derived from
+  this ARA (ADR-0012 rev — non-blocking).

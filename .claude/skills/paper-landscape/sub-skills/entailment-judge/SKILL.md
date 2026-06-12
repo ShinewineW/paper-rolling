@@ -72,12 +72,10 @@ The required-design rubric is the seam's **private** knowledge — it lives in t
 judge's prompt, never in any generator prompt (mirrors `RigorScoreFn` /
 `SkepticVoteFn` isolation in `scripts/audit/types.py`).
 
-## Relation to C4 (`empirical_classifier`)
+## Relation to C4 (`empirical_classifier`) — RETIRED
 
-`run_g3` also accepts an optional `empirical_classifier: Callable[[str], bool]`
-(ROADMAP C4), which is a **separate** seam feeding the branch1 anchor check's
-empirical-sentence detection in `scripts/audit/anchor_resolution.py::check_branch1_md_anchors`
-(defaulting to the `_is_empirical_performance` metric-cue heuristic). That C4 slot
-is where a trained NLI / factual-consistency classifier plugs in. `entailment_judge`
-is the distinct **LLM/heuristic entailment path** over claims↔experiments — do not
-conflate the two.
+ADR-0012 rev retired the branch1 anchor machinery, so the `empirical_classifier`
+(ROADMAP C4) seam — which fed the now-dead `anchor_resolution.check_branch1_md_anchors`
+empirical-sentence detection — was **removed** from `run_g3` / `run_campaign` (see
+`tests/audit/test_public_api.py`). `entailment_judge` is unaffected: it remains the
+**LLM/heuristic entailment path** over claims↔experiments inside G3's 最终门.

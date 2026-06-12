@@ -94,21 +94,25 @@ analyzer written `12.0` (absent from the MD), the majority would vote
 `found_in_source=False` → `ProduceGateBlocked`, nothing promoted (OT-5),
 `_failed/{key}.md` written, hub backfills the next candidate.
 
-## 6. branch1 → person_vault/{key}/report.md  [忠实门]
+## 6. branch1 → person_vault/{key}/report.md  [opening 「评价」, no gate]
 
 The illustrated Chinese report (template:
 [`../templates/branch1-report.md`](../templates/branch1-report.md); quality bar:
-[`../references/branch1-quality.md`](../references/branch1-quality.md)). ADR-0012:
-prose numbers must be GROUNDED in the frozen MD (their value present), not
-self-anchored; the engine 核心结论 claim weave still carries resolvable anchors:
+[`../references/branch1-quality.md`](../references/branch1-quality.md)). ADR-0012 rev:
+branch1 has NO hard gate — it opens with a non-blocking 「评价」 note, and prose carries
+numbers in plain natural language (the `<!--ref-->` anchoring is retired):
 
 ```markdown
+## 评价
+> 机器核对:正文数字均可在已验证知识包(ARA)中对应。
+整体与已验证知识包一致,叙述忠实。
+
 ## 摘要翻译
-...在 Minecraft Diamond 上取得 9.1<!--ref:r-9-1--><!--anchor:quote:9.1--> 的回合回报,强于最强基线的 7.1<!--ref:r-7-1--><!--anchor:quote:7.1-->。
+...在 Minecraft Diamond 上取得 9.1 的回合回报,强于最强基线的 7.1。
 ```
 
 `### 数学方法` / `### Loss 亮点解释` stay number-free (from `math_intuition` /
-`loss_highlight`), so they make no performance claim and pass the 忠实门.
+`loss_highlight`), so they make no claim for the 评价's machine number-check to surface.
 
 ## 7. G3 seal  [LLM seams #3 + #4 — after both branches]
 
@@ -122,7 +126,8 @@ D4_argument_coherence:5  D5_exploration_integrity:5  D6_methodological_rigor:4
 
 mean = 4.67, min = 4 → grade **Strong Accept** → `passes_seal2 = true`.
 `entailment_judge` confirms C1 (a `generalization` claim) is entailed by experiment
-E1. The 忠实门's kept anchor-form lint passes (核心结论 anchors resolve). `level2_report.json` is written; the seal holds. (Had the
+E1. G3's branch1 check is only G3R0 (report.md exists — it does; ADR-0012 rev retired
+anchor-resolution). `level2_report.json` is written; the seal holds. (Had the
 grade been < Weak Accept, `run_g3` returns a blocked `GateVerdict` carrying a
 hard-block `SEAL2` finding, and the bounded `run_with_budget` re-emits, then
 quarantines.)

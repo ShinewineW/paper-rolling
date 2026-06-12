@@ -224,7 +224,6 @@ def run_campaign(
     run_cli: Callable,  # infra adapter
     cross_model_votes: dict | None = None,  # future
     cross_model_sample: float = 0.0,  # future
-    empirical_classifier: Callable | None = None,  # future
     requested_topic: str | None = None,  # override for gate
     requested_n: int | None = None,  # override for gate
 ) → TickResult:

@@ -1,25 +1,31 @@
 <!--
 TEMPLATE — person_vault/{key}/report.md  (branch1, written by scripts/output/branch1_report.py::write_branch1)
 The human-facing illustrated Chinese report. Section ORDER and headings below match the writer.
-The engine 核心结论-block anchor convention and the "number-free derivation" rule are
-LOAD-BEARING — see ../references/branch1-quality.md (they keep the branch1 忠实门 green,
-ADR-0012: prose numbers must be GROUNDED, not anchored). Worked instance:
+ADR-0012 rev: branch1 has NO hard gate — it ALWAYS publishes, opening with a non-blocking
+「评价」 note (see ../references/branch1-quality.md). Prose carries numbers in plain natural
+language; the <!--ref-->/<!--anchor:--> anchoring is RETIRED. Worked instance:
 ../examples/worked-example.md.
 -->
 # {candidate.title} — 深度解读
 
+## 评价
+<!-- Prepended by branch1_gate.build_assessment — NEVER blocks. (b) machine number-check:
+     any report prose number whose value is not in the verified ARA is listed for the reader
+     (or "未能读取 ARA,本次未核对" if the ARA can't be read — never a false all-clear);
+     (c) an advisory LLM judge note (report ↔ ARA); plus the ARA's AUDIT_FLAGS body quoted inline. -->
+> 机器核对:正文数字均可在已验证知识包(ARA)中对应。
+
 ## 摘要翻译
-<!-- analysis.claims, woven into prose. ADR-0012 (忠实门): every prose number MUST be
-     GROUNDED — its value must appear in the frozen {ID}.md — or the gate hard-blocks
-     (AnchorGateError). Prose no longer needs a <!--ref--> marker; the engine 核心结论
-     block is still anchored (shape \d+(?:\.\d+)?, integers AND decimals) so 最终门 resolves it: -->
-本文方法在 Minecraft Diamond 上取得 9.1<!--ref:r1--><!--anchor:quote:9.1--> 的回合回报,强于最强基线的 7.1<!--ref:r2--><!--anchor:quote:7.1-->。…
+<!-- analysis.claims, woven into prose. ADR-0012 rev: prose carries numbers in plain natural
+     language (no <!--ref--> anchors). Faithfulness is surfaced to the reader by the 评价
+     above, never by a gate — branch1 always publishes. -->
+本文方法在 Minecraft Diamond 上取得 9.1 的回合回报,强于最强基线的 7.1。…
 
 ## 整体架构
 本文方法的核心组件构成如下(原图为 ground truth,以下为简化示意,以原图为准):
 
 ## 模型结构图
-原图见论文 Figure(忠实锚点,ground truth)。下为统一风格简化重绘(简化示意,以原图为准):
+原图见论文 Figure(以原图为准,ground truth)。下为统一风格简化重绘(简化示意,以原图为准):
 
 ```mermaid
 flowchart TB
@@ -41,8 +47,8 @@ flowchart TB
 
 ### 数学方法
 <!-- analysis.math_intuition + analysis.math_toy_example + the $$…$$ pulled from analysis.algorithm.
-     DELIBERATELY number-free / metric-cue-free so the section reads as illustration, not a
-     performance claim the 忠实门 would demand grounding for. -->
+     DELIBERATELY number-free / metric-cue-free so the section reads as a clean illustration
+     (no bare numbers for the 评价's machine number-check to surface). -->
 
 > ⚠ AI 推导,需人工复核(公式保真已对照 branch2 algorithm.md 源公式)。
 

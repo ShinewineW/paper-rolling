@@ -21,8 +21,7 @@ a CLI:
 run_campaign(*, workspace, discover, resolve_analysis, skeptic_votes,
              rigor_scores, entailment_judge, http, run_cli,
              cross_model_votes=None, cross_model_sample=0.0,
-             empirical_classifier=None, write_report=None,
-             faithfulness_judge=None,
+             write_report=None, faithfulness_judge=None,
              repo_resolver=None, requested_topic=None,
              requested_n=None, requested_auto_discover=None,
              max_concurrent=5) -> TickResult
@@ -184,7 +183,7 @@ That is the entire wiring — see SKILL.md "Invoke the engine (quickstart)".
 so a `ProduceGateBlocked` aborts before promotion. G3 runs after both branches
 under the bounded `run_with_budget(...)` (`max_gate_rounds=2`), calling
 `run_g3(person_path, ai_path, md_path, content_list_path, rigor_scores=...,
-entailment_judge=..., empirical_classifier=...)`. The spoke **never** writes the
+entailment_judge=...)`. The spoke **never** writes the
 ledger; the hub records the exact `person_vault_path` / `ai_package_path`
 `produce_outputs` returned. See SKILL.md "Full pipeline order (per tick)" for the full tick.
 
