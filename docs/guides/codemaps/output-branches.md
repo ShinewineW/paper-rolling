@@ -37,7 +37,7 @@ branch1 (human report)
     │
     └─ thin deterministic path (if no write_report):
        ├─ format analysis → markdown template
-       ├─ 忠实门 (ADR-0012): kept anchor-form lint + (b) grounding
+       ├─ 忠实门 (ADR-0012): kept anchor-form lint + (b) grounding + (c) judge (if supplied)
        └─ output: person_vault/{key}/report.md
     ↓
 G3 gate (seal: anchor + eq fidelity + rigor + entailment)
