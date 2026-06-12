@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+import scripts.output.produce as produce_mod
 from scripts.output.ara_schema import validate_ara_tree
 from scripts.output.produce import produce_outputs
+from scripts.paths import EngineAbort
 
 
 def test_produce_writes_both_vaults_with_same_key(tmp_path, candidate, ledger, md_path, analyzer):
@@ -223,3 +227,68 @@ def test_branch2_reemit_threads_repo_resolver(tmp_path, candidate, ledger, md_pa
         prior_failure_analyzer="上一稿 rigor 不足,请更严格核对源文数字",
     )
     assert calls, "branch2 re-emit 未调用注入的 repo_resolver(回退默认 = R10 回归)"
+
+
+def test_engineabort_after_ara_built_preserves_staging(tmp_path, monkeypatch):
+    # 让 branch2 渲染出一个非空 ARA 并过 Seal-1（不依赖真 analyzer bundle）。
+    def fake_write_branch2(stage_ai, candidate, analysis, *, md_path, repo_resolver=None):
+        Path(stage_ai).mkdir(parents=True, exist_ok=True)
+        (Path(stage_ai) / "PAPER.md").write_text("ara", encoding="utf-8")
+
+    monkeypatch.setattr(produce_mod, "write_branch2", fake_write_branch2)
+    monkeypatch.setattr(produce_mod, "validate_ara_tree", lambda _stage_ai: [])
+
+    md = tmp_path / "x.md"
+    md.write_text("src", encoding="utf-8")
+    candidate = {"title": "T", "arxiv_id": "2509.00001", "doi": None}
+
+    class _Ledger:
+        def intake_date(self):
+            import datetime
+
+            return datetime.date(2026, 6, 12)
+
+        def record_code_ref(self, *a, **k): ...
+
+    def abort_gate(_ai_entry):
+        raise EngineAbort("qwen audit endpoint down")
+
+    with pytest.raises(EngineAbort) as ei:
+        produce_mod.produce_outputs(
+            md,
+            candidate,
+            _Ledger(),
+            root=tmp_path,
+            resolve_analysis=lambda *a, **k: {"ok": 1},
+            g2_gate=abort_gate,
+        )
+    staged = getattr(ei.value, "staged_dir", None)
+    assert staged is not None, "EngineAbort must carry staged_dir when an ARA was built"
+    assert (Path(staged) / "ai" / "ara" / "PAPER.md").exists(), "built ARA must survive the abort"
+
+
+def test_engineabort_before_ara_built_still_cleans(tmp_path, monkeypatch):
+    # analyzer transport down → ARA 没建 → staging 无 ARA → 仍然清理，不挂 staged_dir。
+    md = tmp_path / "x.md"
+    md.write_text("src", encoding="utf-8")
+    candidate = {"title": "T", "arxiv_id": "2509.00002", "doi": None}
+
+    class _Ledger:
+        def intake_date(self):
+            import datetime
+
+            return datetime.date(2026, 6, 12)
+
+    def abort_resolve(*a, **k):
+        raise EngineAbort("analyzer backend down")
+
+    with pytest.raises(EngineAbort) as ei:
+        produce_mod.produce_outputs(
+            md,
+            candidate,
+            _Ledger(),
+            root=tmp_path,
+            resolve_analysis=abort_resolve,
+            g2_gate=lambda _x: None,
+        )
+    assert getattr(ei.value, "staged_dir", None) is None

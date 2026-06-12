@@ -28,6 +28,7 @@ from scripts.output.branch1_llm import write_branch1_llm
 from scripts.output.branch1_report import AnchorGateError, write_branch1
 from scripts.output.branch2_ara import write_branch2
 from scripts.output.naming import find_existing_entries, vault_key
+from scripts.paths import EngineAbort, ara_is_nonempty
 
 
 @dataclass(frozen=True)
@@ -353,6 +354,17 @@ def produce_outputs(
         # so do NOT let `finally` delete it. SpokeCancelled + success keep this
         # False, so their staging is still cleaned up (no temp leak).
         handed_off = True
+        raise
+    except EngineAbort as exc:
+        # ADR-0011: a transport abort (e.g. the Qwen audit endpoint dropped) must
+        # NOT let `finally` delete a built-but-unverified ARA. If the staged branch2
+        # ARA exists, hand `staging` to the spoke (which scenes it) via the same
+        # `staged_dir` attribute the gate exceptions use, then re-raise so the tick
+        # still aborts (cost guard unchanged). An abort BEFORE the ARA is built
+        # (analyzer transport down) leaves no ARA → fall through to the finally rm.
+        if ara_is_nonempty(staging / "ai" / "ara"):
+            exc.staged_dir = staging
+            handed_off = True
         raise
     finally:
         if not handed_off:

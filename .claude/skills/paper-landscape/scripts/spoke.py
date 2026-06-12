@@ -45,7 +45,7 @@ from scripts.output.produce import (
     StructuralSealFailed,
     produce_outputs,
 )
-from scripts.paths import FAILURE_AUDIT_BLOCK, FAILURE_CONVERT_ERROR
+from scripts.paths import FAILURE_AUDIT_BLOCK, FAILURE_CONVERT_ERROR, EngineAbort
 
 
 def _synthesize_content_list(md_path: Path) -> Path:
@@ -223,6 +223,29 @@ def make_spoke(
                 attempted_tier=str(ing.tier),
             )
 
+        def _abort_scene(exc) -> None:
+            # ADR-0011: a transport abort (EngineAbort) anywhere in produce / G3 may
+            # carry a built-but-unverified staged ARA (produce_outputs attached
+            # `staged_dir`). Scene it so the paid-for ARA survives for debug; the
+            # caller then RE-RAISES so the tick still aborts (cost guard unchanged).
+            # No staged_dir (abort before the ARA was built) → nothing to preserve.
+            staged = getattr(exc, "staged_dir", None)
+            if staged is None:
+                return
+            write_scene(
+                workspace=workspace,
+                key=cand_key,
+                ledger_key=cand_key,
+                failed_gate="传输中断",
+                findings=[{"target": "ara", "observation": str(exc)}],
+                engine_commit=current_commit(workspace),
+                candidate=candidate,
+                md_path=ing.md_path,
+                content_list_path=content_list_path,
+                analysis=None,
+                staged_dir=staged,
+            )
+
         # 5. branch2 -> Seal-1 -> G2 -> branch1, with a G2 blind-retry budget. A
         #    number-gate hard block re-runs the analyzer (fresh sampling, NO verdict
         #    injection — ADR-0006) up to g2_blind_retry_rounds times; each intermediate
@@ -266,6 +289,11 @@ def make_spoke(
                     staged_dir=getattr(exc, "staged_dir", None),
                     reason=f"branch1 three-layer anchor hard-gate: {exc}",
                 )
+            except EngineAbort as exc:
+                # ADR-0011: pre-promote transport abort with a built ARA → scene it,
+                # then re-raise (tick still aborts; cost guard unchanged).
+                _abort_scene(exc)
+                raise
         assert produced is not None  # the loop either broke with a result or returned a scene
 
         # 6. G3 seal (after both branches), bounded. On re-emit, rebuild branches.
@@ -381,17 +409,22 @@ def make_spoke(
                     "tier": ing.tier,
                 },
             )
+        except EngineAbort as exc:
+            # ADR-0011 (Codex R1): an EngineAbort during a G3 re-emit's _attempt()
+            # carries the re-emit's built staged ARA — scene it, then re-raise so the
+            # tick still aborts. Without this the staged ARA is orphaned in /tmp.
+            _abort_scene(exc)
+            raise
         except _Unfixable as exc:
             # An ingest-rooted G3 finding → don't spin the budget; land the 最终门 scene.
             return _g3_to_scene(exc.verdict)
         except (StructuralSealFailed, ProduceGateBlocked, AnchorGateError) as exc:
             # A re-emitted branch hit its own downstream gate before re-promotion.
             # `produced` still points at the PRIOR round's promoted product (the
-            # _on_g3_reemit assignment never completed) — remove it so a G3-failed
-            # product never lingers in the vault, then land the matching scene from
-            # the re-emit's staged_dir (audit R3 Finding 1).
-            shutil.rmtree(produced.person_path, ignore_errors=True)
-            shutil.rmtree(produced.ai_path, ignore_errors=True)
+            # _on_g3_reemit assignment never completed). ADR-0011 scene-before-rm:
+            # land the re-emit scene FIRST, THEN remove the prior promoted product
+            # from the vault — a write_scene failure can no longer lose both (and if
+            # it throws, produced.* lingers and consistency_check preserves it).
             gate = {
                 "StructuralSealFailed": "结构门",
                 "ProduceGateBlocked": "数字门",
@@ -410,6 +443,8 @@ def make_spoke(
                 analysis=None,
                 staged_dir=getattr(exc, "staged_dir", None),
             )
+            shutil.rmtree(produced.person_path, ignore_errors=True)
+            shutil.rmtree(produced.ai_path, ignore_errors=True)
             return SpokeResult(
                 status="failed",
                 person_vault_path=None,
