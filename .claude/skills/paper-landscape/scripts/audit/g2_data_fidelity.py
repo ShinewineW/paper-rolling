@@ -21,7 +21,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from scripts.audit.ara_tree import extract_claim_registry, extract_numbers, find_ara_dir
+from scripts.audit.ara_tree import (
+    extract_claim_registry,
+    extract_numbers,
+    find_ara_dir,
+    number_present,
+    source_value_set,
+)
 from scripts.audit.types import (
     Finding,
     GateVerdict,
@@ -139,34 +145,6 @@ def _nearest_source_number(number: str, source_md: str) -> str | None:
     return None
 
 
-def _source_value_set(source_md: str) -> set[float]:
-    """The distinct numeric VALUES present in the source MD (ground truth), parsed
-    from its number tokens. Layer-1 uses this to confirm an evidence number
-    mechanically — by value, so cosmetic forms match (28.40 == 28.4, 1.0 == 1) —
-    without consulting the (unreliable) LLM skeptic."""
-    values: set[float] = set()
-    for tok in extract_numbers(source_md):
-        try:
-            values.add(float(tok))
-        except ValueError:
-            continue
-    return values
-
-
-def _mechanically_present(number: str, source_values: set[float]) -> bool:
-    """True iff `number`'s VALUE appears in the source MD — the deterministic
-    lookup-channel check. Verbatim/normalized presence is CODE's job (a substring/
-    value check is exact where the LLM skeptic false-flags present numbers); only
-    a number NOT mechanically present escalates to the skeptic for the SEMANTIC
-    question (is it derivable via a trivial transform?). Conservative: a
-    non-numeric token or an absent value returns False, so a fabricated number is
-    never confirmed here — it escalates and is judged."""
-    try:
-        return float(number) in source_values
-    except ValueError:
-        return False
-
-
 def run_g2(
     ai_package_dir: Path,
     md_path: Path,
@@ -213,8 +191,8 @@ def run_g2(
     # numbers (the qwen failure that motivated this split); a value check does not.
     # Only numbers NOT mechanically present escalate to the skeptic (Layer 2),
     # which judges the SEMANTIC question — is it derivable via a trivial transform?
-    source_values = _source_value_set(source_md)
-    escalated = tuple(n for n in candidate_numbers if not _mechanically_present(n, source_values))
+    source_values = source_value_set(source_md)
+    escalated = tuple(n for n in candidate_numbers if not number_present(n, source_values))
     escalated_set = set(escalated)
 
     votes_per_round: list[tuple[SkepticVote, ...]] = []

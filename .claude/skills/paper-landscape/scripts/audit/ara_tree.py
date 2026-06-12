@@ -42,6 +42,30 @@ def extract_numbers(text: str) -> tuple[str, ...]:
     return tuple(seen)
 
 
+def source_value_set(text: str) -> set[float]:
+    """The distinct numeric VALUES present in `text` (parsed from its number
+    tokens). Lets a candidate number be confirmed BY VALUE — cosmetic forms match
+    (28.40 == 28.4, 1.0 == 1) — without an LLM. Shared by 数字门 (G2) and the
+    branch1 忠实门."""
+    values: set[float] = set()
+    for tok in extract_numbers(text):
+        try:
+            values.add(float(tok))
+        except ValueError:
+            continue
+    return values
+
+
+def number_present(number: str, source_values: set[float]) -> bool:
+    """True iff `number`'s VALUE appears in `source_values`. Conservative: a
+    non-numeric token or an absent value returns False, so a fabricated number is
+    never confirmed mechanically — it escalates to the LLM layer."""
+    try:
+        return float(number) in source_values
+    except ValueError:
+        return False
+
+
 def _infer_claim_type(statement: str) -> ClaimType:
     low = statement.lower()
     if any(k in low for k in _CAUSAL):
