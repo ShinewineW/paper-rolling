@@ -19,6 +19,7 @@ import json
 import sys
 from pathlib import Path
 
+from scripts.audit.g3_seal import load_ara_bundle
 from scripts.audit.rigor_rubric import DIMENSION_KEYS
 from scripts.audit.types import ClaimRecord, SkepticVote
 from scripts.llm.analyzer import REQUIRED_ARA_KEYS as _REQUIRED_ARA_KEYS
@@ -390,8 +391,48 @@ def write_report(
     return {"sections": sections, "figures": figures}
 
 
+def faithfulness_judge(report_text: str, ara_dir: Path) -> dict:
+    """branch1 忠实门 (c): is the 理解阅读 FAITHFUL to its verified ARA? (ADR-0012)
+
+    Ground-truth-isolated from the writer: routed to the `faithfulness` provider
+    and run at tier=fast, so it is a DIFFERENT model than the writer (writer=strong).
+    Bar = "would a reader be MATERIALLY MISLED" (clear misattribution / overclaim),
+    NOT prose-precision nitpicks — rigor lives in the ARA; this is a light backstop.
+
+    Returns {"faithful": bool, "findings": [{"claim": str, "issue": str}, ...]}.
+    Fails CLOSED: a malformed/empty judge response => faithful=False.
+    """
+    bundle = load_ara_bundle(ara_dir)  # reuse g3_seal's reader (claims + evidence)
+    ara_text = "\n\n".join(f"=== {name} ===\n{text}" for name, text in bundle.items())
+    if len(ara_text) > _MD_CHAR_CAP:
+        ara_text = ara_text[:_MD_CHAR_CAP] + "\n[...TRUNCATED...]"
+    _log("faithfulness: judging report ↔ ARA")
+    prompt = (
+        "You verify a Chinese human-facing REPORT against a VERIFIED knowledge pack "
+        "(the ARA: claims + evidence tables). The ARA is ground truth. Flag ONLY "
+        "places where the REPORT would MATERIALLY MISLEAD a reader: a metric/number "
+        "attributed to the wrong system, a result overstated beyond what the ARA "
+        "supports, or a claim the ARA contradicts. Do NOT flag wording, style, "
+        "rounding, or general qualitative phrasing.\n\n"
+        'Return JSON: {"faithful": true|false, "findings": '
+        '[{"claim": "<short quote from the report>", "issue": "<<=1 line>"}]}. '
+        "faithful=true with an empty findings list means no material misleading.\n\n"
+        "=== VERIFIED ARA ===\n" + ara_text + "\n=== END ARA ===\n\n"
+        "=== REPORT ===\n" + report_text + "\n=== END REPORT ==="
+    )
+    try:
+        obj = _ask_json(prompt, seam="faithfulness", tier="fast", timeout=600.0, effort="medium")
+    except RuntimeError as exc:
+        _log(f"faithfulness: seam error, failing closed: {exc}")
+        return {"faithful": False, "findings": [{"claim": "", "issue": f"seam error: {exc}"}]}
+    if not isinstance(obj, dict) or "faithful" not in obj:
+        return {"faithful": False, "findings": [{"claim": "", "issue": "malformed judge response"}]}
+    findings = obj.get("findings") if isinstance(obj.get("findings"), list) else []
+    return {"faithful": bool(obj["faithful"]), "findings": findings}
+
+
 def build_seams() -> dict:
-    """The six provider-routed, fallback-wrapped LLM seams for run_campaign.
+    """The seven provider-routed, fallback-wrapped LLM seams for run_campaign.
 
     Each value is an independent Agent-tool-equivalent callable whose transport is
     chosen per config/llm.yaml. Pass these into run_campaign(...). (write_report is
@@ -404,4 +445,5 @@ def build_seams() -> dict:
         "entailment_judge": entailment_judge,
         "expand_llm": expand_llm,
         "write_report": write_report,
+        "faithfulness_judge": faithfulness_judge,
     }

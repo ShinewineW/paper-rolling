@@ -161,7 +161,7 @@ def test_load_absent_config_raises(tmp_path: Path) -> None:
 
 
 def _full_seam_yaml(*, analyzer: str = "{ provider: claude-code, mode: grounded }") -> str:
-    """A config routing ALL six seams (every seam must be explicitly routed)."""
+    """A config routing ALL seven seams (every seam must be explicitly routed)."""
     return (
         "providers:\n"
         "  claude-code:\n"
@@ -181,6 +181,7 @@ def _full_seam_yaml(*, analyzer: str = "{ provider: claude-code, mode: grounded 
         "  entailment: opencode\n"
         "  expand: opencode\n"
         "  writer: opencode\n"
+        "  faithfulness: opencode\n"
     )
 
 
@@ -398,6 +399,7 @@ def _codex_grounded_yaml(*, analyzer_provider: str = "codex") -> str:
         "  entailment: opencode\n"
         "  expand: opencode\n"
         "  writer: opencode\n"
+        "  faithfulness: opencode\n"
     )
 
 
@@ -504,6 +506,7 @@ def _round_robin_yaml() -> str:
         "  entailment: opencode\n"
         "  expand: opencode\n"
         "  writer: opencode\n"
+        "  faithfulness: opencode\n"
     )
 
 

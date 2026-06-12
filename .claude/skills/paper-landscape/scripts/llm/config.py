@@ -43,7 +43,7 @@ from scripts.llm.providers import (
 
 LLM_CONFIG_REL = Path("config") / "llm.yaml"
 
-SEAMS = ("analyzer", "skeptic", "rigor", "entailment", "expand", "writer")
+SEAMS = ("analyzer", "skeptic", "rigor", "entailment", "expand", "writer", "faithfulness")
 VALID_MODES = ("inline", "grounded", "agent_team")
 
 # Per-seam default execution MODE only (the finalized spec). Only the heavy
@@ -58,6 +58,7 @@ _DEFAULT_MODES = {
     "entailment": "inline",
     "expand": "inline",
     "writer": "inline",
+    "faithfulness": "inline",  # ADR-0012: branch1 忠实门 judge (report ↔ ARA)
 }
 
 

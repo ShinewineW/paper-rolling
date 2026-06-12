@@ -51,7 +51,7 @@ def _parse_experiments(ara_dir: Path) -> dict[str, str]:
     return out
 
 
-def _load_ara_bundle(ara_dir: Path) -> dict[str, str]:
+def load_ara_bundle(ara_dir: Path) -> dict[str, str]:
     """Read the ARA text files the rigor reviewer reads, in fixed order."""
     bundle: dict[str, str] = {}
     for rel in (
@@ -126,7 +126,7 @@ def run_g3(
 
     # (c) 6-dim rigor seal — always write the report.
     report = score_rigor(
-        _load_ara_bundle(ara_dir),
+        load_ara_bundle(ara_dir),
         artifact_name=_artifact_name(ai_package_entry),
         rigor_scores=rigor_scores,
     )

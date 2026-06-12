@@ -107,3 +107,4 @@ seams:
   entailment: hellorobotaxi    # G3 entailment — tiny in/out (tier=fast → qwen3.7-plus)
   expand: hellorobotaxi        # discovery query expansion (tier=fast → qwen3.7-plus)
   writer: hellorobotaxi        # human chain (tier=strong → qwen3.7-max)
+  faithfulness: hellorobotaxi  # ADR-0012: branch1 忠实门 judge (tier=fast → qwen3.7-plus)
