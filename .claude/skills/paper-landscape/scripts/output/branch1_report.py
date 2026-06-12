@@ -10,13 +10,11 @@ Composition (v1 structure + this layer's three highlights):
   4. loss: 4-section explainer 修复方向/机制/对比基线/证据 (双输出-D3);证据
      points into ai_package evidence, never copies exact numbers.
 
-忠实门 (ADR-0012): the producer self-checks the composed report with
-`branch1_gate.check_report_faithfulness` and RAISES `AnchorGateError` on a hard
-block. Prose MAY carry numbers in natural language — the old per-prose-line
-`<!--ref-->` requirement was DROPPED; instead each prose number must be
-mechanically grounded in `{ID}.md` ((b) layer), and on the LLM path the report
-must not materially mislead vs the verified ARA ((c) judge). The engine 核心结论
-block still carries `<!--ref-->` anchors and 最终门 still resolves them.
+评价 (ADR-0012 rev): the report has NO hard gate and the <!--ref--> anchoring
+machinery is retired. The producer prepends an opening `## 评价` note
+(`branch1_gate.build_assessment`: machine number-facts vs the verified ARA + the
+optional (c) judge's prose) — it NEVER blocks. Prose carries numbers in plain
+natural language; faithfulness is the 评价's job, not an anchor's.
 """
 
 from __future__ import annotations
@@ -24,7 +22,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 
 from scripts.output.branch1_gate import _prepend_assessment, build_assessment
 
@@ -42,31 +39,6 @@ class AnchorGateError(RuntimeError):
     """Raised when the branch1 忠实门 (ADR-0012) hard-blocks: an ungrounded prose
     number, a malformed engine 核心结论 anchor, or — on the LLM path — a report that
     materially misleads vs the verified ARA. Identifier kept per ADR-0008."""
-
-
-def _anchor(snippet: str) -> str:
-    """Build a three-layer anchor whose quote is taken verbatim from the MD.
-
-    The slug is derived from the snippet and ALWAYS prefixed with `r-` so it
-    begins with a letter (the strict ref pattern rejects digit-leading slugs).
-    The quote value is URL-encoded and capped to <=20 words; `-` is encoded as
-    `%2D` to avoid premature HTML-comment termination.
-    """
-    body = re.sub(r"[^a-z0-9]+", "-", snippet.lower())[:22].strip("-") or "ref"
-    slug = f"r-{body}"
-    words = snippet.split()[:20]
-    value = quote(" ".join(words), safe="").replace("-", "%2D")
-    return f"<!--ref:{slug}--><!--anchor:quote:{value}-->"
-
-
-def _find_in_md(md_text: str, number: str) -> str | None:
-    """Return a <=20-word MD window containing `number`, for anchoring."""
-    for line in md_text.splitlines():
-        if number in line:
-            stripped = re.sub(r"\$\$.*?\$\$", "", line).strip()
-            stripped = re.sub(r"[#*`]", "", stripped)
-            return " ".join(stripped.split()[:20]) or stripped[:60]
-    return None
 
 
 def _mermaid_redraw(architecture_md: str) -> str:
@@ -160,24 +132,11 @@ def _loss_section(analysis: dict, key: str) -> str:
     )
 
 
-def _body_with_anchors(md_text: str, analysis: dict) -> str:
-    """Compose the prose body, anchoring each claim's number into the MD."""
+def _body(analysis: dict) -> str:
+    """Compose the prose body (摘要翻译). ADR-0012 rev: the <!--ref--> anchoring is
+    retired — the report carries plain prose and the 评价 vouches for faithfulness."""
     out: list[str] = ["## 摘要翻译", ""]
-    para: list[str] = []
-    for c in analysis["claims"]:
-        # Match `\d+(?:\.\d+)?` (integers AND decimals). The engine 核心结论 block
-        # still carries <!--ref--> anchors so 最终门 can resolve them; anchoring
-        # every grounded number (not just decimals) keeps those anchors complete.
-        # ADR-0012: prose anchors are no longer GATE-required (faithfulness is
-        # checked by branch1_gate's (b) grounding + (c) judge), but the producer
-        # still emits resolvable anchors for the core-block truth chain.
-        nums = re.findall(r"\d+(?:\.\d+)?", c["statement"])
-        sentence = c["statement"]
-        for n in nums:
-            window = _find_in_md(md_text, n)
-            if window:
-                sentence += _anchor(window)
-        para.append(sentence)
+    para = [c["statement"] for c in analysis["claims"]]
     out.append(("".join(para) if para else "本文方法在标准基准上取得有竞争力的结果。") + "。")
     out += [
         "",
@@ -227,12 +186,11 @@ def write_branch1(
     """
     person_dir.mkdir(parents=True, exist_ok=True)
     key = key or person_dir.name
-    md_text = md_path.read_text(encoding="utf-8")
 
     sections = [
         f"# {candidate['title']} — 深度解读",
         "",
-        _body_with_anchors(md_text, analysis),
+        _body(analysis),
         "",
         "## 模型结构图",
         "原图见论文 Figure(忠实锚点,ground truth)。下为统一风格简化重绘(简化示意,以原图为准):",

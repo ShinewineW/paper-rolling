@@ -75,6 +75,16 @@ def test_unanchored_prose_number_no_longer_raises_gate_error(
     assert (person / "report.md").exists()
 
 
+def test_report_carries_no_ref_anchors(tmp_path, candidate, analysis, md_path):
+    # ADR-0012 rev: the whole <!--ref-->/<!--anchor:--> machinery is retired —
+    # the report no longer carries ANY anchor (faithfulness is the 评价's job).
+    ara = tmp_path / "ara"
+    write_branch2(ara, candidate, analysis)
+    person = tmp_path / "person"
+    write_branch1(person, candidate, ara, md_path, analysis)
+    assert "<!--ref" not in (person / "report.md").read_text(encoding="utf-8")
+
+
 def test_deterministic_path_honors_a_supplied_judge(tmp_path, candidate, analysis, md_path):
     # ADR-0012 rev: write_branch1 (the deterministic fallback) must NOT silently drop a
     # supplied (c) faithfulness judge — when one is passed it writes the opening 「评价」

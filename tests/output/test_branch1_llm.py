@@ -45,11 +45,12 @@ def test_write_branch1_llm_assembles_grounded_report(tmp_path: Path) -> None:
     report = (person / "report.md").read_text(encoding="utf-8")
     assert (person / "report.html").exists()
     assert "# DemoPaper — 深度解读" in report
-    assert "## 核心结论" in report  # mechanically-anchored claims block
+    assert "## 核心结论" in report  # verified claims block (no anchors, ADR-0012 rev)
     assert "28.4" in report
     assert "一句话总结" in report and "实验与对比" in report
     assert "| Ours | 28.4 |" in report  # gated evidence table inlined after 06
-    assert "<!--anchor:" in report
+    assert "<!--anchor:" not in report  # ADR-0012 rev: anchor machinery retired
+    assert "## 评价" in report  # opening faithfulness note prepended
 
 
 def test_write_branch1_llm_embeds_selected_figures(tmp_path: Path) -> None:

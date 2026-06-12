@@ -3,19 +3,16 @@ r"""branch1 (human report) via the LLM writer seam — the rich, vivid Chinese p
 
 When produce_outputs is given a ``write_report`` seam, the human report is WRITTEN
 by an LLM (per config/llm.yaml writer routing) from the gated ARA, instead of the
-thin deterministic write_branch1. This module then GROUNDS it deterministically:
+thin deterministic write_branch1. This module then assembles it:
 
-  - a mechanically-anchored ``## 核心结论`` block (claim statements with every
-    MD-present number three-layer-anchored),
+  - a ``## 核心结论`` block (the verified claim statements, verbatim from the ARA),
   - the REAL evidence tables rendered verbatim (exact numbers live here),
-  - a whole-report grounding pass (anchor any stray empirical number to the MD),
-  - the branch1 忠实门 (ADR-0012): anchor-form lint + tolerant prose-number
-    grounding + optional LLM faithfulness judge, checked by branch1_gate before
-    promotion.
+  - the curated original figures woven into the relevant sections.
 
-So the rich LLM prose MAY carry performance numbers in natural sentences (ADR-0012)
-as long as each value is grounded in the MD; the 忠实门 ((b) grounding + (c) judge)
-verifies faithfulness, and the engine 核心结论 block stays anchored.
+ADR-0012 rev: the report has NO hard gate and the whole <!--ref--> anchoring
+machinery is retired. Faithfulness is vouched for by the opening ``## 评价`` note
+(``branch1_gate.build_assessment``: machine number-facts vs the ARA + the (c)
+judge's prose), prepended here — it NEVER blocks publication.
 """
 
 from __future__ import annotations
@@ -26,13 +23,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from scripts.output.anchor_lint import _is_empirical_assertion
 from scripts.output.branch1_gate import _prepend_assessment, build_assessment
-from scripts.output.branch1_report import AnchorGateError, _anchor, _find_in_md
+from scripts.output.branch1_report import AnchorGateError
 from scripts.output.figures import Figure, copy_figures, is_architecture_caption
-
-_NUM = re.compile(r"\d+(?:\.\d+)?")
-_FENCE = re.compile(r"^```")
 
 # Project IRON RULE: NO emoji in ANY report. Strip them (and a trailing space)
 # deterministically in the assembler so style is uniform regardless of the writer
@@ -83,25 +76,21 @@ def _fig_block(figures: list[Figure], zh: dict[str, str], *, heading: str = "") 
     return "\n".join(out)
 
 
-def _claims_block(ara_dir: Path, md_text: str) -> str:
-    """核心结论 — claim statements with every MD-present number anchored."""
+def _claims_block(ara_dir: Path) -> str:
+    """核心结论 — the verified claim statements (ADR-0012 rev: no <!--ref--> anchors;
+    faithfulness is vouched for by the opening 评价, not per-number anchors)."""
     claims_md = ara_dir / "logic" / "claims.md"
     statements = (
         re.findall(r"(?m)^\s*[-*]?\s*\*\*Statement\*\*[:：]\s*(.+)$", claims_md.read_text("utf-8"))
         if claims_md.exists()
         else []
     )
-    out = ["## 核心结论", "", "> 每条结论后的隐形锚点把数字回链到论文原文(忠实性保证)。", ""]
+    out = ["## 核心结论", "", "> 以下结论摘自已通过数据保真审计的知识包(ARA)。", ""]
     if not statements:
         out.append("(未解析到结论)")
         return "\n".join(out)
     for i, st in enumerate(statements, 1):
-        sentence = st.strip()
-        for n in _NUM.findall(sentence):
-            window = _find_in_md(md_text, n)
-            if window:
-                sentence += _anchor(window)
-        out.append(f"{i}. {sentence}")
+        out.append(f"{i}. {st.strip()}")
     return "\n".join(out)
 
 
@@ -114,33 +103,6 @@ def _evidence_tables(ara_dir: Path) -> str:
             # Demote the table file's own `# Title` so the report keeps one H1.
             out.append(re.sub(r"(?m)^#\s+", "#### ", f.read_text("utf-8").strip()))
             out.append("")
-    return "\n".join(out)
-
-
-def _ground_line(line: str, md_text: str) -> str:
-    """Anchor every MD-present number on an empirical line lacking a ref."""
-    if "<!--ref:" in line or not _is_empirical_assertion(re.sub(r"<!--.*?-->", "", line)):
-        return line
-    anchored = line
-    for n in _NUM.findall(line):
-        window = _find_in_md(md_text, n)
-        if window:
-            anchored += _anchor(window)
-    return anchored
-
-
-def _ground_report(report: str, md_text: str) -> str:
-    """Grounding safety net: anchor stray empirical sentences (skip code/tables)."""
-    out: list[str] = []
-    in_fence = False
-    for line in report.splitlines():
-        if _FENCE.match(line):
-            in_fence = not in_fence
-            out.append(line)
-            continue
-        out.append(
-            line if (in_fence or line.lstrip().startswith("|")) else _ground_line(line, md_text)
-        )
     return "\n".join(out)
 
 
@@ -237,7 +199,6 @@ def write_branch1_llm(
     """
     title = candidate["title"]
     key = key or person_dir.name
-    md_text = md_path.read_text(encoding="utf-8")
 
     # 审计 R5 Finding 1: only forward prior_failure when set, so an older injected
     # write_report fake/seam (without the param) stays TypeError-free on the happy
@@ -270,7 +231,7 @@ def write_branch1_llm(
         "",
         f"> 面向人类读者的深度解读(中文)。事实源与配对的 AI 知识包 `ai_package/{key}/ara/` 同源,均已通过数据保真审计。",  # noqa: E501
         "",
-        _claims_block(ara_dir, md_text),
+        _claims_block(ara_dir),
     ]
     emitted: set[str] = set()
 
@@ -300,8 +261,7 @@ def write_branch1_llm(
         parts.append(_fig_block(leftover, zh, heading="## 其余论文原图"))
 
     assembled = _strip_emoji("\n".join(parts) + "\n")  # no-emoji iron rule
-    assembled = _quote_mermaid_labels(assembled)  # make LLM mermaid parse-safe
-    report = _ground_report(assembled, md_text)
+    report = _quote_mermaid_labels(assembled)  # make LLM mermaid parse-safe
     # ADR-0012 rev: prepend the opening 「评价」 (faithfulness note) — NEVER blocks.
     report = _prepend_assessment(
         report, build_assessment(report, ara_dir, judge=faithfulness_judge)
