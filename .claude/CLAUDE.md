@@ -19,6 +19,11 @@ re-derive their content here:
   seam input/output shapes).
 - **`docs/INDEX.md`** — documentation map **and governance rules** for `docs/`.
 
+Behavioral rules (loaded every session) live in **`.claude/rules/`** —
+`00-principles.md` is the control-plane index (load model + the always-loaded set).
+Notably `failure-recovery.md`: on a mid-run failure, never `git checkout HEAD` /
+reset to "protect" state — resume via the ledger + `_failed/` scenes + `revival.py`.
+
 ## Commands
 
 ```bash
