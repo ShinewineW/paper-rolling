@@ -1,0 +1,197 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何把视频基础模型转成Physical AI世界模拟器
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  description: 核心问题是训练一个能基于文本、图像、视频和后续控制信号生成高质量、多样化视觉环境的world simulator，用作Physical
+    AI训练、评估和闭环仿真的安全代理。
+  children:
+  - D1
+  - Q2
+- id: D1
+  type: decision
+  title: 采用像素空间高保真视频预测路线
+  support_level: explicit
+  source_refs:
+  - Sec 7
+  choice: 采用直接在pixel space中建模world dynamics的video generative model范式。
+  alternatives:
+  - latent representation space中的预测模型
+  - native 3D和4D world state表示
+  - 物理仿真器或神经场景表示
+- id: Q2
+  type: question
+  title: 如何获得更干净且面向Physical AI的数据
+  support_level: explicit
+  source_refs:
+  - Sec 2.1
+  - Sec 2.2
+  description: 研究问题是如何从大规模原始视频中筛出高质量、语义多样且贴近物理世界分布的数据，同时补充robotics、autonomous driving、smart
+    spaces、human dynamics和physics等领域数据。
+  children:
+  - E1
+  - D2
+- id: E1
+  type: experiment
+  title: 多阶段视频过滤与领域数据策划
+  support_level: explicit
+  source_refs:
+  - Sec 2.1
+  - Sec 2.2
+  result: 更严格的过滤和领域专用captioning带来更大、更干净、更细粒度的数据基础，方向上提升预训练效率和下游泛化。
+- id: D2
+  type: decision
+  title: 统一Text2World、Image2World和Video2World
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3.2
+  - Sec 4.1
+  choice: 用单个Cosmos-Predict2.5模型覆盖Text2World、Image2World和Video2World，并在训练中通过条件帧和mask统一三类任务。
+  alternatives:
+  - 为三类任务分别训练独立模型
+  - 仅保留视频续写任务
+  - 只在后处理阶段添加条件能力
+- id: Q3
+  type: question
+  title: 如何让高分辨率FM训练更稳定
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Sec 4.1
+  description: 高分辨率内容有强局部相关性，若噪声不足，模型难以打散相关结构并学习有效重建；同时视频训练还可能出现突兀帧间过渡。
+  also_depends_on:
+  - D2
+- id: D3
+  type: decision
+  title: 选择flow matching与高噪声偏置
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Sec 4.1
+  choice: 采用flow matching速度预测目标，并使用shifted logit-normal timestep分布，随分辨率增加β，同时显式增加最高噪声区域采样。
+  alternatives:
+  - 沿用Cosmos-Predict1中的EDM参数化
+  - 不做timestep shift
+  - 只依赖普通logit-normal采样
+- id: X1
+  type: dead_end
+  title: 高噪声样本不足导致过渡伪影
+  support_level: explicit
+  source_refs:
+  - Sec 4.1
+  hypothesis: 模型在高噪声区域看到的训练样本太少，导致生成视频出现突兀和不自然的帧间过渡。
+  failure_mode: 即使使用随分辨率增长的timestep shift，仍观察到transition artifacts。
+  lesson: 需要在训练scheduler中显式抽取最高噪声区域样本，以改善时间一致性。
+  also_depends_on:
+  - Q3
+  - D3
+- id: E2
+  type: experiment
+  title: 领域专用SFT与模型合并
+  support_level: explicit
+  source_refs:
+  - Sec 4.2.1
+  - Fig. 3
+  - Fig. 4
+  result: 领域专用SFT在目标领域方向上优于pretrained baseline；合并后模型可整合多个领域优势并保持通用域表现。
+  also_depends_on:
+  - E1
+- id: X2
+  type: dead_end
+  title: 直接联合领域SFT需要混合比例权衡
+  support_level: explicit
+  source_refs:
+  - Sec 4.2.1
+  hypothesis: 把所有领域数据混在一起训练需要设计mixture ratios，可能削弱某些领域数据的充分利用。
+  failure_mode: 联合训练会引入领域平衡问题；论文转而为每个领域fine-tune独立模型。
+  lesson: 先训练领域专用模型，再用model merging统一能力，是更符合本文目标的路径。
+  also_depends_on:
+  - E2
+- id: D4
+  type: decision
+  title: 用model soup作为最终合并模型
+  support_level: explicit
+  source_refs:
+  - Sec 4.2.1
+  choice: 在model soup、TIES、DARE-Linear和DARE-TIES中，经过grid search和人工质量评估后选择model soup
+    variant作为最终post-trained model。
+  alternatives:
+  - TIES
+  - DARE-Linear
+  - DARE-TIES
+  - 按单个fine-tuned模型win rate启发式选超参数
+  also_depends_on:
+  - E2
+- id: E3
+  type: experiment
+  title: VideoAlign强化学习后训练
+  support_level: explicit
+  source_refs:
+  - Sec 4.2.2
+  - Tab. 6
+  - Fig. 5
+  result: RL后训练在reward score和human voting方向上均提升生成质量，并改善文本对齐、运动质量和视觉质量。
+  also_depends_on:
+  - D4
+- id: P1
+  type: pivot
+  title: 从基础预测扩展到可控world translation
+  support_level: explicit
+  source_refs:
+  - Sec 6.1
+  from: Cosmos-Predict2.5作为Text2World、Image2World和Video2World基础模型
+  to: Cosmos-Transfer2.5作为control-net style框架，支持edge、blur、segmentation和depth等空间控制输入
+  trigger: 下游Physical AI需要Sim2Real、Real2Real和多模态控制输入，而不仅是开放式视频生成。
+  also_depends_on:
+  - D2
+  - E3
+- id: E4
+  type: experiment
+  title: Cosmos-Transfer2.5控制输入与长视频验证
+  support_level: explicit
+  source_refs:
+  - Sec 6.1
+  - Sec 6.1.1
+  - Sec 6.1.2
+  result: 相较Cosmos-Transfer1，Cosmos-Transfer2.5在控制遵循、视频质量和长视频误差累积方向上表现更好。
+  also_depends_on:
+  - P1
+- id: P2
+  type: pivot
+  title: 从生成视频转向机器人策略数据增强
+  support_level: explicit
+  source_refs:
+  - Sec 6.2
+  - Sec 6.2.2
+  - Sec 6.2.3
+  from: 使用Cosmos-Transfer2.5生成视觉增强视频
+  to: 把增强后的观察用于训练diffusion policy并评估真实机器人泛化
+  trigger: 传统图像增强难以进行语义编辑，例如改变对象颜色、环境外观或光照条件。
+  also_depends_on:
+  - E4
+- id: X3
+  type: dead_end
+  title: 标准图像增强难覆盖语义场景变化
+  support_level: explicit
+  source_refs:
+  - Sec 6.2.3
+  hypothesis: 亮度、对比度、色相、噪声、模糊等标准图像增强足以提升测试时视觉鲁棒性。
+  failure_mode: 这类增强不能执行对象颜色、环境外观或光照条件等语义编辑，在挑战性场景中表现受限。
+  lesson: 需要使用可控视频世界模型生成结构化、语义级视觉变化。
+  also_depends_on:
+  - P2
+- id: E5
+  type: experiment
+  title: action-conditioned world generation消融
+  support_level: explicit
+  source_refs:
+  - Sec 6.6
+  - Tab. 19
+  - Tab. 20
+  result: Cosmos-Predict2.5-2B/robot/action-cond相对Cosmos-Predict1基线方向上更好；在动作注入方式中，TimeEmbedding方向上优于CrossAtten和ChannelConcat。
+  also_depends_on:
+  - D2

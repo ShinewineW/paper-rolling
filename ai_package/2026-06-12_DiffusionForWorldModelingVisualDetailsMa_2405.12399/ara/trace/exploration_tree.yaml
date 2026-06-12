@@ -1,0 +1,224 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 离散 latent 是否会丢失对 RL 关键的视觉细节
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  description: 论文从近期 world models 常用离散 latent 出发,提出压缩可能忽略任务关键视觉细节,尤其是小目标或远处对象这类会改变策略的信号。
+  children:
+  - id: D1
+    type: decision
+    title: 改用 image-space diffusion world model
+    support_level: explicit
+    source_refs:
+    - Abstract
+    - Sec 1
+    - Sec 2.3
+    choice: 选择 DIAMOND,直接在 image space 中建模条件环境动力学,用 diffusion model 生成下一帧观测。
+    alternatives: 继续使用 discrete latent world model,或增加 discrete latents 以缓解信息损失但承担更高计算成本。
+    children:
+    - id: Q2
+      type: question
+      title: 如何把无条件 diffusion 变成 POMDP world model
+      support_level: explicit
+      source_refs:
+      - Sec 2.3
+      - Figure 1
+      description: 需要条件化在历史观测与动作上,估计并采样下一帧,并把生成帧和新动作继续放入后续条件中形成 autoregressive imagination。
+      children:
+      - id: E1
+        type: experiment
+        title: 在 Atari 100k 中训练完全位于 world model imagination 的 agent
+        support_level: explicit
+        source_refs:
+        - Sec 4
+        - Table 1
+        result: DIAMOND 在 world model baseline 中取得更强的平均表现,并显示 image-space world model
+          可支持完整 RL 训练。
+- id: Q3
+  type: question
+  title: 扩散范式能否在低 NFE 下稳定长时展开
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Sec 5.1
+  description: world model 每一步都要采样下一帧,NFE 直接决定想象训练成本,因此需要低 denoising steps 下仍稳定的扩散范式。
+  children:
+  - id: E2
+    type: experiment
+    title: 比较 DDPM 与 EDM 的 autoregressive 轨迹稳定性
+    support_level: explicit
+    source_refs:
+    - Sec 5.1
+    - Figure 3
+    - Appendix K
+    result: DDPM 在低步数下更快积累误差并漂移出分布,EDM 在长时展开中明显更稳定。
+  - id: D2
+    type: decision
+    title: 采用 EDM 而不是 DDPM
+    support_level: explicit
+    source_refs:
+    - Sec 3.1
+    - Sec 5.1
+    choice: 采用 EDM formulation 与 network preconditioning,让训练目标随噪声水平自适应混合信号和噪声。
+    alternatives: 使用 DDPM noise prediction objective,但低步数时初始高噪声阶段 score 估计较差。
+    also_depends_on:
+    - E2
+  - id: DE1
+    type: dead_end
+    title: 低步数 DDPM 作为 world model 不稳定
+    support_level: explicit
+    source_refs:
+    - Sec 5.1
+    - Figure 3
+    hypothesis: DDPM 可以直接作为 Atari world model 并用很少 denoising steps 进行快速想象。
+    failure_mode: 在 autoregressive 生成中出现严重 compounding error,步数越少误差累积越快并导致轨迹漂移出分布。
+    lesson: 用于 RL imagination 的 diffusion world model 不只需要单帧质量,还需要低 NFE 下长期稳定的目标设计。
+- id: Q4
+  type: question
+  title: denoising steps 应该设为多少
+  support_level: explicit
+  source_refs:
+  - Sec 5.2
+  - Appendix L
+  description: 单步 EDM 在某些确定性游戏中稳定,但 partial observability 会带来多模态下一帧分布,需要评估单步是否会模糊。
+  children:
+  - id: E3
+    type: experiment
+    title: 观察 Boxing 中 single-step 与 multi-step 采样差异
+    support_level: explicit
+    source_refs:
+    - Sec 5.2
+    - Figure 4
+    result: single-step 会在不可预测目标上插值并产生模糊,multi-step 更能走向某个清晰模式。
+  - id: D3
+    type: decision
+    title: 主实验使用 n=3 denoising steps
+    support_level: explicit
+    source_refs:
+    - Sec 5.2
+    - Appendix E
+    - Appendix L
+    choice: 所有 Atari 主实验使用 n=3,在视觉质量与推理成本之间折中。
+    alternatives: n=1 成本更低且在部分确定性游戏中可行,但多模态场景下更容易模糊；更高步数可能改善质量但增加 NFE。
+    also_depends_on:
+    - E3
+- id: Q5
+  type: question
+  title: 简单 frame stacking 是否足够作为历史条件
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Appendix D
+  - Appendix M
+  description: 主方法用过去帧与下一噪声帧 channel-wise concat,问题是这种轻量条件化是否比更复杂的 cross-attention
+    架构更合适。
+  children:
+  - id: E4
+    type: experiment
+    title: 在 3D 静态数据上比较 frame-stack 与 cross-attention DIAMOND
+    support_level: explicit
+    source_refs:
+    - Appendix M.2
+    - Appendix M.4
+    - Table 8
+    result: frame-stack 在视觉质量指标上总体优于 cross-attention,并且作者认为逐帧直接输入的 inductive bias
+      适合 autoregressive generation。
+  - id: D4
+    type: decision
+    title: 主论文采用 frame stacking
+    support_level: explicit
+    source_refs:
+    - Appendix M.2
+    - Appendix M.4
+    choice: 保留 lightweight frame-stacking architecture 作为主方法的观察历史条件化机制。
+    alternatives: 使用 autoregressive cross-attention history encoder,或采用 U-Net 3D 式联合视频扩散。
+    also_depends_on:
+    - E4
+- id: Q6
+  type: question
+  title: 视觉细节改进是否能解释部分游戏性能提升
+  support_level: explicit
+  source_refs:
+  - Sec 5.3
+  - Figure 5
+  description: 作者比较 IRIS 与 DIAMOND 在相同 expert static datasets 上的想象轨迹,关注几像素级别的奖励、敌人、砖块和分数是否保持一致。
+  children:
+  - id: E5
+    type: experiment
+    title: 定性比较 IRIS 与 DIAMOND 的连续帧一致性
+    support_level: explicit
+    source_refs:
+    - Sec 5.3
+    - Figure 5
+    result: IRIS 轨迹出现敌人与奖励混淆、砖块和分数不一致等问题,DIAMOND 的关键视觉细节更一致。
+  - id: Q7
+    type: question
+    title: 这种细节优势是否只是更多计算带来的
+    support_level: explicit
+    source_refs:
+    - Sec 5.3
+    - Appendix H
+    description: 论文检查 DIAMOND 与 IRIS 的分辨率、NFE、参数量和训练时间,避免把视觉质量差异简单归因于更多计算。
+    children:
+    - id: D5
+      type: decision
+      title: 将改进主要归因于 world model 视觉一致性
+      support_level: inferred
+      choice: 将若干游戏中的性能提升解释为更忠实的关键视觉细节建模所带来的学习信号改善。
+      alternatives: 将提升归因于 agent 组件、分辨率或更多计算；但论文指出 agent 类似且 DIAMOND NFE、参数和训练时间并不更高。
+      also_depends_on:
+      - E5
+- id: Q8
+  type: question
+  title: diffusion world model 能否扩展到更复杂 3D 环境
+  support_level: explicit
+  source_refs:
+  - Sec 6
+  - Appendix M
+  description: '论文除 Atari 外,还把 DIAMOND world model 训练在 Counter-Strike: Global Offensive
+    与 motorway driving 静态数据上,检验复杂视觉轨迹生成。'
+  children:
+  - id: E6
+    type: experiment
+    title: 训练 CS:GO interactive neural game engine
+    support_level: explicit
+    source_refs:
+    - Sec 6
+    - Figure 6
+    result: 模型能够生成较稳定的长轨迹并支持交互式神经游戏引擎,但在少见区域和有限记忆下仍会漂移或遗忘状态。
+  - id: DE2
+    type: dead_end
+    title: 离线演示数据中的 novel actions 会暴露因果混淆与不稳定
+    support_level: explicit
+    source_refs:
+    - Appendix M.4
+    - Figure 11
+    - Figure 12
+    hypothesis: 用静态离线 gameplay 训练后,模型应能稳健响应任意用户动作序列。
+    failure_mode: 常见动作短期效果符合预期,但长 rollout 或罕见动作序列会退化；motorway driving 中 slow down
+      与 speed up 会被关联到整体交通变化。
+    lesson: 离线数据训练的 world model 可能学到数据相关性而非可干预因果机制,这不是 DIAMOND 架构本身的充分反证。
+- id: P1
+  type: pivot
+  title: 从 Atari RL 评估转向静态 3D 视觉质量评估
+  support_level: explicit
+  source_refs:
+  - Sec 6
+  - Appendix M
+  from: Atari 100k 中用 world model imagination 训练 RL agent 并以 return 评估。
+  to: 在 CS:GO 与 motorway driving 静态数据上直接评估生成轨迹视觉质量,且不执行 RL。
+  trigger: 更复杂环境没有标准 RL protocol,但可用 FVD、FID、LPIPS 与 sampling rate 评估 world model
+    视觉轨迹。
+- id: P2
+  type: pivot
+  title: 从单一 dynamics model 转向 dynamics plus upsampler
+  support_level: explicit
+  source_refs:
+  - Sec 6
+  from: Atari 中直接生成 64×64×3 观察并用于 imagination。
+  to: CS:GO 中先在低分辨率上建模 dynamics,再用较小 upsampler 改善原始分辨率图像。
+  trigger: CS:GO 原始分辨率更高且计算成本更大,需要在视觉质量和推理成本之间取得可运行折中。

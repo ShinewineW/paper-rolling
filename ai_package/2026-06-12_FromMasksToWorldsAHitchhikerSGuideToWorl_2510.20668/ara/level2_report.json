@@ -1,0 +1,120 @@
+{
+  "artifact": "2026-06-12_FromMasksToWorldsAHitchhikerSGuideToWorl_2510.20668",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Accept",
+    "mean_score": 4,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 3,
+      "strengths": [
+        "The literature table (ä»£è¡¨æ¹æ³è·¯çº¿å¾) provides a solid descriptive sampling of representative works across the proposed stages.",
+        "Claims are appropriately tagged as scoping/descriptive, aligning with the survey nature of the paper."
+      ],
+      "weaknesses": [
+        "The cited evidence bases (E1, E2, E3) are formulated as self-referential text checks (e.g., 'read the paper's definition and check') rather than substantive synthesis of the cited literature.",
+        "For C3 (tagged causal/generalization), the evidence is purely conceptual and lacks empirical or heterogeneous literature sampling to prove the causal bottleneck."
+      ],
+      "suggestions": [
+        "Reframe E1-E3 to explicitly evaluate the sampled literature in the table against the proposed subsystem definitions and stage boundaries.",
+        "For C3, cite specific empirical failures from the literature (e.g., specific drift metrics in Genie-1 vs memory-augmented models) rather than just checking the paper's own text."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 4,
+      "strengths": [
+        "Falsification criteria are well-adapted for a position/survey paper, focusing on structural and conceptual counterexamples.",
+        "Criteria for C2 (alternative main paths or misclassified representative works) are highly actionable for literature reviews."
+      ],
+      "weaknesses": [
+        "Criteria for C1 and C3 rely on qualitative judgments ('stably present', 'long-term consistency') without defining quantitative thresholds for persistence or drift.",
+        "Lacks independently testable operational definitions for 'emergence' and 'agency' in the falsification criteria."
+      ],
+      "suggestions": [
+        "Define measurable proxies for 'persistence' (e.g., state recovery after N steps) and 'drift' (e.g., semantic similarity decay) to make C3 strictly testable.",
+        "Specify what constitutes a 'stable' presentation of a persistent world in C1 to avoid moving the goalposts."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Explicitly frames the work as a 'narrowed roadmap' rather than a comprehensive survey, setting clear expectations.",
+        "Concepts have rigorously defined boundary conditions (e.g., excluding 'glue models' from Unified Models, distinguishing short-term context from Persistence).",
+        "Assumptions are clearly isolated and stated in the problem specification."
+      ],
+      "weaknesses": [
+        "The boundary between Stage IV (Memory) and Stage V (True World Model) could be slightly more precise regarding the exact threshold of 'emergence'."
+      ],
+      "suggestions": [
+        "Provide a concrete checklist or set of necessary conditions that a Stage IV system must fail to be classified as Stage V."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "Flawless logical arc: Observations (scattered definitions, static limits, consistency bottlenecks) map 1:1 to Gaps, which directly motivate the Key Insight and the 3 Claims.",
+        "The 5-stage roadmap perfectly operationalizes the synthesis of the three subsystems proposed in the insight."
+      ],
+      "weaknesses": [
+        "None significant; the narrative structure is exceptionally tight for a position paper."
+      ],
+      "suggestions": [
+        "Consider adding a brief discussion on how the proposed framework handles edge cases that might blur the lines between stages (e.g., models with implicit memory)."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "The exploration tree captures genuine conceptual dead-ends (DE1, DE2, DE3) that accurately reflect the historical limitations of the field.",
+        "Pivots (P1, P2, P3) are logically triggered by the failure modes of the preceding dead-ends, showing a faithful research DAG.",
+        "Decision nodes (D1, D2, D3) explicitly list rejected alternatives, demonstrating rigorous scoping choices."
+      ],
+      "weaknesses": [
+        "The tree is purely conceptual; it doesn't reflect any empirical dead-ends (e.g., 'we tried X architecture for memory and it failed'), which is expected for a survey but limits empirical depth."
+      ],
+      "suggestions": [
+        "If the authors conducted any preliminary empirical probes to validate the literature claims, adding those as empirical dead-ends/experiments would strengthen the tree."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 2,
+      "strengths": [
+        "The literature sampling in the evidence table is structured and covers the necessary breadth for the proposed roadmap."
+      ],
+      "weaknesses": [
+        "The 'experiments' (E1, E2, E3) are methodologically trivial; their procedure is simply 'read the paper's markdown and check if it says X', which is a self-referential tautology, not a rigorous test.",
+        "Lacks any empirical validation, metric-claim alignment, or statistical reporting, which, while typical for surveys, leaves the conceptual claims unverified in practice.",
+        "Baselines listed in experiments are conceptual strawmen rather than actual evaluated systems."
+      ],
+      "suggestions": [
+        "Redesign E1-E3 as systematic literature reviews or meta-analyses. For example, E3 should quantitatively or qualitatively code a sample of interactive models to measure how many fail due to memory vs. generation bottlenecks.",
+        "If empirical testing is out of scope, explicitly frame E1-E3 as 'Conceptual Framework Verification' and use rigorous rubric-based evaluation of the cited papers rather than checking the paper's own text."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "major",
+      "observation": "The 'experiments' are formulated as self-referential text checks (e.g., 'read the paper's definition and check') rather than rigorous evaluations of the cited literature or empirical systems. This renders the methodological verification trivial."
+    },
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "minor",
+      "observation": "While the literature table provides good descriptive sampling, the formal evidence basis (E1-E3) points to internal text verification rather than the substantive literature synthesis required to support scoping and causal claims."
+    },
+    {
+      "dimension": "D2_falsifiability",
+      "severity": "minor",
+      "observation": "Falsification criteria for C1 and C3 rely on qualitative concepts like 'stably present' and 'long-term consistency' without operationalized metrics, making independent testing difficult."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "suggestion",
+      "observation": "The boundary conditions for concepts are excellent, but the exact threshold separating Stage IV (Memory) from Stage V (True World Model) regarding 'emergence' could be more precisely defined."
+    }
+  ]
+}

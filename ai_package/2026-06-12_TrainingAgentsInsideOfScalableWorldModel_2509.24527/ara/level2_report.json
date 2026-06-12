@@ -1,0 +1,115 @@
+{
+  "artifact": "2026-06-12_TrainingAgentsInsideOfScalableWorldModel_2509.24527",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 5,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Type-aware mapping is excellent: causal claims (C1, C4) are supported by ablations (Fig 4, Table 2); generalization (C3) by heterogeneous splits (Nether/End); improvement (C1, C2) by strong baselines.",
+        "Every claim explicitly links to specific tables and figures that directly measure the stated outcome without relying on proxy metrics."
+      ],
+      "weaknesses": [
+        "None significant; the evidence bundle is tightly coupled with the claims and appropriately scoped."
+      ],
+      "suggestions": [
+        "Ensure that the causal link in C1 (imagination training vs pure BC) is explicitly highlighted in the main text alongside Fig 4, not just relegated to supplementary sections."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly specific, actionable, and scope-matched (e.g., C3 specifies exact holdout dimensions Nether/End; C4 specifies FVD/FPS degradation).",
+        "Criteria are independently testable by third parties using the stated datasets, protocols, and baseline configurations."
+      ],
+      "weaknesses": [
+        "C5's falsification is slightly tautological (checking if the authors used forbidden data sources), though this is appropriate and standard for a scoping claim."
+      ],
+      "suggestions": [
+        "For C2, explicitly define the threshold for 'real-time' (e.g., >20 FPS) in the falsification criteria to make it strictly quantitative rather than qualitative."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Boundary conditions are explicitly stated in concepts.md (e.g., Dreamer 4 is not a perfect replica, long-term inventory tracking is limited).",
+        "Claims carefully restrict themselves to the offline VPT contractor dataset and specific Minecraft mechanics, avoiding over-claiming general AGI or zero-shot transfer capabilities."
+      ],
+      "weaknesses": [
+        "C2 claims superiority over MineWorld, but MineWorld's interactive success rate is unreported in Table 1 due to lack of interactive evaluation; this slightly weakens the direct empirical comparison."
+      ],
+      "suggestions": [
+        "Explicitly state in C2's interpretation that the comparison with MineWorld is strictly limited to context length and FPS, as interactive success could not be evaluated."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "Clear logical arc: Observations (O1-O3) identify the need for scalable, interactive world models; Gaps (G1-G2) pinpoint the failure of existing methods in long-horizon offline RL and error accumulation; Insight and Solution directly address these.",
+        "Every identified gap is mapped to a specific experiment (G1->E1, G2->E2/E4), ensuring no logical leaps."
+      ],
+      "weaknesses": [
+        "The transition from pure video prediction to offline agent (P1) is marked as inferred rather than explicit in the paper's narrative structure."
+      ],
+      "suggestions": [
+        "Make the strategic pivot from world model pretraining to agent finetuning more explicit in the paper's introduction to strengthen the narrative arc for readers."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "Rich exploration tree with genuine, concrete dead-ends (F1: Oasis hallucinating structures; F2: MineWorld's parallel decoding failing real-time; F3: naive step reduction degrading quality).",
+        "Decisions (D1-D3) include clear alternatives and rationales, demonstrating a faithful research process rather than post-hoc justification of the final architecture."
+      ],
+      "weaknesses": [
+        "Pivot P1 is inferred, meaning the paper might not explicitly discuss the strategic shift from building a simulator to using it for imagination training."
+      ],
+      "suggestions": [
+        "Document the exact trigger or failure mode in the main text that prompted the shift from purely evaluating the world model to using it for offline RL."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 5,
+      "strengths": [
+        "Exceptional ablation coverage: Table 2 provides a 12-step cascading ablation isolating the contribution of every architectural and objective choice.",
+        "Comprehensive baselines across all experiments (VPT, BC, VLA, WM+BC for agents; Oasis, Lucid, MineWorld for world models).",
+        "Large-scale evaluation (1000 episodes per milestone) ensures statistical robustness for success rates."
+      ],
+      "weaknesses": [
+        "Tables 7 and 8 report only mean success rates and times, omitting standard deviations or confidence intervals, which are standard for rigorous RL reporting.",
+        "Hardware specifications for the environment evaluation (E1) are not explicitly detailed in the bundle."
+      ],
+      "suggestions": [
+        "Add 95% confidence intervals or standard errors to Tables 7 and 8 to reflect variance across the 1000 evaluation episodes.",
+        "Explicitly report the hardware used for environment rollouts and evaluation to ensure full reproducibility."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "Tables 7 and 8 lack variance metrics (standard deviation or confidence intervals) despite the large sample size (1000 episodes), which is expected for rigorous RL evaluation reporting."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "minor",
+      "observation": "C2 claims superiority over MineWorld, but MineWorld's interactive success rate is missing from Table 1; the scope of this specific comparison should be explicitly bounded to FPS and context length."
+    },
+    {
+      "dimension": "D4_argument_coherence",
+      "severity": "suggestion",
+      "observation": "The strategic pivot (P1) from building a scalable simulator to an offline agent is marked as inferred; making this transition explicit in the paper's narrative would strengthen the argument coherence."
+    },
+    {
+      "dimension": "D2_falsifiability",
+      "severity": "suggestion",
+      "observation": "C2's falsification criteria regarding 'real-time interactive speed' should define a strict quantitative threshold (e.g., >= 20 FPS) to be fully actionable and unambiguous."
+    }
+  ]
+}

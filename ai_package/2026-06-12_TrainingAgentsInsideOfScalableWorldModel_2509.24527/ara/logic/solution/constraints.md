@@ -1,0 +1,8 @@
+- world model 仍远非 Minecraft 的完整克隆。
+- temporal consistency 受限于 context, 尽管比前作更长。
+- inventory predictions 不精确, inventory items 有时不清楚或随时间变化。
+- 对 MineWorld 未做人类交互任务评估, 因为其缺少 interactive inference。
+- 无法直接比较 Genie 3, 因为它只支持 camera actions 和 generic interact button, 不支持 Minecraft 所需的通用 mouse 和 keyboard action space。
+- 离线 diamond agent 依赖 VPT contractor dataset 的 videos、actions 和 event annotations, sparse binary rewards 来自 existing events。
+- prompt sequence 在环境评估时线性引导 agent, 自动发现子目标仍被列为未来方向。
+- 论文将 general internet videos、long-term memory、language understanding、small corrective online data 和 automatic goal discovery 留作未来方向。

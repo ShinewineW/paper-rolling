@@ -1,0 +1,173 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 能否只靠离线数据在 Minecraft 获得 diamonds
+  support_level: explicit
+  source_refs:
+  - Sec 4.1
+  - Fig 3
+  description: 核心问题是 Dreamer 4 是否能在没有 online environment interaction 的条件下，通过 world
+    model 内的 imagination training 学会长程控制。
+- id: D1
+  type: decision
+  title: 采用纯离线 Offline Diamond Challenge
+  support_level: explicit
+  source_refs:
+  - Sec 4.1
+  choice: 只使用 VPT contractor dataset，并按 raw pixel inputs 与 low-level mouse and keyboard
+    actions 评测。
+  alternatives: 使用 online RL、synthetically annotated YouTube videos 或 abstract crafting
+    actions。
+  also_depends_on:
+  - Q1
+- id: E1
+  type: experiment
+  title: 离线 diamond agent 对比
+  support_level: explicit
+  source_refs:
+  - Sec 4.1
+  - Table 7
+  - Table 8
+  result: Dreamer 4 相比 VPT、BC、VLA 与 WM+BC 在更难里程碑上表现更强，imagination training 也让到达里程碑更快。
+  also_depends_on:
+  - D1
+- id: Q2
+  type: question
+  title: world model 是否能准确预测复杂 object interactions
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  description: 作者用人类在 world model 内交互的方式检验 Minecraft game mechanics、物体放置、破坏、载具与界面交互是否可被模拟。
+- id: E2
+  type: experiment
+  title: 人类交互式 world model 评测
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Table 1
+  - Fig 5
+  result: Dreamer 4 能完成更多交互任务，并保持 real-time interactive inference；相比 Oasis 与 Lucid-v1
+    更能维持复杂操作的因果结果。
+  also_depends_on:
+  - Q2
+- id: F1
+  type: dead_end
+  title: Oasis building autocompletion 失败
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  hypothesis: 大型 Minecraft world model 可能凭视觉补全生成看似合理结构，而不真正遵循玩家逐步放置方块的机制。
+  failure_mode: 放置少量方块后快速 hallucinate large structures，building tasks 失败。
+  lesson: 交互式 world model 不能只追求视觉合理性，还要保持动作条件下的 game mechanics 因果一致性。
+  also_depends_on:
+  - E2
+- id: F2
+  type: dead_end
+  title: MineWorld 缺少可用交互式评测路径
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  hypothesis: 并行解码的 Minecraft world model 也许可以作为交互式 simulator baseline。
+  failure_mode: parallel decoding 需要提前知道 actions，且推理慢于 real time，因此无法用于需要数百步人类动作的任务。
+  lesson: imagination training 与人类检验都要求真正的低延迟闭环 action conditioning。
+  also_depends_on:
+  - E2
+- id: Q3
+  type: question
+  title: action conditioning 需要多少带动作视频
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  description: 作者测试 world model 是否可从大量 unlabeled videos 吸收知识，并只用少量 paired actions
+    学到 embodiment grounding。
+- id: E3
+  type: experiment
+  title: paired actions 数量扫描
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  - Fig 7
+  result: 少量 paired actions 已能恢复大部分 action-conditioned generation 质量，更多动作数据继续改善条件生成。
+  also_depends_on:
+  - Q3
+- id: Q4
+  type: question
+  title: action grounding 能否跨 Minecraft 维度泛化
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  description: 作者将 Overworld 的 actions 与 Nether/End 的 unlabeled videos 分离，检验动作条件能否迁移到只见过无动作视频的区域。
+- id: E4
+  type: experiment
+  title: Overworld 到 Nether 和 End 的 action extrapolation
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  - Fig 7
+  result: 只在 Overworld 提供 actions 时，action conditioning 仍能在 Nether 与 End 上获得明显泛化。
+  also_depends_on:
+  - Q4
+- id: P1
+  type: pivot
+  title: 从纯视频预测转向可控离线 agent
+  support_level: inferred
+  from: 学习准确、快速的 action-conditioned world model
+  to: 在冻结或部分复用 world model 的基础上进行 task-conditioned policy、reward 与 value 学习
+  trigger: 如果 simulator 足够快且动作条件足够准，就可把环境交互替换为 imagined rollouts；这是分析推断，论文未显式声明为 pivot。
+  also_depends_on:
+  - E1
+  - E2
+  - E3
+- id: Q5
+  type: question
+  title: 哪些 objective 与 architecture 选择带来速度和质量
+  support_level: explicit
+  source_refs:
+  - Sec 4.4
+  description: 作者用级联 ablation 从 naive diffusion forcing transformer 出发，逐步加入 shortcut
+    forcing、x-space 目标、ramp weight 与高效 attention 设计。
+- id: E5
+  type: experiment
+  title: model design cascade ablation
+  support_level: explicit
+  source_refs:
+  - Sec 4.4
+  - Table 2
+  result: shortcut forcing、x-space prediction、x-loss、ramp weight 与高效 transformer 组合后，同时改善长生成质量与交互式推理速度。
+  also_depends_on:
+  - Q5
+- id: D2
+  type: decision
+  title: 使用 x-prediction 而非 v-prediction
+  support_level: explicit
+  source_refs:
+  - Sec 3.2
+  - Sec 4.4
+  choice: 让 dynamics model 预测 clean representations，并在 x-space 中计算 loss。
+  alternatives: 继续用 v-prediction 与 v-space loss。
+  also_depends_on:
+  - E5
+- id: D3
+  type: decision
+  title: 使用高效 transformer 而非 dense block-causal baseline
+  support_level: explicit
+  source_refs:
+  - Sec 3.4
+  - Sec 4.4
+  choice: 组合 space-only/time-only attention、每 4 layers 的 temporal attention、GQA、register
+    tokens 与更多 spatial tokens。
+  alternatives: 使用标准 dense attention block-causal transformer。
+  also_depends_on:
+  - E5
+- id: F3
+  type: dead_end
+  title: 单纯减少 sampling steps 会导致质量退化
+  support_level: explicit
+  source_refs:
+  - Sec 4.4
+  hypothesis: 把 diffusion forcing 的采样步数直接降到较少步数即可满足实时交互。
+  failure_mode: 速度提高但 generation quality 变差，不能单独解决准确交互模拟问题。
+  lesson: 需要 shortcut model 学习大步长端点预测，而不是只在推理时粗暴减少采样步。
+  also_depends_on:
+  - E5

@@ -1,0 +1,92 @@
+{
+  "artifact": "2026-06-12_WorldSimulationWithVideoFoundationModels_2511.00062",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.83,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Evidence is perfectly type-matched to claims (e.g., causal claims supported by ablations/RL comparisons, generalization by heterogeneous downstream tasks like robotics and driving).",
+        "Every claim explicitly links to specific tables and experiments that directly measure the stated outcomes."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly specific, actionable, and directly tied to the metrics and baselines used in the experiments.",
+        "Criteria avoid vague language, explicitly stating the conditions under which a claim would be invalidated (e.g., 'if post-trained version does not outperform pre-trained version under the same evaluation protocol')."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Boundary conditions for concepts are exceptionally well-defined, preventing over-interpretation of components (e.g., clarifying that frame-replacement is not for Text2World).",
+        "Assumptions are explicitly listed, and claim interpretations carefully distinguish between proxy metrics (like reward models) and ground-truth performance."
+      ],
+      "weaknesses": [],
+      "suggestions": [
+        "Consider embedding minor scope limitations directly into the claim statements themselves (e.g., noting the reliance on proxy reward models in C2's statement, not just its interpretation) to prevent superficial over-claiming."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "Clear and logical arc from observations to gaps, insights, and solutions.",
+        "Every identified gap (data quality, fragmented generation modes, high-res temporal artifacts) is directly addressed by specific decisions and experiments in the exploration tree and methodology."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "The exploration tree includes genuine, concrete dead-ends (e.g., X1: high-noise sample insufficiency, X2: joint SFT mixture ratio issues) with clear failure modes and lessons learned.",
+        "Decision rationales (e.g., choosing pixel space over latent/3D, model soup over TIES) are well-documented and reflect real research pivots rather than post-hoc justifications."
+      ],
+      "weaknesses": [],
+      "suggestions": [
+        "Enhance dead-end descriptions (like X2) with specific quantitative failure metrics (e.g., 'joint training caused a X% drop in domain Y') to make the negative results even more concrete."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Comprehensive baselines including previous generations, contemporary competitors (Wan2.1/2.2), and real-world references.",
+        "Strong ablation coverage (e.g., action injection methods, model merging strategies) and excellent metric-claim alignment.",
+        "High reproducibility commitment with open weights, code, and curated benchmarks."
+      ],
+      "weaknesses": [
+        "Lack of statistical reporting (error bars, variance, or confidence intervals) for continuous metrics like FVD, FID, and PSNR across multiple runs, which is common in large-scale generation papers but strictly reduces methodological rigor."
+      ],
+      "suggestions": [
+        "Include variance or confidence intervals for key continuous metrics, or explicitly state the number of evaluation runs and seeds used to compute the reported averages."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "Continuous evaluation metrics (e.g., FVD, FID, PSNR) lack error bars or variance reporting across multiple runs. While standard for large-scale foundation model papers, this omission limits strict statistical rigor."
+    },
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "suggestion",
+      "observation": "Dead-ends in the exploration tree (e.g., X2: joint SFT mixture issues) are well-reasoned but would benefit from specific quantitative failure metrics to concretize the negative results."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "suggestion",
+      "observation": "While interpretations and concept boundaries are excellent, embedding minor scope limitations (like proxy metric reliance) directly into the core claim statements could further prevent superficial over-claiming."
+    }
+  ]
+}

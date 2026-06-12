@@ -1,0 +1,7 @@
+- 论文主要基于 open-loop evaluation 和离线数据集验证, 没有展示闭环真实车辆部署结果。
+- 规划模块依赖 future occupancy 和 flow 的预测质量；如果世界模型预测错误, occupancy-based cost 也会受到影响。
+- 论文指出 most of the time consumption is attributed to the historical encoder W_E, 因而效率瓶颈主要不在 memory queue 或 world decoder。
+- fine-grained GMO forecasting 比 inflated GMO forecasting 更具挑战, 因为需要预测更细粒度的 voxel labels。
+- action-controllable generation 中为了避免 ego-status leakage 会丢弃 planner P, 因此该设置与 end-to-end planning 的连续 rollout 使用方式不同。
+- 使用 GT trajectory 作为 action condition 的规划结果更好, 说明 predicted trajectory 设置仍受轨迹预测误差约束。
+- 论文未来工作提到探索 sparse representations such as Sparse-BEV, 暗示当前 dense BEV 表示仍有进一步效率优化空间。

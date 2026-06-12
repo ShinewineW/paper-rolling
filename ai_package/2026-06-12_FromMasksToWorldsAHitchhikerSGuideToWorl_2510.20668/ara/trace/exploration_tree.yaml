@@ -1,0 +1,221 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 怎样从遮蔽建模走向 true world model
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  description: 论文的主问题是沿一条窄路理解 world models：从 mask-based models 到 unified architectures，再到
+    interactive generative models 和 memory-augmented systems，最后合成为 true world models。
+  children:
+  - id: Q2
+    type: question
+    title: 遮蔽范式能否作为跨模态预训练基础
+    support_level: explicit
+    source_refs:
+    - Sec 3
+    description: 论文把 Stage I 描述为通过重建缺失或损坏输入来学习，并强调该原则在多种模态中具有普遍性。
+  - id: E1
+    type: experiment
+    title: 跨模态遮蔽建模路线的证据汇总
+    support_level: explicit
+    source_refs:
+    - Sec 3.1
+    - Sec 3.2
+    - Sec 3.3
+    result: 语言、视觉、视频、音频、3D 与结构化数据中的代表性工作共同支持遮蔽建模是一种可迁移的基础范式。
+- id: D1
+  type: decision
+  title: 选择窄路而非全量综述
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  choice: 聚焦 generative heart、interactive loop 与 memory system 三个核心，而不是罗列所有提到 world
+    model 的论文。
+  alternatives:
+  - 覆盖所有相关分支
+  - 按任务或 benchmark 做宽泛分类
+  - 只沿强化学习 world model 历史展开
+  children:
+  - id: Q3
+    type: question
+    title: true world model 需要哪些必要子系统
+    support_level: explicit
+    source_refs:
+    - Sec 2.2
+    description: 论文提出 true world model 不是单体，而是 Generative Heart、Interactive Loop 与
+      Memory System 的集成。
+  - id: E2
+    type: experiment
+    title: 三子系统形式化分析
+    support_level: explicit
+    source_refs:
+    - Sec 2.2
+    - Appendix A
+    result: 形式化框架把 dynamics、observation、outcome、filter、policy、value 与 memory update
+      组合为统一分析镜头。
+- id: D2
+  type: decision
+  title: 把 unified model 定义为共享骨干和同一范式
+  support_level: explicit
+  source_refs:
+  - Sec 4
+  choice: 要求模型跨模态处理和生成时使用 shared backbone 与 same paradigm。
+  alternatives:
+  - 把不同范式拼接的 multimodal systems 也算作统一模型
+  - 只要求能输入输出多模态即可
+  - 只关注 text generation 能力
+  also_depends_on:
+  - Q2
+- id: E3
+  type: experiment
+  title: 统一模型代表路线比较
+  support_level: explicit
+  source_refs:
+  - Sec 4.1
+  result: language-prior、visual-prior 与 industrial-scale systems 显示统一建模减少碎片化并增强跨模态迁移。
+  also_depends_on:
+  - D2
+- id: DE1
+  type: dead_end
+  title: 只靠统一架构不能生成动态世界
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  hypothesis: 如果一个系统已经能跨模态处理和生成，那么它可能足以成为 world model。
+  failure_mode: 论文指出 visual-prior unified models 仍主要停留在 single-shot synthesis 或 stepwise
+    editing，缺乏 continuous real-time closed-loop interaction。
+  lesson: 统一架构是必要前驱，但缺少交互闭环时不能形成真正动态世界。
+  also_depends_on:
+  - E3
+- id: P1
+  type: pivot
+  title: 从统一生成转向闭环交互
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Sec 5
+  from: Stage II Unified Models
+  to: Stage III Interactive Generative Models
+  trigger: 统一模型缺少 continuous real-time closed-loop interaction，因此需要研究由 streamed inputs
+    或 user actions 条件化并带 internal state 的生成系统。
+  also_depends_on:
+  - DE1
+- id: E4
+  type: experiment
+  title: 语言、视频与场景交互范式汇总
+  support_level: explicit
+  source_refs:
+  - Sec 5.1
+  - Sec 5.2
+  result: 从 interactive fiction、AI Dungeon、GameGAN、Playable Video Generation、Genie
+    series 到 World Labs，交互生成从静态内容走向实时可控模拟。
+  also_depends_on:
+  - P1
+- id: DE2
+  type: dead_end
+  title: 实时交互仍不能保证持久一致性
+  support_level: explicit
+  source_refs:
+  - Sec 5.3
+  hypothesis: 只要模型能实时响应 action-conditioned inputs，就能 sustain persistent worlds。
+  failure_mode: 论文指出 implicit frame-by-frame generators 容易 losing context 和 hallucinating
+    objects，显式 3D 方法也仍难处理 dynamic elements。
+  lesson: reactive action-perception loop 需要 dedicated memory and state management
+    才能长期维持世界。
+  also_depends_on:
+  - E4
+- id: P2
+  type: pivot
+  title: 从交互转向记忆与一致性
+  support_level: explicit
+  source_refs:
+  - Sec 5.3
+  - Sec 6
+  from: Stage III Interactive Generative Models
+  to: Stage IV Memory and Consistency
+  trigger: 长时程一致性仍未解决，交互回路没有专门记忆系统就无法 sustain persistent worlds。
+  also_depends_on:
+  - DE2
+- id: Q4
+  type: question
+  title: 记忆应锚定在哪里并如何扩展
+  support_level: explicit
+  source_refs:
+  - Sec 6
+  description: 论文把 Stage IV 组织为三个问题：where to anchor memory、how to extend span and
+    capacity、how to govern it to preserve consistency。
+  also_depends_on:
+  - P2
+- id: E5
+  type: experiment
+  title: 外部记忆、架构持久性和一致性策略比较
+  support_level: explicit
+  source_refs:
+  - Sec 6.1
+  - Sec 6.2
+  - Sec 6.3
+  result: retrieval、recurrence、compression、state-space models、scaling strategies 与
+    explicit memory policies 分别增强可编辑性、持久性和可靠性。
+  also_depends_on:
+  - Q4
+- id: D3
+  type: decision
+  title: 把一致性视为记忆治理而非单纯长上下文
+  support_level: explicit
+  source_refs:
+  - Sec 6.3
+  choice: 关注写入、检索、更新和遗忘策略，而不是只扩大上下文窗口。
+  alternatives:
+  - 单纯增加 context length
+  - 依赖 KV cache 或 control signals 维持身份
+  - 只使用 explicit 3D spatial location
+  also_depends_on:
+  - E5
+- id: DE3
+  type: dead_end
+  title: 只扩大上下文窗口不足以控制漂移
+  support_level: explicit
+  source_refs:
+  - Sec 6.3
+  - Sec 6.4
+  hypothesis: 扩大上下文容量即可自然解决 world model 的记忆一致性问题。
+  failure_mode: 论文指出 longer context alone is insufficient，并提出记忆系统可能是硬件和数据约束下的工程权宜，也可能需要明确的
+    memory discipline。
+  lesson: 持久性需要在 scale、architecture、data 与 memory policies 之间建立可检验关系。
+  also_depends_on:
+  - D3
+- id: P3
+  type: pivot
+  title: 从组件集成转向自维持世界
+  support_level: explicit
+  source_refs:
+  - Sec 7
+  from: Stage IV Memory and Consistency
+  to: Stage V True World Models
+  trigger: 前四阶段提供 universal generative paradigm、unified architecture、real-time interactive
+    loop 与 persistent memory system，Stage V 通过合成产生 persistence、agency 与 emergence。
+  also_depends_on:
+  - D3
+- id: Q5
+  type: question
+  title: true world model 的前沿难题是什么
+  support_level: explicit
+  source_refs:
+  - Sec 7.2
+  description: 论文把 frontier 定义为 Coherence Problem、Compression Problem 与 Alignment
+    Problem。
+  also_depends_on:
+  - P3
+- id: E6
+  type: experiment
+  title: 把 world model 作为科学仪器的用途推演
+  support_level: explicit
+  source_refs:
+  - Sec 7.3
+  result: 当模型跨过 persistence、agency 与 emergence 门槛后，可用于研究现实中难以实验的复杂自适应系统。
+  also_depends_on:
+  - Q5

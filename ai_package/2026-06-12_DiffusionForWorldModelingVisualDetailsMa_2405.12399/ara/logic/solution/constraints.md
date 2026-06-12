@@ -1,0 +1,6 @@
+- 扩散世界模型的推理成本由 Number of Function Evaluations 决定，更多 denoising steps 会改善视觉质量但增加 imagination 训练成本。
+- 单步 denoising 在多模态后验下会输出可能落在分布外的平均结果，论文在 Boxing 中观察到模糊预测，因此主实验改用多步采样。
+- 模型记忆有限；在 CS:GO 中接近墙面或丢失可见性时可能忘记当前状态并生成新的武器或地图区域。
+- 静态 offline gameplay 训练会带来动作分布外问题；论文观察到少见用户输入会让长 rollout 退化或跳到另一区域。
+- Counter-Strike: Global Offensive 实验没有强化学习协议，论文只训练和展示世界模型，定量能力测量留给未来工作。
+- 视觉细节质量提升并不消除所有任务差异；论文表格中仍有若干 Atari 游戏上 DIAMOND 不优于全部基线。

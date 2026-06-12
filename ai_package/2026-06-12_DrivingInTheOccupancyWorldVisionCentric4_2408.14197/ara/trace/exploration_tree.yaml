@@ -1,0 +1,194 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 能否把 world model 从生成或预训练扩展到端到端规划
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3.1
+  description: 论文首先提出核心问题：已有 world models 多关注数据生成或预训练，而本文要探索将未来预测能力与 end-to-end planning
+    结合。
+- id: D1
+  type: decision
+  title: 采用 vision-centric 4D occupancy world model 作为规划基础
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3.2
+  choice: 选择预测 future occupancy and flow states，并在 occupancy 空间中进行规划。
+  alternatives: 继续使用 image-based driving video generation、point cloud forecasting
+    或只做预训练。
+  also_depends_on:
+  - Q1
+- id: Q2
+  type: question
+  title: 如何让历史 BEV embeddings 积累语义与动态信息
+  support_level: explicit
+  source_refs:
+  - Sec 3.2
+  description: 历史 BEV embeddings 需要在 memory queue 中保留对语义类别和运动变化更敏感的信息，服务后续 forecasting
+    与 planning。
+  also_depends_on:
+  - D1
+- id: D2
+  type: decision
+  title: 引入 semantic- and motion-conditional normalization
+  support_level: explicit
+  source_refs:
+  - Sec 3.2
+  - Figure 3
+  choice: 用 semantic labels、ego-pose transformation 与 3D backward centripetal flow
+    生成 affine transformation 参数，调制 BEV embeddings。
+  alternatives: 直接堆叠或缓存原始 BEV embeddings，不显式进行语义增强与运动补偿。
+  also_depends_on:
+  - Q2
+- id: E1
+  type: experiment
+  title: 条件归一化消融验证各分支贡献
+  support_level: explicit
+  source_refs:
+  - Sec 4.4
+  - Table 6
+  result: semantic、ego-motion 与 agent-motion 相关归一化都带来收益，其中 ego-motion 对未来状态预测特别关键，agent-motion
+    对实例关联更有帮助。
+  also_depends_on:
+  - D2
+- id: Q3
+  type: question
+  title: 如何把 ego actions 作为可控生成条件
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  description: 论文需要支持 velocity、steering angle、trajectory 与 commands 等异构条件，使 world
+    model 预测与不同 ego motion 对齐。
+  also_depends_on:
+  - D1
+- id: D3
+  type: decision
+  title: 用 Fourier embeddings 与 conditional cross-attention 统一注入动作条件
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  - Sec 3.2
+  choice: 先用 Fourier embeddings 编码动作，再拼接并经 learned projections 对齐到 conditional cross-attention
+    layers。
+  alternatives: 把条件直接加到 BEV queries，或只使用单一种类动作条件。
+  also_depends_on:
+  - Q3
+- id: E2
+  type: experiment
+  title: 动作条件与条件接口消融
+  support_level: explicit
+  source_refs:
+  - Table 3
+  - Table 7
+  result: 注入动作条件整体优于 baseline；低层动作条件更利于未来预测，cross-attention 比 addition 更有效，Fourier
+    embedding 继续带来改进。
+  also_depends_on:
+  - D3
+- id: Q4
+  type: question
+  title: 预测到的未来占据如何转化为安全轨迹选择
+  support_level: explicit
+  source_refs:
+  - Sec 3.4
+  description: 由于 world model 能预测 occupancy 与 flow，下一步是用这些三维未来状态约束候选轨迹，避免只依赖图像级奖励。
+  also_depends_on:
+  - D1
+  - D3
+- id: D4
+  type: decision
+  title: 构建 occupancy-based planner 并加入 BEV Refinement
+  support_level: explicit
+  source_refs:
+  - Sec 3.4
+  choice: 使用 Agent-Safety Cost、Road-Safety Cost、Learned-Volume Cost 选择候选轨迹，再用 BEV
+    embeddings refinement 输出最终轨迹。
+  alternatives: 使用 image-based reward function，或只用离散 cost selection 而不做 BEV latent
+    refinement。
+  also_depends_on:
+  - Q4
+- id: E3
+  type: experiment
+  title: occupancy-based cost factors 消融
+  support_level: explicit
+  source_refs:
+  - Table 8
+  - Sec 4.4
+  result: 各 cost factor 都有助于安全规划，缺少 agent constraints 会明显恶化碰撞风险，BEV refinement 对利用完整三维环境信息很重要。
+  also_depends_on:
+  - D4
+- id: E4
+  type: experiment
+  title: 主结果验证 occupancy forecasting、flow forecasting 与 planning
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Sec 4.3
+  - Table 1
+  - Table 5
+  result: Drive-OccWorld 在 inflated GMO、fine-grained occupancy、flow forecasting 与
+    end-to-end planning 上整体优于对比方法，说明 world knowledge 与连续预测可改善规划。
+  also_depends_on:
+  - D2
+  - D3
+  - D4
+- id: P1
+  type: pivot
+  title: 从单步预测转向 continuous forecasting and planning
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Sec 3.4
+  from: 仅根据历史观察和当前动作预测一段未来 occupancy。
+  to: 将预测轨迹作为下一步 action condition，循环进行未来状态预测与轨迹规划。
+  trigger: planner 选出的 predicted trajectory 可重新输入 world model，形成 continuous rollout。
+  also_depends_on:
+  - D4
+- id: X1
+  type: dead_end
+  title: 仅用 image-based reward function 做规划不充分
+  support_level: explicit
+  source_refs:
+  - Sec 3.4
+  hypothesis: 可以把生成 driving videos 与 image-based reward function 结合来选择轨迹。
+  failure_mode: 论文指出这种路线没有充分利用环境的 geometric 3D features，难以直接表达 agents、road 与 volume
+    约束。
+  lesson: 规划需要占据级三维结构作为安全约束，因此转向 occupancy-based planner。
+  also_depends_on:
+  - Q4
+- id: X2
+  type: dead_end
+  title: 训练规划时直接使用 GT ego actions 会带来泄漏风险
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Sec 3.4
+  hypothesis: 端到端规划训练可以直接把 GT ego actions 作为 action conditions。
+  failure_mode: 论文明确为防止 GT ego actions 泄漏到 planner，在 end-to-end planning 中训练和测试都使用
+    predicted trajectories。
+  lesson: 规划场景下 action condition 应与测试时可获得的信息一致，避免用不可用的真实 ego action 强化 planner。
+  also_depends_on:
+  - P1
+- id: Q5
+  type: question
+  title: 历史输入和 memory queue length 是否值得增加
+  support_level: explicit
+  source_refs:
+  - Table 9
+  - Sec D.1
+  description: 论文进一步检查输入帧数与 memory queue length 对性能和延迟的影响，以判断历史信息积累的收益与代价。
+  also_depends_on:
+  - D2
+- id: E5
+  type: experiment
+  title: 输入帧数与 memory queue length 的效率权衡
+  support_level: explicit
+  source_refs:
+  - Table 9
+  - Sec D.1
+  result: 增加历史输入和 memory queue length 会提升表现；大部分延迟来自 historical encoder，memory queue
+    与 world decoder 的额外延迟相对有限。
+  also_depends_on:
+  - Q5

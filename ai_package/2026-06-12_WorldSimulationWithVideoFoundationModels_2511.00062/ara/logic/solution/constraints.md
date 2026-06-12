@@ -1,0 +1,7 @@
+- 论文没有给出 RL post-training 的完整显式损失公式，只描述 VideoAlign reward、组内 advantage、trajectory probability decomposition 和 diffusion loss regularization。
+- Cosmos-Transfer2.5 的 control branch 细节依赖 Cosmos-Transfer1，本文只说明 control blocks 插入方式的关键变化。
+- 多处应用实验是特定 robotics、driving 或 camera-control 设置，泛化到其他 embodiment、传感器布局和场景类型需要再验证。
+- action-conditioned 模型只比较 TimeEmbedding、CrossAtten 和 ChannelConcat 三种动作注入方式，未穷尽所有动作条件化设计。
+- 长视频生成仍采用 chunked autoregressive 方式，论文重点评估误差累积但未声称彻底消除累积。
+- 文中若干数据处理、reward service、训练基础设施依赖大规模 GPU、外部 reward models 和专有数据管线，复现实验成本较高。
+- Cosmos-Reason1 的 vision encoder 可支持额外视觉条件输入用于 style control，但论文明确将其留作 future exploration。

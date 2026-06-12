@@ -1,0 +1,8 @@
+- 论文是路线图式综述，不是提出一个可训练的新模型，因此没有显式训练损失、优化目标或可复现实验协议。
+- Stage II 的统一模型仍可能缺少 continuous, real-time closed-loop interaction，视觉优先的 text-to-image 和 text-to-video 多停留在 single-shot synthesis 或 stepwise editing。
+- Stage III 虽实现 real-time interaction，但 sustaining long-horizon consistency remains unsolved；implicit frame-by-frame generators 容易 losing context 和 hallucinating objects。
+- explicit 3D approaches 依赖 explicit spatial modeling，空间一致性较强但仍 struggle with dynamic elements 和 long-term object states。
+- mask-based persistent memory remains underexplored，因此论文在 Stage IV 采取 architecture-agnostic view，缺少 mask-specific mechanism。
+- true world model 面临 Coherence Problem、Compression Problem 与 Alignment Problem，尤其 self-generating reality 的内部逻辑、因果和叙事一致性难以评价。
+- ever-growing history 可能导致 computational collapse；需要 causally sufficient state abstractions，但 long-horizon dynamics 可能 computationally irreducible。
+- alignment 在 multi-agent society 中变得更难，需要同时对齐 substrate 与 agents interaction 产生的 emergent dynamics。
