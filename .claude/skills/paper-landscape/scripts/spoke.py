@@ -342,7 +342,7 @@ def make_spoke(
 
         def _classify(verdict) -> set[str]:
             # M2: endswith / exact-suffix, not fragile substrings. Observed targets:
-            # anchor→report.md (branch1); rigor→level2_report.json, entailment→
+            # report.md→branch1 (G3R0 presence); rigor→level2_report.json, entailment→
             # claims.md:<id> (branch2); equation→<id>.md (ingest — unfixable).
             roots: set[str] = set()
             for f in verdict.hard_findings:

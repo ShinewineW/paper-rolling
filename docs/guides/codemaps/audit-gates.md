@@ -47,9 +47,8 @@ Per-paper spoke:
   │                                                     │
   │  Input: staged branch2 + branch1 + corpus/{ID}.md │
   │                                                     │
-  │  Logic:                                             │
-  │  ├─ anchor-lint: three-layer consistency         │
-  │  │  (equation → claim → evidence table)           │
+  │  Logic (ADR-0012 rev: no branch1 anchor-resolution):│
+  │  ├─ G3R0: branch1 report.md must exist (presence) │
   │  ├─ equation-fidelity: content_list.json count    │
   │  ├─ entailment-judge: semantic claim validity     │
   │  └─ rigor-rubric: 6-dim assessment (D1-D6)        │
@@ -225,7 +224,7 @@ def _extract_numbers_from_evidence(ara: dict) -> list[str]:
 
 ---
 
-### `scripts/audit/g3_seal.py` — Seal gate (anchor + rigor + entailment)
+### `scripts/audit/g3_seal.py` — Seal gate (G3R0 presence + entailment + rigor + equation)
 
 **核心函数**：
 
@@ -309,17 +308,17 @@ def g3_gate(
 
 ---
 
-### `scripts/audit/anchor_resolution.py` — Three-layer anchor lint (RETIRED per branch1, survives for engine core block)
+### `scripts/audit/anchor_resolution.py` — Three-layer anchor lint (FULLY RETIRED — dead code)
 
-> **ADR-0012 (2026-06-13, landed):** the hard-gated `check_report_faithfulness` seam was DELETED.
-> The per-prose-line anchor requirement on branch1 is GONE. The 理解阅读 branch1 is now
-> plain prose (no <!--ref--> anchors required). Prose faithfulness moved to the optional
-> non-blocking **评价** assessment in `branch1_gate.py::build_assessment()` — (b) mechanical
-> number-grounding vs ara_value_set + (c) a config-routed LLM judge (advisory note, never blocks).
->
-> What SURVIVES here: anchor RESOLUTION in the ARA's own engine 核心结论 block (the internal
-> machine-generated block, not the branch1 prose). The pseudocode below illustrates the concept,
-> retained only for reference on how the engine's own anchors are resolved by G3.
+> **ADR-0012 rev (2026-06-13, landed):** the WHOLE `<!--ref-->`/`<!--anchor:-->` machinery is
+> retired. The hard-gated `check_report_faithfulness` seam was DELETED; `g3_seal.py` no longer
+> calls `check_branch1_md_anchors` (G3 does only G3R0 branch1-presence + entailment + rigor +
+> equation); and `branch1_llm._claims_block` no longer emits anchors — the 核心结论 block is now
+> plain prose. `anchor_resolution.py` is therefore **dead code**: still importable and unit-tested,
+> but called by NO gate. Prose faithfulness moved to the optional non-blocking **评价**
+> (`branch1_gate.py::build_assessment()` — (b) number-grounding vs `ara_value_set` + (c) advisory
+> LLM judge note, never blocks). The pseudocode below is retained only as a historical illustration
+> of the now-retired three-layer concept.
 
 **三层锚定架构**：
 

@@ -15,10 +15,10 @@ from scripts.audit.ara_tree import extract_numbers, number_present, source_value
 from scripts.audit.g3_seal import load_ara_bundle
 
 _FENCE = re.compile(r"^\s*```")
-# Strip HTML comments BEFORE number extraction. The engine 核心结论 block carries
-# anchors like `<!--ref:quote:Table%201%20reports%2028.4-->`; without stripping,
-# extract_numbers parses the URL-encoded payload into bogus tokens ('201', '20',
-# '2028.4') that would be flagged as ungrounded prose numbers.
+# Strip HTML comments BEFORE number extraction. ADR-0012 rev retired the <!--ref-->
+# anchoring, but any stray HTML comment (e.g. a legacy `<!--ref:quote:Table%201...-->`
+# in an old report, or an editorial note) would otherwise let extract_numbers parse its
+# URL-encoded payload into bogus tokens ('201', '20', '2028.4') — so we always drop them.
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 # Markdown ordered-list index ("1. ", "2. ") — the LLM assembler emits numbered
 # 核心结论 lines; the index is structure, not a data number.

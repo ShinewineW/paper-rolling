@@ -183,8 +183,7 @@ def make_spoke(
    └─ Stages to person_vault/{key}/ (not yet promoted)
 
 5. G3 = seal_gate(branch1, branch2, md_path)
-   ├─ G3R0: branch1 presence (must exist, no anchor-resolution on branch1 prose)
-   ├─ Anchor-resolution: resolve anchors PRESENT in engine 核心结论 block (NOT per-prose-line check)
+   ├─ G3R0: branch1 presence (report.md must exist; ADR-0012 rev retired all anchor-resolution)
    ├─ Equation fidelity: content_list.json count vs claims
    ├─ Entailment: claim vs experiment text semantically sound
    ├─ 6-dim rigor rubric (D1-D6)
@@ -547,7 +546,7 @@ Hard Gate (HITL):
    (staging: _stage_{key}_person)
 
 5. G3 gate
-   anchor-lint + eq fidelity + entailment + 6-dim rubric
+   G3R0 branch1 presence + eq fidelity + entailment + 6-dim rubric
 
 6. promote
    both staging → real vaults (OT-5 atomic)

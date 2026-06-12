@@ -111,7 +111,8 @@ def _loss_section(analysis: dict, key: str) -> str:
     # The three explainer bullets are sourced from the analyzer's per-paper
     # `loss_highlight` so the producer asserts NO fixed domain narrative; the
     # neutral fallbacks (used when the analyzer omits a field) are number-free
-    # and metric-cue-free so the section never trips the anchor gate.
+    # and metric-cue-free so the section stays a clean illustration (no bare
+    # numbers to surface in the 评价's machine number-check).
     evidence_link = f"../../ai_package/{key}/ara/evidence/"
     lh = analysis.get("loss_highlight") or {}
     direction = lh.get("direction") or "该损失针对方法要解决的核心训练目标设计。"

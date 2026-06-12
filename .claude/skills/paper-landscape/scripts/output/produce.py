@@ -269,7 +269,7 @@ def produce_outputs(
     """Produce branch2 + branch1 atomically into the two top-level vaults.
 
     Args:
-        md_path: Frozen {ID}.md (the MD-only truth base + anchor target).
+        md_path: Frozen {ID}.md (the MD-only truth base; equation-fidelity source).
         candidate: Discovery record (carries identity + metadata).
         ledger: Ledger; provides `intake_date()` and `record_code_ref(key, path)`.
         root: Workspace root containing `person_vault/` and `ai_package/`.

@@ -352,8 +352,9 @@ def write_report(
     typically a cheaper backend like deepseek/qwen). Returns:
         {"sections": {section_id: markdown},
          "figures":  [{"ref","caption","zh"}, ...]}  # ORIGINAL paper figures + 中文导览
-    branch1 stitches + grounds + lint-gates the sections and embeds EVERY figure
-    (the paper-guided-tour requirement). ``md_path`` enables the figure inventory.
+    branch1 stitches the sections, prepends the opening 「评价」 note (ADR-0012 rev —
+    never blocks), and embeds EVERY figure (the paper-guided-tour requirement).
+    ``md_path`` enables the figure inventory.
     """
     provider = _provider_for("writer")
     _log(f"write_report: writer provider = {provider.name}")
