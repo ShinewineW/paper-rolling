@@ -31,6 +31,21 @@ def test_invented_prose_number_is_flagged() -> None:
     assert unconfirmed_report_numbers(report, md) == ["99.9"]
 
 
+def test_arxiv_id_and_doi_in_prose_are_not_data_numbers() -> None:
+    # ADR-0012 demo (ORION): the writer echoed the paper's own arXiv id into prose;
+    # an id is paper-identity metadata, never a metric, so it must NOT be grounded.
+    md = "Our model reaches 28.4 NDS."  # id absent from the source MD
+    report = "本文(arXiv:2503.19755,DOI 10.1109/ABC.2025.123456)达到 28.4 NDS。"
+    assert unconfirmed_report_numbers(report, md) == []
+
+
+def test_real_metric_decimal_is_not_mistaken_for_an_arxiv_id() -> None:
+    # The identifier shape is 4-int.4–5-decimal; a normal metric (28.4 / 0.61) is
+    # unaffected, and a genuinely ungrounded metric still flags.
+    md = "Our model reaches 28.4 NDS."
+    assert unconfirmed_report_numbers("达到 28.4 NDS,基线 0.61。", md) == ["0.61"]
+
+
 def test_table_rows_and_code_fences_are_skipped() -> None:
     md = "Only 28.4 appears in source."
     report = "\n".join(

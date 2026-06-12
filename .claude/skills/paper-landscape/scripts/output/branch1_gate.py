@@ -36,15 +36,23 @@ _LOCATOR = re.compile(
 # not parsed as ungrounded data numbers (they are infrastructure references, not
 # scientific claims).
 _MD_LINK_TARGET = re.compile(r"\]\([^)]*\)")
+# Bibliographic IDENTIFIERS — an arXiv id (`2503.19755`, YYMM.NNNNN) or a DOI
+# (`10.1234/...`). These are paper-identity metadata, never scientific data, so a
+# report that names the paper's own arXiv id in prose must not be number-grounded
+# on it (ADR-0012 demo, ORION: the writer echoed `arXiv:2503.19755` → a bogus
+# ungrounded "number"). A real metric with 4 integer + 4–5 decimal digits does not
+# occur, so this shape is unambiguous.
+_IDENTIFIER = re.compile(r"(?<!\d)\d{4}\.\d{4,5}(?!\d)|10\.\d{4,9}/\S+")
 
 
 def prose_numbers(report_text: str) -> list[str]:
     """Distinct DATA numbers in report PROSE. Stripped/skipped before extraction:
     HTML-comment anchor payloads, fenced code blocks, markdown table rows (the
     paper's own figures, gated by 数字门 on the ARA), ordered-list indices,
-    markdown link targets (vault-key paths / hrefs), and provenance locators
-    (Table 1 / 图1 / §4). The SINGLE scope used by both the grounding check and
-    its ratio denominator, so they can never diverge."""
+    markdown link targets (vault-key paths / hrefs), bibliographic identifiers
+    (arXiv id / DOI), and provenance locators (Table 1 / 图1 / §4). The SINGLE
+    scope used by both the grounding check and its ratio denominator, so they can
+    never diverge."""
     nums: list[str] = []
     in_fence = False
     for raw in report_text.splitlines():
@@ -55,6 +63,7 @@ def prose_numbers(report_text: str) -> list[str]:
             continue
         line = _OL_PREFIX.sub("", _COMMENT.sub("", raw))  # drop anchors + list index
         line = _MD_LINK_TARGET.sub(" ", line)  # drop link targets (vault-key paths, hrefs)
+        line = _IDENTIFIER.sub(" ", line)  # drop arXiv id / DOI (paper-identity metadata)
         line = _LOCATOR.sub(" ", line)  # drop Table 1 / 图1 / §4
         for n in extract_numbers(line):
             if n not in nums:
