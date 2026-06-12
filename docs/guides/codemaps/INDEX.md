@@ -50,8 +50,8 @@ write_branch1_llm(stage_person, candidate, stage_ai, md_path, write_report, key=
 **流程**：
 1. LLM writer 生成富文本中文段落（来自 `write_report` seam）
 2. **力学锚定** `## 核心结论` 块（每个数字三层锚定 = 源文本 → Tier1/2 → 证据表）
-3. 逐行**接地 pass**：任何未锚定的实证数字 → `AnchorGateError`（硬门，促进前失败）
-4. 三层 **anchor-lint** 硬门（与分支1 确定性路径相同）
+3. **忠实门 (ADR-0012)**：正文数字允许自然书写，但其值必须出现在 MD（(b) 机械落源），否则 `AnchorGateError`（促进前失败）
+4. **忠实门 (c) 判官**：报告不得相对已验证 ARA 实质误导（与分支1 确定性路径共用同一门）
 5. **图形策展**：强制架构图 + 几个结果图（base64 内联到自包含 HTML）
 6. **NO emoji 铁律**：确定性剥离表情符号 + mermaid 标签引用
 7. **MathJax** 数学 + **parse-safe mermaid 11** 引用

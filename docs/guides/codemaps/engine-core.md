@@ -219,6 +219,7 @@ def run_campaign(
     rigor_scores: Callable,  # LLM seam
     entailment_judge: Callable,  # LLM seam
     write_report: Callable | None = None,  # LLM seam (optional)
+    faithfulness_judge: Callable | None = None,  # LLM seam — branch1 忠实门 (c), ADR-0012
     http: Callable,  # infra adapter
     run_cli: Callable,  # infra adapter
     cross_model_votes: dict | None = None,  # future
@@ -285,6 +286,7 @@ def produce_outputs(
     resolve_analysis: Callable[[Path, dict], dict],
     g2_gate: Callable[[Path], GateVerdict] | None = None,
     write_report: Callable[..., dict] | None = None,
+    faithfulness_judge: Callable[..., dict] | None = None,  # branch1 忠实门 (c), ADR-0012
     cancel: threading.Event | None = None,
 ) → ProduceResult:
     """Produce branch2 + branch1 atomically (OT-5 both-or-neither).
@@ -305,7 +307,8 @@ def produce_outputs(
         stage_ai, analysis = stage_branch2(staging, candidate, md_path, resolve_analysis=…)  # → Seal-1 结构门
         if g2_gate and g2_gate(staging / "ai").blocked:          # G2 数字门 (before branch1)
             raise ProduceGateBlocked(verdict, staged_dir=staging)
-        stage_branch1(staging, candidate, stage_ai, md_path, write_report, analysis, key)  # 锚点门 self-gate
+        stage_branch1(staging, candidate, stage_ai, md_path, write_report, analysis, key,
+                      faithfulness_judge=faithfulness_judge)  # 忠实门 self-gate (ADR-0012)
         if cancel and cancel.is_set():           # stall 砍单 last safe point
             raise SpokeCancelled(…)
         return promote(staging, key, …)          # move BOTH → vaults, atomic
@@ -341,6 +344,7 @@ def write_branch1_llm(
     md_path: Path,
     write_report: Callable[..., dict],
     key: str,
+    faithfulness_judge: Callable[..., dict] | None = None,  # branch1 忠实门 (c), ADR-0012
 ) → None:
     """生成 branch1（人链 LLM 写入版本）。
     
@@ -349,7 +353,7 @@ def write_branch1_llm(
       2. 调用 write_report(ara, figures) → {section: rich_markdown, ...}
       3. 组装 report（header + sections + grounded assembly）
       4. EMOJI 剥离 + mermaid 标签引用
-      5. 三层 anchor-lint（门控）
+      5. 忠实门（kept anchor-form lint + (b) 数字落源 + (c) 判官）
       6. 图形策展（强制 arch + 部分结果）
       7. 转换为白主题自包含 HTML（MathJax + mermaid）
       8. 写 person_vault/{key}/report.html + metadata.json
@@ -390,7 +394,8 @@ def write_branch1_llm(
 ...
 """
     
-    # Whole-report grounding pass (any stray empirical number → anchor)
+    # Engine 核心结论 block anchoring (so 最终门 can resolve them); ADR-0012: prose
+    # numbers are GROUNDED vs MD by branch1_gate, not required to self-anchor.
     report = _ground_empirical_claims(report, md_path)
     
     # Strip emoji + quote mermaid labels
@@ -422,7 +427,7 @@ def write_branch1_llm(
 - **LLM-generated**: 来自 write_report seam（路由到 config/llm.yaml 中的提供商）
 - **Vivid prose**: 不是数据 → markdown 的机械映射，而是活泼的叙述
 - **Core block**: механически 从 ARA 派生（claim statement + three-layer anchors）
-- **Grounded assembly**: 全报告扫描任何实证数字，确保都锚定到 MD
+- **Grounded assembly**: 忠实门 (ADR-0012) 机械校验正文每个数字的值都出现在 MD（(b)），核心结论块仍带 `<!--ref-->` 锚点
 - **Emoji stripping**: 确定性去除所有表情符号（项目铁律）
 - **Figure curation**: 架构图强制，选中几个高优结果图
 - **Self-contained HTML**: 所有图 base64 inlined，MathJax 嵌入，独立可浏览
@@ -441,6 +446,7 @@ def write_branch1(
     md_path: Path,
     analysis: dict,
     key: str,
+    faithfulness_judge: Callable | None = None,  # branch1 忠实门 (c), ADR-0012
 ) → None:
     """生成 branch1（确定性简版，从 analysis 直接派生）。
     
@@ -470,7 +476,7 @@ def write_branch1(
 - write_branch1: 确定性，可审计，可重现
 - write_branch1_llm: 生动，自然语言，可能有创意但不可重现
 
-两者都通过相同的三层 anchor-lint 门，确保精度。
+两者都通过相同的 忠实门（ADR-0012：保留的锚点形态 lint + (b) 数字落源 + (c) 判官），确保精度。
 
 ---
 

@@ -29,15 +29,15 @@ G2 gate (data-fidelity on evidence)
 branch1 (human report)
     ├─ LLM-written path (if write_report seam provided):
     │  ├─ write_report(ara, figures) → vivid Chinese sections
-    │  ├─ build core-conclusions (mechanically grounded)
-    │  ├─ ground empirical claims (three-layer anchor)
+    │  ├─ build core-conclusions (mechanically grounded, <!--ref--> anchored)
+    │  ├─ 忠实门 (ADR-0012): (b) prose numbers grounded vs MD + (c) judge
     │  ├─ curate figures (arch mandatory + top-N results)
     │  ├─ self-contained HTML (MathJax + mermaid + base64)
     │  └─ output: person_vault/{key}/report.html
     │
     └─ thin deterministic path (if no write_report):
        ├─ format analysis → markdown template
-       ├─ three-layer anchor-lint
+       ├─ 忠实门 (ADR-0012): kept anchor-form lint + (b) grounding
        └─ output: person_vault/{key}/report.md
     ↓
 G3 gate (seal: anchor + eq fidelity + rigor + entailment)
@@ -231,6 +231,7 @@ def write_branch1(
     md_path: Path,
     analysis: dict,
     key: str,
+    faithfulness_judge: Callable | None = None,  # branch1 忠实门 (c), ADR-0012
 ) → None:
     """Render branch1 (human report) deterministically from analysis.
     
@@ -303,11 +304,13 @@ def write_branch1_llm(
     md_path: Path,
     write_report: Callable,  # LLM seam
     key: str,
+    faithfulness_judge: Callable | None = None,  # LLM seam — branch1 忠实门 (c), ADR-0012
 ) → None:
     """Render branch1 (human report) via LLM writer.
     
     LLM-written path: analysis → vivid Chinese prose (from write_report seam).
-    Grounded mechanically: every number triple-anchored.
+    Faithfulness-checked (ADR-0012): prose numbers grounded vs MD ((b)) + (c) judge;
+    the engine 核心结论 block stays triple-anchored.
     """
     
     # 1. Load ARA + figures
@@ -334,7 +337,8 @@ def write_branch1_llm(
         figures=curated_figs,
     )
     
-    # 5. Whole-report grounding (any empirical number → anchor)
+    # 5. Anchor the engine 核心结论 block (so 最终门 resolves it); ADR-0012: prose
+    #    numbers are GROUNDED vs MD by the 忠实门, not required to self-anchor.
     report = _ground_empirical_claims(report, md_path)
     
     # 6. Deterministic normalization

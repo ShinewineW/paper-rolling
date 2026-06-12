@@ -37,9 +37,13 @@ Execution Flow:
             │   Provider: routed (default opencode)
             │   Role: discovery query 扩展（小、便宜）
             │
-            └─ write_report(ara, figures_list) → rich HTML report
-                Provider: routed (default opencode)
-                Role: 人链 LLM（生成 vivid 中文 + 图形注释）
+            ├─ write_report(ara, figures_list) → rich HTML report
+            │   Provider: routed (default opencode)
+            │   Role: 人链 LLM（生成 vivid 中文 + 图形注释）
+            │
+            └─ faithfulness_judge(report_text, ara_dir) → {faithful, findings}
+                Provider: routed (default opencode); tier=fast (≠ writer)
+                Role: branch1 忠实门 (c) — report↔ARA 语义判官，fail-closed（ADR-0012）
 
   Each seam = independent provider call
            ↓
