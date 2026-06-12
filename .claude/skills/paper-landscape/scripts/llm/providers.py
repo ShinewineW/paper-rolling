@@ -335,15 +335,19 @@ class CodexCliProvider:
     only when explicitly routed here.
 
     ``model`` is OPTIONAL: empty string lets the Codex CLI use its own configured
-    default model (the codex convention). ``tier`` is ignored (single model);
-    ``tools`` is ignored — codex always has its own file tools, and the grounded
-    prompt names the path to read. ``max_concurrent`` is this instance's OWN cap
-    (its own semaphore), settable per provider in config/llm.yaml. ``grounded_capable``
-    is True → the routing layer permits it for grounded seams.
+    default model (the codex convention). ``reasoning_effort`` (minimal|low|medium|
+    high|xhigh) overrides the codex config default per call via ``-c
+    model_reasoning_effort=…`` — scoped to THIS provider, NOT the user's global
+    ~/.codex/config.toml. For grounded EXTRACTION the global xhigh default is wildly
+    slow (150–366s/chunk); medium/low cuts it and reduces the variance. ``tier`` is
+    ignored (single model); ``tools`` is ignored — codex always has its own file
+    tools, and the grounded prompt names the path to read. ``max_concurrent`` is this
+    instance's OWN cap; ``grounded_capable`` is True.
     """
 
     name: str
     model: str = ""  # "" => codex CLI default model
+    reasoning_effort: str = ""  # "" => codex config default; else -c model_reasoning_effort
     max_concurrent: int = _DEFAULT_AGENT_CONCURRENCY
     _sem: threading.Semaphore = field(init=False, compare=False, repr=False, default=None)
     cli: ClassVar[str] = "codex"  # preflight checks `which(cli)` for local providers
@@ -364,6 +368,8 @@ class CodexCliProvider:
         argv = ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "-C", os.getcwd()]
         if self.model:
             argv += ["-m", self.model]
+        if self.reasoning_effort:
+            argv += ["-c", f"model_reasoning_effort={self.reasoning_effort}"]
         last: Exception | None = None
         attempt = 0
         max_retries = 4
@@ -596,6 +602,7 @@ def build_provider(
         return CodexCliProvider(
             name=name,
             model=spec.get("model") or "",
+            reasoning_effort=spec.get("reasoning_effort") or "",
             max_concurrent=_max_concurrent(_DEFAULT_AGENT_CONCURRENCY),
         )
     if ptype == "openai_compatible":

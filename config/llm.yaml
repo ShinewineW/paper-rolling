@@ -40,12 +40,13 @@ providers:
     type: claude_code
     strong_model: claude-sonnet-4-6
     fast_model: claude-haiku-4-5-20251001
-    max_concurrent: 5                # this instance's own `claude -p` cap (account rate-limit guard)
+    max_concurrent: 3                # GENTLE (2026-06-12 overnight): 5-wide hit the rate-limit (exit 1); 3-wide grinds steadier
 
   # --- Local agent providers (grounded-capable; subscription auth, no API key) ---
   codex:                             # headless `codex exec` (Codex/ChatGPT login); model unset => CLI default
     type: codex_cli
-    max_concurrent: 5                # this instance's own `codex exec` cap (independent of claude's)
+    reasoning_effort: medium         # STEP2 (2026-06-12): 全局默认是 xhigh(150-366s/chunk!)→ medium 提速+稳定,只作用于本 analyzer
+    max_concurrent: 5                # medium 下并行跑 5 chunk
     # model: gpt-5.3-codex            # optional: pin a model; empty => codex CLI default
 
   analyzer-pool:                     # round-robin claude-code <-> codex for the grounded analyzer
@@ -100,7 +101,7 @@ providers:
 # value below is the v1 form; the routing schema is shaped to grow into a list.
 # ----------------------------------------------------------------------------
 seams:
-  analyzer: { provider: analyzer-pool, mode: grounded }  # grounded chunked-parallel, round-robin claude-code + codex (5+5 = 10-wide)
+  analyzer: { provider: codex, mode: grounded }  # codex-only this round (2026-06-12): verify codex solo (medium reasoning) before re-enabling the round-robin analyzer-pool
   skeptic: hellorobotaxi       # G2 number-fidelity (tier=fast → qwen3.7-plus)
   rigor: hellorobotaxi         # G3 6-dim rigor (tier=strong → qwen3.7-max);analyzer 走 claude+codex,审计在 qwen,跨模型不破
   entailment: hellorobotaxi    # G3 entailment — tiny in/out (tier=fast → qwen3.7-plus)
