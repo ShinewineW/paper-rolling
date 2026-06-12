@@ -41,13 +41,14 @@ The wiring is CODE precisely so prose drift can't bypass the adversarial
 guarantees (G2 number-fabrication hard-block + G3 6-dim seal): every run goes
 through both gates regardless of which seams the agent supplies.
 
-## The injected callables — 7 to run_campaign, two kinds
+## The injected callables — 8 to run_campaign, two kinds
 
-`run_campaign(...)` takes **seven** injected callables, of two distinct kinds (an
-eighth LLM seam — the query-expansion `llm` — is used to *build* the `discover`
-adapter before composition, not passed to `run_campaign`).
+`run_campaign(...)` takes **eight** injected callables, of two distinct kinds (a
+ninth LLM seam — the query-expansion `llm` — is used to *build* the `discover`
+adapter before composition, not passed to `run_campaign`; the optional human-chain
+`write_report` writer is passed separately).
 
-### (A) 4 LLM seams — agent-provided, each an INDEPENDENT Agent-tool invocation
+### (A) 5 LLM seams — agent-provided, each an INDEPENDENT Agent-tool invocation
 
 Each of these **MUST** be backed by a *fresh sub-agent per call* (an independent
 Agent-tool invocation), so audit votes are uncorrelated with the generator that
@@ -78,11 +79,18 @@ and silently neuter G2/G3.
    Returns `(entailed, reason)`. The per-role HOW lives in
    `sub-skills/entailment-judge/SKILL.md`.
 
+5. **`faithfulness_judge(report_text: str, ara_dir: Path) -> dict`** — the branch1
+   忠实门 (c) judge (ADR-0012). Compares the human report against the verified ARA;
+   returns `{"faithful": bool, "findings": [{"claim": str, "issue": str}, ...]}` and
+   fails CLOSED (malformed/empty → `faithful=False`). Ground-truth-isolated from the
+   `write_report` writer (routed at tier=fast → a model ≠ the writer's). No sub-skill
+   role dir — it is a config-routed judge.
+
 ### (B) 3 infra adapters — real I/O, NOT LLM seams
 
-5. **`http(url) -> (status, body)`** — Tier-1 arXiv-HTML fetch (used by ingest).
-6. **`run_cli(argv, cwd) -> result`** — Tier-2 MinerU / pandoc subprocess.
-7. **`discover(topic: str, n: int) -> list[dict]`** — the discovery layer
+6. **`http(url) -> (status, body)`** — Tier-1 arXiv-HTML fetch (used by ingest).
+7. **`run_cli(argv, cwd) -> result`** — Tier-2 MinerU / pandoc subprocess.
+8. **`discover(topic: str, n: int) -> list[dict]`** — the discovery layer
    (`DiscoverFn`). It is **not** an LLM seam, though internally it is built over a
    query-expansion LLM seam: `scripts/discovery/query_expand.expand_queries(topic, llm=...)`.
    It returns the ranked candidate pool, over-pulled ~2–3×N so failures backfill.
@@ -140,14 +148,14 @@ any tier, still passes the same clone-verification gate in `build_code_ref`
 (official → accept on clone; search → must match arxiv_id/title or an innovation
 symbol), so a wrong/reimplementation link is rejected, never linked.
 
-**Net runtime job to make the workspace go**: construct the 4 LLM seams (+ the
-query-expansion `llm`), call `build_http()` / `build_run_cli()` / `build_discover(...)`
+**Net runtime job to make the workspace go**: construct the 5 LLM seams (+ the
+query-expansion `llm`, + the optional `write_report` writer), call `build_http()` / `build_run_cli()` / `build_discover(...)`
 for the rest, optionally `make_repo_resolver(...)`, and invoke `run_campaign(...)`.
 That is the entire wiring — see SKILL.md "Invoke the engine (quickstart)".
 
 ## Independence + isolation invariants [MUST]
 
-- **Fresh sub-agent per call** for all four LLM seams (uncorrelated audit votes).
+- **Fresh sub-agent per call** for all five LLM seams (uncorrelated audit votes).
 - **Skeptic ground-truth isolation**: `skeptic_votes` sees ONLY `numbers` +
   `source_md` + `claim_context` — NEVER the evidence file / answer key / any
   rubric. G2 runs `n_skeptics` independent passes (default `n_skeptics=3`,

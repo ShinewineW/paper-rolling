@@ -4,7 +4,7 @@ The discovery layer turns a campaign topic into a ranked list of authoritative
 candidates. Entry point: `discover(campaign_config, sources, llm)` in
 `scripts/discovery/discover.py`. It returns plain candidate dicts (see the
 `_INTERFACE_FIELDS` projection); no LLM analysis happens here — discovery is
-NOT one of the four LLM audit seams (see `../SKILL.md`). The one LLM call inside
+NOT one of the LLM analysis/audit seams (see `../SKILL.md`). The one LLM call inside
 discovery is the query-expansion seam `llm` threaded into
 `scripts.discovery.query_expand.expand_queries(topic, llm=...)`.
 

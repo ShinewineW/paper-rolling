@@ -85,6 +85,7 @@ seams:
   entailment: opencode         # G3 蕴含
   expand: opencode             # discovery 查询扩展
   writer: opencode             # human chain（便宜）
+  faithfulness: opencode       # branch1 忠实门 (c) judge（ADR-0012；每个 seam 都必须路由）
 ```
 
 #### `config/audit.yaml` — 审计旋钮（用户可调）

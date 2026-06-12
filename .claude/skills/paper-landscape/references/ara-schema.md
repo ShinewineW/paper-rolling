@@ -76,9 +76,10 @@ found in the source MD are hard-blocked as fabrication before promotion.
 
 ## See also
 
-- [wiring-the-seams.md](./wiring-the-seams.md) — the four LLM seams (analyzer
+- [wiring-the-seams.md](./wiring-the-seams.md) — the five LLM seams (analyzer
   `resolve_analysis`, the G2 skeptic `skeptic_votes` over the numbers in this
-  bundle, `rigor_scores` over the 6 `DIMENSION_KEYS`, `entailment_judge`).
+  bundle, `rigor_scores` over the 6 `DIMENSION_KEYS`, `entailment_judge`, and the
+  branch1 忠实门 `faithfulness_judge`).
 - `../sub-skills/g2-skeptic/SKILL.md` — the skeptic gate over the numbers in this bundle.
 - `../sub-skills/g3-rigor-reviewer/SKILL.md` — `rigor_scores` reads this same bundle over the 6 `DIMENSION_KEYS`.
 - Engine composition + the injected seams: `../SKILL.md` and `wiring-the-seams.md`.
