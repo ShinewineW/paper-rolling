@@ -177,8 +177,8 @@ def make_spoke(
 4. branch1 = write_branch1_llm(..., write_report) OR write_branch1(...)
    ├─ If write_report: LLM-written vivid Chinese + figures + grounded assembly
    ├─ Else: thin deterministic markdown (from analysis)
-   ├─ Every empirical number THREE-LAYER anchored to MD
-   ├─ Anchors: equation → claim → evidence table (吸收-D1)
+   ├─ 忠实门 (ADR-0012): prose numbers grounded vs MD ((b)) + judge ((c))
+   ├─ Engine 核心结论 block still <!--ref--> anchored: equation → claim → evidence (吸收-D1)
    └─ Stages to person_vault/{key}/ (not yet promoted)
 
 5. G3 = seal_gate(branch1, branch2, md_path)

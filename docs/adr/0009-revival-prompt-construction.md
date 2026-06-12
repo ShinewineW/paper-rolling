@@ -51,7 +51,7 @@ entailment.py 实测):
 `stage_branch1 → write_branch1_llm(branch1_llm.py:212)→ write_report seam(seams.py:333)
 → write_human_sections → _section_prompt`,每层加 `prior_failure: str | None = None`(默认 None
 保持原行为)。analyzer 侧:`analyzer._chunk_prompt` 同加。`write_report` 是注入 seam,改签名
-等于动 6-seam 装配契约,以 keyword + 默认 None 保持向后兼容。
+等于动 6-seam 装配契约(ADR-0012 后为 7,新增 faithfulness),以 keyword + 默认 None 保持向后兼容。
 
 ## 收敛模型与目的风险(spec-review / sim-review 修订)
 

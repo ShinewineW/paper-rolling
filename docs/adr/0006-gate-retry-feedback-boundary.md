@@ -12,9 +12,10 @@ gates**. G2 (number-fidelity) is deliberately excluded from feedback and gets a
 
 ## Why the split
 
-- **Content gates** (G3 anchor/equation/entailment, branch1 unanchored-claim
-  gate) fail on *how a true thing is expressed* — a claim with no `<!--ref-->`,
-  a number sitting in prose instead of a table. These are un-gameable: feeding
+- **Content gates** (G3 anchor/equation/entailment, the branch1 忠实门 — ADR-0012,
+  formerly the unanchored-claim gate) fail on *how a true thing is expressed* —
+  e.g. (pre-ADR-0012) a claim with no `<!--ref-->`; the 忠实门 now instead flags an
+  ungrounded prose number or a misattribution. These are un-gameable: feeding
   the finding back ("anchor this claim or cut it") lets the **generator** of the
   failed branch self-correct, and the auditor re-verifies independently. The fix
   *is* the goal. (The feedback **target** is dispatched by root, per ADR-0009:

@@ -7,7 +7,8 @@
 
 ## Context
 
-ADR-0003 decided the four LLM seams are "agent-provided at runtime, not code" and
+ADR-0003 decided the four LLM seams (ADR-0012 later added a fifth,
+`faithfulness_judge`) are "agent-provided at runtime, not code" and
 that hard-coding them "would be wrong." That framing left one thing unresolved:
 **what, mechanically, IS an agent-provided seam** at the point `run_campaign(...)`
 calls it? The wiring contract (`SKILL.md`, `references/wiring-the-seams.md`,

@@ -7,7 +7,7 @@ description: The 6-dimension rigor reviewer backing the rigor_scores seam for th
 
 The independent sub-agent backing the **`rigor_scores`** seam (`RigorScoreFn`,
 `scripts/audit/types.py`). It is the *cognitive terminal seal* — Seal Level 2 of
-the ARA — and **owns the private rubric** below. It is one of the 4 LLM seams
+the ARA — and **owns the private rubric** below. It is one of the 5 LLM seams
 injected into `run_campaign`; see `../../scripts/run_campaign.py`.
 
 ## Contract

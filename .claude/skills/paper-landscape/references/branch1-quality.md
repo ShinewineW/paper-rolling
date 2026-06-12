@@ -1,8 +1,9 @@
 # branch1 report — quality bar & anchor discipline
 
 What makes a *good* `person_vault/{key}/report.md` (the illustrated Chinese
-report), and the rules that keep it past the **three-layer anchor hard-gate**
-(`scripts/output/anchor_lint.py`, 吸收-D1). The producer is
+report), and the rules that keep it past the **branch1 忠实门**
+(`scripts/output/branch1_gate.py`, ADR-0012; kept anchor-form lint in
+`scripts/output/anchor_lint.py`, 吸收-D1). The producer is
 `scripts/output/branch1_report.py`; the structure template is
 `../templates/branch1-report.md`; a full instance is `../examples/worked-example.md`.
 
@@ -10,25 +11,32 @@ This is the headline anti-hallucination surface for the human report: a number
 the reader sees must be traceable to the frozen `{ID}.md`, or it must not read as
 a performance claim at all.
 
-## The anchor contract (hard-gate — violations raise `AnchorGateError`)
+## The 忠实门 contract (hard-gate — violations raise `AnchorGateError`)
 
-1. **Grammar.** Every `<!--ref:slug-->` is immediately followed by a well-formed
-   `<!--anchor:<kind>:<value>-->`, `kind ∈ {quote, page, section, paragraph, none}`.
-   A `quote` value is URL-encoded, **≤ 25 words**, and contains no raw `--`
-   (it would terminate the HTML comment early). Non-`none` kinds need a non-empty value.
+The branch1 gate is `scripts/output/branch1_gate.py` `check_report_faithfulness`
+(ADR-0012). It keeps the anchor-form lint for the engine `## 核心结论` block AND
+adds two faithfulness layers for free prose:
+
+1. **Anchor grammar (engine 核心结论 block).** Every `<!--ref:slug-->` is immediately
+   followed by a well-formed `<!--anchor:<kind>:<value>-->`,
+   `kind ∈ {quote, page, section, paragraph, none}`. A `quote` value is URL-encoded,
+   **≤ 25 words**, and contains no raw `--`. Non-`none` kinds need a non-empty value.
 2. **No orphans.** An `<!--anchor:…-->` with no preceding well-formed `<!--ref-->` fails.
-3. **No unanchored performance claims (the paper-rolling addition).** A line that
-   carries a number next to a metric/comparison cue (`NDS`/`mAP`/`accuracy`/`F1`/
-   `提升`/`超过`/`达到`/…), or a `%` / `个百分点`, or an English empirical verb
-   (`achieved`/`outperformed`/`improved`/…) **must** carry a `<!--ref-->` marker —
-   or it hard-blocks. Definition phrases (`is defined as` / `定义为` / `是指` …) are exempt.
+3. **Faithful prose numbers (ADR-0012 — replaces the old unanchored-claim block).**
+   Prose MAY carry performance numbers in natural language WITHOUT a `<!--ref-->`
+   marker. Instead: (b) every prose number must be mechanically grounded in
+   `{ID}.md` (its value must appear in the source), and (c) an LLM judge confirms the
+   report does not materially mislead vs the verified ARA (misattribution / overclaim).
+   An ungrounded number or a misleading claim hard-blocks; 最终门 still resolves the
+   核心结论 block's anchors.
 
 ## How to satisfy it (what the producer does — match it)
 
-- **Anchor every grounded number.** In `## 摘要翻译`, for each claim, every number
-  matching `\d+(?:\.\d+)?` (**integers AND decimals** — `87` and `12.4` both) that
-  is found in `{ID}.md` gets an anchor. Anchoring only decimals once left integer
-  claims like "61 NDS" unanchored and the lint hard-blocked them — anchor both.
+- **Ground every prose number.** Each number the report states in prose must have
+  its value present in `{ID}.md` — the (b) layer matches by VALUE (`28.40` == `28.4`,
+  `1.0` == `1`), so cosmetic forms are fine; a value absent from the source hard-blocks.
+  The producer additionally anchors the engine `## 核心结论` block's numbers
+  (`\d+(?:\.\d+)?`, integers AND decimals) so 最终门 can resolve them.
 - **Keep illustration number-free.** `### 数学方法` and `### Loss 亮点解释` are
   deliberately **number-free and metric-cue-free** (use `math_intuition` /
   `math_toy_example` / `loss_highlight` analogies, not figures). That is *why* they

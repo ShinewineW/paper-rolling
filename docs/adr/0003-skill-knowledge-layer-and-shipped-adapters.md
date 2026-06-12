@@ -30,7 +30,8 @@ Inspecting the cloned skills settled the underlying question:
 
 **Verdict on the seam claims (correct).** The four LLM seams (`resolve_analysis`,
 `skeptic_votes`, `rigor_scores`, `entailment_judge`, plus discovery's
-query-expansion `llm`) are **agent-provided at runtime, not code** — confirmed by
+query-expansion `llm`) — ADR-0012 later added a fifth, `faithfulness_judge` — are
+**agent-provided at runtime, not code** — confirmed by
 the pure-knowledge skills above. Hard-coding them would be wrong. The three infra
 adapters (`http`, `run_cli`, `discover`) are deterministic I/O that must be Python
 callables (the agent's WebFetch/Bash are tools, not Python fn args).

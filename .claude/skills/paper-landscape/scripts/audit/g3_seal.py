@@ -2,8 +2,9 @@
 
 Runs AFTER the dual-output branches. Three parts, all run; the verdict is the
 union of their findings (which blocks iff any hard finding fires):
-  (a) anchor resolution  — every empirical sentence in person_vault/report.md
-      resolves to a real MD span (吸收-D1 K4 fix);
+  (a) anchor resolution  — every <!--ref--> anchor PRESENT in person_vault/report.md
+      (the engine 核心结论 block) resolves to a real MD span (吸收-D1 K4 fix; ADR-0012
+      dropped the per-prose-line requirement — prose faithfulness is branch1_gate's);
   (b) type-aware entailment — every claim's experiment design matches its claim
       type (吸收-D8);
   (c) 6-dim rigor seal — Seal Level 2; level2_report.json is written into the

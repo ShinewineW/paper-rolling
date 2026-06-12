@@ -6,7 +6,7 @@ description: The type-aware claim<->evidence entailment judge backing the entail
 # entailment-judge (entailment_judge seam role)
 
 This sub-skill is the **independent sub-agent** that backs the `entailment_judge`
-seam — one of the 4 LLM seams injected into `run_campaign(...)`. It is consumed
+seam — one of the 5 LLM seams injected into `run_campaign(...)`. It is consumed
 **only by G3** (`scripts/audit/g3_seal.py::run_g3`, part (b) type-aware
 entailment) via `scripts/audit/entailment.py::check_entailment`.
 

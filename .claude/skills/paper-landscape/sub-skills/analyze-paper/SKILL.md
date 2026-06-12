@@ -6,7 +6,7 @@ description: The paper-landscape analyzer sub-agent — turns a frozen paper MD 
 # analyze-paper (resolve_analysis seam role)
 
 This sub-skill is the **independent sub-agent** that backs the
-`resolve_analysis` seam — the first of the four LLM seams in
+`resolve_analysis` seam — the first of the five LLM seams in
 [`../../SKILL.md`](../../SKILL.md) (§ *Wiring the model seams*). Per the engine
 contract, every `resolve_analysis` call **MUST** be a fresh Agent-tool
 invocation (its own sub-agent), so the downstream audit votes (G2 skeptic, G3
@@ -75,7 +75,7 @@ for a complete, copy-pasteable instance.
 
 ## See also
 
-- [`../../SKILL.md`](../../SKILL.md) — engine overview, pipeline order, all four seams.
+- [`../../SKILL.md`](../../SKILL.md) — engine overview, pipeline order, all five seams.
 - [`../../references/ara-schema.md`](../../references/ara-schema.md) — full ARA bundle shape.
 - [`../../examples/worked-example.md`](../../examples/worked-example.md) — your output
   in the full pipeline; [`../../examples/sample-ara-bundle.json`](../../examples/sample-ara-bundle.json)

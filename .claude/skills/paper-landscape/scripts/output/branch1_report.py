@@ -165,12 +165,12 @@ def _body_with_anchors(md_text: str, analysis: dict) -> str:
     out: list[str] = ["## 摘要翻译", ""]
     para: list[str] = []
     for c in analysis["claims"]:
-        # Match the SAME number shape as the anchor lint (`\d+(?:\.\d+)?`,
-        # integers AND decimals). Anchoring only decimals left integer
-        # performance claims like "61 NDS" unanchored, which the lint then
-        # hard-blocked (Codex Round-8). Anchor every number that grounds in the
-        # MD; the lint only hard-fails number+metric-cue claims, so this closes
-        # the producer↔lint gap for honest integer metrics.
+        # Match `\d+(?:\.\d+)?` (integers AND decimals). The engine 核心结论 block
+        # still carries <!--ref--> anchors so 最终门 can resolve them; anchoring
+        # every grounded number (not just decimals) keeps those anchors complete.
+        # ADR-0012: prose anchors are no longer GATE-required (faithfulness is
+        # checked by branch1_gate's (b) grounding + (c) judge), but the producer
+        # still emits resolvable anchors for the core-block truth chain.
         nums = re.findall(r"\d+(?:\.\d+)?", c["statement"])
         sentence = c["statement"]
         for n in nums:
