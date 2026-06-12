@@ -440,6 +440,8 @@ def _make_spoke(
     rigor_scores=_good_rigor,
     max_gate_rounds=2,
     resolve_analysis=_resolve_analysis,
+    write_report=None,
+    faithfulness_judge=None,
 ):
     fake_cli.program(returncode=0, side_effect=_mineru_emitting(analysis_md))
     return make_spoke(
@@ -453,6 +455,8 @@ def _make_spoke(
         ledger=_ledger(tmp_path),
         n_skeptics=3,
         max_gate_rounds=max_gate_rounds,
+        write_report=write_report,
+        faithfulness_judge=faithfulness_judge,
     )
 
 
@@ -1102,3 +1106,56 @@ def test_sampled_is_deterministic_and_rate_bounded():
     assert _sampled("k", 0.5) == _sampled("k", 0.5)  # stable across calls
     hits = sum(_sampled(f"paper-{i}", 0.3) for i in range(1000))
     assert 200 <= hits <= 400  # ~30% within a loose band
+
+
+# --- ADR-0012: branch1 忠实门 end-to-end ----------------------------------------
+
+
+def test_spoke_branch1_passes_faithful_prose_numbers(tmp_path, fake_http, fake_cli):
+    """ADR-0012: a report carrying grounded prose numbers must NOT be quarantined.
+
+    The deterministic write_branch1 path derives the report from the ARA (which is
+    itself grounded from the source MD), so the finished report naturally passes the
+    忠实门. This test confirms the full gated pipeline (ingest → branch2 → G2 →
+    branch1 → G3 → done) succeeds end-to-end when no faithfulness violation exists.
+    """
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    spoke = _make_spoke(tmp_path, fake_http, fake_cli, analysis_md=_SOURCE_MD)
+    result = spoke(dict(_CANDIDATE))
+    assert result.status == "done"
+
+
+def test_spoke_branch1_blocks_on_judge_drift(tmp_path, fake_http, fake_cli):
+    """ADR-0012: (c) faithfulness judge firing → 锚点门 hard-block on the LLM path.
+
+    The fake write_report emits ONLY qualitative prose (zero bare numbers), so the
+    (b) mechanical grounding layer PASSES unconditionally. The _drift_judge then
+    returns faithful=False, which is the ONLY cause of the 锚点门 block — proving
+    that the (c) judge seam is correctly wired through the full spoke pipeline.
+    """
+    _tier2_http(fake_http, dict(_CANDIDATE))
+
+    def _drift_judge(report_text, ara_dir):
+        return {"faithful": False, "findings": [{"claim": "x", "issue": "misattributed vs ARA"}]}
+
+    def fake_write_report(ara_dir, *, md_path=None, outdir=None):  # noqa: ARG001
+        # Qualitative prose only — no bare performance numbers. The (b) grounding
+        # layer sees nothing to flag, so the block is attributable to _drift_judge.
+        return {
+            "sections": {
+                "01_导读": "本文提出一种方法,在整体质量上领先所有对比基线。",
+            },
+            "figures": [],
+        }
+
+    spoke = _make_spoke(
+        tmp_path,
+        fake_http,
+        fake_cli,
+        analysis_md=_SOURCE_MD,
+        write_report=fake_write_report,
+        faithfulness_judge=_drift_judge,
+    )
+    result = spoke(dict(_CANDIDATE))
+    assert result.status == "failed"
+    assert result.failure_class == FAILURE_AUDIT_BLOCK
