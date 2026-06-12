@@ -1,0 +1,251 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 闭环 AV 仿真需要什么世界模型
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec. 1
+  description: 核心问题是如何在策略会改变环境状态的闭环中生成可交互、可扩展、长尾覆盖的传感器观测。
+  children:
+  - id: D1
+    type: decision
+    title: 选择生成式世界模型而非只依赖重建式渲染
+    support_level: explicit
+    source_refs:
+    - Sec. 1
+    - Sec. 10.1.1
+    choice: 以 OmniDreams 这类 action-conditioned generative world model 作为闭环传感器生成器。
+    alternatives: 继续使用 reconstruction-based neural simulators 或离线视频生成模型。
+    children:
+    - id: Q2
+      type: question
+      title: 如何让生成器理解驾驶场景控制信号
+      support_level: explicit
+      source_refs:
+      - Sec. 2.2
+      - Sec. 3.1
+      description: 模型需要同时接收文本环境描述、首帧外观、抽象世界场景图和历史视觉上下文。
+      children:
+      - id: E1
+        type: experiment
+        title: 构建 RDS 与 RDS-HQ-1M 训练混合
+        support_level: explicit
+        source_refs:
+        - Sec. 2.1
+        - Sec. 2.4
+        result: 训练数据覆盖多地区、多天气、多道路和多相机驾驶场景，为 AV 生成能力提供基础。
+      - id: E2
+        type: experiment
+        title: 用 VLM 生成多长度文本提示
+        support_level: explicit
+        source_refs:
+        - Sec. 2.2
+        result: 文本提示为天气、光照、时间和交通状态提供可控入口。
+      - id: E3
+        type: experiment
+        title: 渲染 world-scenario map 作为结构条件
+        support_level: explicit
+        source_refs:
+        - Sec. 2.2
+        - Fig. 2
+        result: 地图、车道线和动态框让模型可以对策略动作与场景结构作条件响应。
+- id: Q3
+  type: question
+  title: 如何从通用 Cosmos 适配到 AV 多视角生成
+  support_level: explicit
+  source_refs:
+  - Sec. 4
+  - Sec. 4.1
+  description: 需要把 Cosmos-Predict 2.5 的视频先验改造成能处理 AV 相机、首帧条件和多视角一致性的模型。
+  also_depends_on:
+  - Q2
+  children:
+  - id: D2
+    type: decision
+    title: 采用分阶段训练流程
+    support_level: explicit
+    source_refs:
+    - Sec. 4
+    choice: 先做 AV mid-training，再做 MV adaptation，再用 Diffusion Forcing 因果化，最后做 world-scenario
+      control 与 Self Forcing DMD 蒸馏。
+    alternatives: 直接端到端训练最终闭环模型，或只在已有 bidirectional 模型上做推理包装。
+  - id: E4
+    type: experiment
+    title: 加入 view embeddings 与 cross-view attention
+    support_level: explicit
+    source_refs:
+    - Sec. 3.2
+    - Sec. 4.1
+    - Fig. 4
+    result: 模型获得跨视角对应关系并提升同步多相机生成的一致性。
+  - id: D3
+    type: decision
+    title: 使用轻量 control branch
+    support_level: explicit
+    source_refs:
+    - Sec. 3.1
+    - Sec. 4.1
+    choice: 用 small MLP 把 structured simulator state 编成 control tokens，并与 visual tokens
+      拼接。
+    alternatives: 使用单独的 ControlNet 风格网络或把控制信息弱化为文本条件。
+- id: Q4
+  type: question
+  title: 如何让视频扩散模型满足闭环自回归要求
+  support_level: explicit
+  source_refs:
+  - Sec. 3
+  - Sec. 4.2
+  description: 闭环仿真要求模型每步只依赖过去观测和当前条件，并能随着策略动作持续更新。
+  children:
+  - id: E5
+    type: experiment
+    title: Diffusion Forcing 因果中训练
+    support_level: explicit
+    source_refs:
+    - Sec. 4.2
+    result: bidirectional models 被转换为 causal autoregressive models，适合逐块闭环生成。
+  - id: D4
+    type: decision
+    title: 用 Flex-Attention 实现 causal masking
+    support_level: explicit
+    source_refs:
+    - Sec. 4.2
+    choice: 在 self-attention 中限制 token 只能看当前和过去帧。
+    alternatives: 保留双向 attention 或在外部用后处理模拟因果性。
+- id: Q5
+  type: question
+  title: 如何降低长 rollout 中的误差累积
+  support_level: explicit
+  source_refs:
+  - Sec. 4.3
+  - Sec. 9.2
+  description: 自回归扩散在推理时会使用自己生成的历史，容易产生 exposure bias 和 shifting artifacts。
+  children:
+  - id: E6
+    type: experiment
+    title: Self Forcing DMD 蒸馏
+    support_level: explicit
+    source_refs:
+    - Sec. 4.3
+    result: 自生成上下文训练和视频级分布匹配减少长 rollout 中的累积偏差。
+  - id: DE1
+    type: dead_end
+    title: 短上下文教师导致长程漂移
+    support_level: explicit
+    source_refs:
+    - Sec. 4.3
+    - Fig. 9
+    - Sec. 9.2
+    hypothesis: 只用 short-context teacher 做 Self Forcing 蒸馏即可支撑长时 rollout。
+    failure_mode: rolling KV cache 超出训练上下文后出现 shifting artifacts，场景结构和对象身份更容易退化。
+    lesson: 需要引入 long-context bidirectional teacher 继续蒸馏来稳定长程生成。
+  - id: P1
+    type: pivot
+    title: 转向渐进长上下文教师
+    support_level: explicit
+    source_refs:
+    - Sec. 4.3
+    - Sec. 9.2
+    from: short-context Self Forcing distillation
+    to: continued distillation with long-context bidirectional teacher
+    trigger: 短上下文蒸馏后的模型在长 autoregressive rollouts 中积累 shifting artifacts。
+- id: Q6
+  type: question
+  title: 如何达到实时闭环推理
+  support_level: explicit
+  source_refs:
+  - Sec. 5
+  description: 模型需要在高分辨率、多视角、少步扩散条件下满足策略闭环交互延迟。
+  children:
+  - id: D5
+    type: decision
+    title: 采用训练无关的推理优化
+    support_level: explicit
+    source_refs:
+    - Sec. 5.1
+    choice: 使用 local temporal attention、static-shape KV cache、torch.compile、CUDA Graphs、LightVAE
+      或 pixel shuffle、LightTAE 和 step-invariant operator hoisting。
+    alternatives: 继续使用原始 VAE、无固定形状 cache 或无图捕获的常规执行路径。
+  - id: E7
+    type: experiment
+    title: 单视角与四视角 GB300 延迟验证
+    support_level: explicit
+    source_refs:
+    - Sec. 5.3
+    - Tab. 2
+    - Tab. 3
+    result: 单视角在单 GPU 上达到实时，多视角通过 16-GPU 配置达到更高每相机吞吐。
+  - id: D6
+    type: decision
+    title: 多 GPU 按视角与时间分层切分
+    support_level: explicit
+    source_refs:
+    - Sec. 5.2
+    choice: 在四视角配置中优先沿 view 轴和 temporal 轴做 context parallelism。
+    alternatives: 只沿空间轴切分，或把 full attention 跨所有视角和时间展开。
+- id: Q7
+  type: question
+  title: 如何接入 AlpaSim 闭环系统
+  support_level: explicit
+  source_refs:
+  - Sec. 6
+  description: 视频模型必须作为有状态服务接入策略、交通和物理仿真循环。
+  children:
+  - id: D7
+    type: decision
+    title: 使用 gRPC stateful server 集成
+    support_level: explicit
+    source_refs:
+    - Sec. 6
+    - Sec. 6.2
+    - Sec. 6.3
+    choice: 视频模型部署为 stateful video model server，rank 0 处理外部请求并协调其他 ranks。
+    alternatives: 把视频模型作为 Python dependency 嵌入 AlpaSim 进程，或让仿真层承担多 GPU rank 逻辑。
+  - id: DE2
+    type: dead_end
+    title: post-fetch 会打乱仿真时间线
+    support_level: explicit
+    source_refs:
+    - Sec. 6.4.1
+    - Sec. 6.4.2
+    hypothesis: 先让 policy 和 traffic 在 chunk 内推进，再请求视频模型补帧即可。
+    failure_mode: 响应视频帧逻辑上发生在请求之前，注入 rollout state 会导致 timeline out of order。
+    lesson: AlpaSim 选择 pre-fetch，以保持事件顺序并减少难以定位的时间线错误。
+- id: Q8
+  type: question
+  title: 生成式世界模型还能扩展哪些能力
+  support_level: explicit
+  source_refs:
+  - Sec. 7
+  - Sec. 8
+  - Sec. 9.3
+  description: 除传感器仿真外，论文还探索将 OmniDreams 表征用于 WAM、重建修复和长尾场景编辑。
+  children:
+  - id: E8
+    type: experiment
+    title: post-training 为 World-Action Model
+    support_level: explicit
+    source_refs:
+    - Sec. 7
+    result: OmniDreams-SV 的 causal DiT backbone 可被改造成端到端轨迹预测策略，并在闭环比较中表现更优方向。
+  - id: E9
+    type: experiment
+    title: post-training 为 Diffusion Fixer
+    support_level: explicit
+    source_refs:
+    - Sec. 8
+    - Fig. 7
+    result: 模型可修复 reconstruction-based simulator 的 novel-view artifacts，同时保持布局和驾驶相关结构。
+  - id: E10
+    type: experiment
+    title: 可控场景编辑与 OOD 物体建模
+    support_level: explicit
+    source_refs:
+    - Sec. 9.3.1
+    - Sec. 9.3.2
+    - Fig. 10
+    - Fig. 11
+    result: 通过修改 text prompt、first-frame RGB 和 world-scenario map，可生成长尾变体；通过 dynamic-cuboid
+      dropout，可更自然延续缺少 cuboid 轨迹的插入物体。

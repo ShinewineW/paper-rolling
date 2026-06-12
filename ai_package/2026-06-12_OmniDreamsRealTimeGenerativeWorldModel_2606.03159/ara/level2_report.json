@@ -1,0 +1,112 @@
+{
+  "artifact": "2026-06-12_OmniDreamsRealTimeGenerativeWorldModel_2606.03159",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.67,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Evidence perfectly aligns with claim types: causal/improvement claims use training-stage and context-length ablations (E2, E3), generalization uses heterogeneous policy rankings (E4), and descriptive claims use system profiling (E1).",
+        "Metrics chosen for each experiment directly measure the specific phenomenon asserted in the corresponding claim (e.g., segmented FVD for long-rollout drift, Effective FPS for real-time interaction)."
+      ],
+      "weaknesses": [
+        "None significant; the mapping between claims, experiments, and evidence tables is exceptionally tight."
+      ],
+      "suggestions": [
+        "Ensure multi-view generation quality metrics are as comprehensively broken down as single-view metrics in future iterations to fully support the MV architecture claims."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly actionable and specific, referencing exact metrics (e.g., segmented FVD, KV-cache hot path) and controlled conditions (e.g., same detector, same evaluation split).",
+        "Criteria successfully isolate the variable being tested, such as explicitly controlling for non-sensor module changes in C4 and evaluation setup changes in C2."
+      ],
+      "weaknesses": [
+        "C1's falsification criterion relies on the qualitative term 'real-time frame rate' without defining a hard numerical threshold."
+      ],
+      "suggestions": [
+        "Define explicit numerical thresholds for 'real-time' in C1's falsification criteria (e.g., >30 FPS or <50ms end-to-end latency) to make it strictly binary."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 4,
+      "strengths": [
+        "Assumptions are explicitly documented in problem.md, and boundary conditions for concepts (e.g., WAM not needing world-scenario map, OmniDreams not replacing physics engines) are clearly stated.",
+        "Claims are generally well-bounded to specific datasets (RDS-HQ-1M, NuRec) and system configurations (AlpaSim closed-loop stack)."
+      ],
+      "weaknesses": [
+        "C4 concludes OmniDreams can serve as a 'real-world proxy' (真实世界代理) based solely on rank correlation with NuRec. Since NuRec is a reconstruction-based simulator, matching its rankings only proves it is a high-fidelity simulator proxy, slightly overclaiming its direct real-world validity."
+      ],
+      "suggestions": [
+        "Rephrase C4 to 'high-fidelity sensor simulator proxy' or explicitly state the assumption that NuRec is already a validated, unbiased real-world proxy."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "Clear logical arc from observations (reconstruction limits, offline model interaction gaps, AR error accumulation) to specific architectural solutions (causal KV-cache, Self Forcing, progressive teacher) and corresponding experiments.",
+        "Every identified gap (G1-G3) is directly addressed by a dedicated architectural component and validated by a specific experiment."
+      ],
+      "weaknesses": [
+        "Auxiliary capabilities like Diffusion Fixer (E9) and OOD editing (E10) are explored in the trace but loosely connected to the core problem-solution arc."
+      ],
+      "suggestions": [
+        "Explicitly categorize E9 and E10 as 'auxiliary extensions' or 'future work' in the problem.md or claims.md to maintain a tight core narrative without distracting from the main closed-loop simulation claims."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "Exploration tree contains genuine, highly specific dead-ends (e.g., short-context teacher causing shifting artifacts, post-fetch breaking simulation timelines) that reflect real engineering and research pivots.",
+        "The pivot from short-context to progressive long-context teacher (P1) is logically triggered by the failure mode observed in DE1, demonstrating authentic iterative research."
+      ],
+      "weaknesses": [
+        "None; the dead-ends are concrete and technically plausible, avoiding post-hoc rationalization."
+      ],
+      "suggestions": [
+        "Document the computational cost or time wasted on the dead-ends (e.g., GPU hours spent on short-context distillation) to further enrich the exploration narrative and highlight the cost of the pivot."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Comprehensive baselines (NuRec, Alpamayo, Bidirectional/Causal stages) and strong ablation coverage (decoder latency/quality tradeoffs, context length).",
+        "Clear metric-claim alignment and detailed reproducibility artifacts (code ref, pinned SHA, architecture diagrams)."
+      ],
+      "weaknesses": [
+        "Quantitative tables (Tables 4, 5, 6) report point estimates for metrics like FVD, LET-AP, and Temp. Sampson without standard deviations, confidence intervals, or variance across multiple seeds."
+      ],
+      "suggestions": [
+        "Include error bars or variance metrics for FVD and downstream task metrics to establish statistical significance, especially for marginal improvements in metrics like Temp. Sampson."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "Tables 4, 5, and 6 report point estimates for quantitative metrics (FVD, LET-AP, etc.) without standard deviations or confidence intervals, limiting the ability to assess the statistical significance of the improvements between training stages and decoder choices."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "minor",
+      "observation": "Claim C4 concludes OmniDreams can serve as a 'real-world proxy' (真实世界代理) based solely on rank correlation with NuRec. Since NuRec is a reconstruction-based simulator, matching its rankings only proves it is a 'high-fidelity simulator proxy,' not necessarily a direct real-world proxy, representing a slight scope overclaim."
+    },
+    {
+      "dimension": "D4_argument_coherence",
+      "severity": "suggestion",
+      "observation": "The 'Diffusion Fixer' (E9) and 'Controllable scenario editing' (E10) are introduced in the exploration tree as extensions but are not explicitly tied to the core claims or scoped as auxiliary contributions in the claims document, slightly diluting the core narrative arc."
+    },
+    {
+      "dimension": "D2_falsifiability",
+      "severity": "suggestion",
+      "observation": "Claim C1's falsification criterion relies on the qualitative phrase 'real-time frame rate' (实时帧率). Defining a hard numerical threshold (e.g., >30 FPS or <50ms latency) would make the criterion strictly binary and more actionable."
+    }
+  ]
+}

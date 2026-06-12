@@ -339,3 +339,11 @@ processed:
   person_vault_path: null
   ai_package_path: null
   processed_at: '2026-06-08T22:12:39Z'
+- key: '2606.03159'
+  md_sha256: null
+  status: done
+  failure_class: null
+  retry_after: null
+  person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-12_OmniDreamsRealTimeGenerativeWorldModel_2606.03159
+  ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-12_OmniDreamsRealTimeGenerativeWorldModel_2606.03159
+  processed_at: '2026-06-12T08:50:48Z'

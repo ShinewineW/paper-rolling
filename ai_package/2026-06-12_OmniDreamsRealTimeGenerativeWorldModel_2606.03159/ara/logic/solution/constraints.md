@@ -1,0 +1,8 @@
+- video-generation based simulator 比 reconstruction-based simulator 需要更多 compute，存在 quality 与 compute 的 tradeoff。
+- 当前 generation 是 chunk-based，agent behavior 必须在每个 chunk 开始时固定且已知；论文把未来目标描述为缩小 chunk size 并最终 frame-at-a-time generation。
+- Distributed inference 通常需要多进程和 GPU 间通信，不能像普通 Python dependency 一样直接 in-process 集成到 simulator。
+- Autoregressive renderer 内部 stateful，不能任意顺序渲染帧，需要 simulator 跟踪 session state 并避免 invalidation。
+- post-fetch generation 会让 response video frames 在逻辑时间上早于 video model request，可能导致 simulation timeline out of order；AlpaSim 因此选择 pre-fetch。
+- local-window attention 是 memory 与 speed 折中；窗口过小可能牺牲长程上下文，窗口过大会增加推理成本。
+- OOD object 仅靠 first-frame RGB edit 会与 world-scenario map 中缺失 cuboid 的结构条件冲突，容易造成 artifacts 与 inconsistent dynamics。
+- 当前 networked integration 仍有 frame encoding/decoding 的 complexity 与 lossiness，论文把 RDMA-based gRPC 或 NCCL bulk video transfer 作为 future work。
