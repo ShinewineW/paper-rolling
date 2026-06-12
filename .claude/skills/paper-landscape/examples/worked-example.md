@@ -94,12 +94,13 @@ analyzer written `12.0` (absent from the MD), the majority would vote
 `found_in_source=False` → `ProduceGateBlocked`, nothing promoted (OT-5),
 `_failed/{key}.md` written, hub backfills the next candidate.
 
-## 6. branch1 → person_vault/{key}/report.md  [anchored]
+## 6. branch1 → person_vault/{key}/report.md  [忠实门]
 
 The illustrated Chinese report (template:
 [`../templates/branch1-report.md`](../templates/branch1-report.md); quality bar:
-[`../references/branch1-quality.md`](../references/branch1-quality.md)). The
-claim weave anchors every grounded number into the frozen MD:
+[`../references/branch1-quality.md`](../references/branch1-quality.md)). ADR-0012:
+prose numbers must be GROUNDED in the frozen MD (their value present), not
+self-anchored; the engine 核心结论 claim weave still carries resolvable anchors:
 
 ```markdown
 ## 摘要翻译
@@ -107,7 +108,7 @@ claim weave anchors every grounded number into the frozen MD:
 ```
 
 `### 数学方法` / `### Loss 亮点解释` stay number-free (from `math_intuition` /
-`loss_highlight`), so they make no performance claim and pass the anchor gate.
+`loss_highlight`), so they make no performance claim and pass the 忠实门.
 
 ## 7. G3 seal  [LLM seams #3 + #4 — after both branches]
 
@@ -121,7 +122,7 @@ D4_argument_coherence:5  D5_exploration_integrity:5  D6_methodological_rigor:4
 
 mean = 4.67, min = 4 → grade **Strong Accept** → `passes_seal2 = true`.
 `entailment_judge` confirms C1 (a `generalization` claim) is entailed by experiment
-E1. Anchor lint passes. `level2_report.json` is written; the seal holds. (Had the
+E1. The 忠实门's kept anchor-form lint passes (核心结论 anchors resolve). `level2_report.json` is written; the seal holds. (Had the
 grade been < Weak Accept, `run_g3` returns a blocked `GateVerdict` carrying a
 hard-block `SEAL2` finding, and the bounded `run_with_budget` re-emits, then
 quarantines.)

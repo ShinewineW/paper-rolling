@@ -128,12 +128,14 @@ def _is_empirical_assertion(prose: str) -> bool:
 def unanchored_empirical_lines(text: str, *, is_empirical=None) -> list[tuple[int, str]]:
     """Lines that ARE empirical-performance assertions but carry NO ``<!--ref-->``.
 
-    THE single source of truth for "which lines must be anchored" — shared by the
-    branch1 authoring lint (`lint_text` below) AND the G3 anchor auditor
-    (`scripts/audit/anchor_resolution.check_branch1_md_anchors`), so a report that
-    passes branch1 can never be rejected by G3 on a *different* empirical scan
-    (the bug that blocked every dense paper: branch1 was line-based + skipped table
-    rows, G3 was sentence-based + didn't).
+    RETAINED but NO LONGER GATE-WIRED (ADR-0012): both `lint_text` (below) and the
+    G3 auditor (`scripts/audit/anchor_resolution.check_branch1_md_anchors`) dropped
+    their per-prose-line anchor checks, so nothing calls this any more. It is kept
+    (and still unit-tested) as the SoT scan for "which lines read as empirical
+    performance" — usable by a future trained classifier (ROADMAP C4) — and shares
+    `_is_empirical_assertion` with `branch1_llm._ground_line`. When it WAS the gate,
+    being the single shared scan is what kept branch1 and G3 from disagreeing on a
+    *different* empirical scan (the bug that blocked every dense paper).
 
     Line-based; skips code fences, ref-carrying lines, and markdown table rows
     (table cells are the paper's own figures, gated by G2 — not prose claims).

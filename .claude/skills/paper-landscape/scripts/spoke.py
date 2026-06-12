@@ -285,13 +285,14 @@ def make_spoke(
                     + "; ".join(f.observation for f in exc.verdict.hard_findings[:3]),
                 )
             except AnchorGateError as exc:
-                # branch1's three-layer anchor lint hard-failed in staging BEFORE
-                # promotion (OT-5). Preserve as a scene instead of crashing the tick.
+                # branch1's 锚点门 — now the 忠实门 (ADR-0012: kept anchor-form lint +
+                # (b) prose-number grounding + (c) judge) — hard-failed in staging
+                # BEFORE promotion (OT-5). Preserve as a scene, not a tick crash.
                 return _pre_promote_scene(
                     failed_gate="锚点门",
                     findings=[{"target": "report.md", "observation": str(exc)}],
                     staged_dir=getattr(exc, "staged_dir", None),
-                    reason=f"branch1 three-layer anchor hard-gate: {exc}",
+                    reason=f"branch1 锚点门 (忠实门) hard-block: {exc}",
                 )
             except EngineAbort as exc:
                 # ADR-0011: pre-promote transport abort with a built ARA → scene it,

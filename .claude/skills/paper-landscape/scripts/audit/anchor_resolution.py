@@ -5,9 +5,11 @@ G3 originally only checked branch1<->branch2 — a self-referential loop. If
 branch2 mis-extracted a value, branch1 inherited it and the loop "self-verified"
 the error, severing the MD-only truth chain (branch1 never reads the MD).
 
-The fix (吸收-D1): every empirical sentence in branch1 carries a three-layer
-citation marker `<!--ref:slug--><!--anchor:kind:value-->` that points DIRECTLY
-at an MD span, and G3 checks branch1<->MD. This module:
+The fix (吸收-D1): the engine 核心结论 block in branch1 carries three-layer
+citation markers `<!--ref:slug--><!--anchor:kind:value-->` that point DIRECTLY
+at an MD span, and G3 checks branch1<->MD. (ADR-0012 dropped the every-empirical-
+PROSE-line anchor requirement — prose faithfulness is now branch1_gate's job; this
+module only RESOLVES the anchors that ARE present.) This module:
   1. parses ref/anchor markers (borrowing the v3.7.3 three-layer-citation
      marker shape — pure regex, zero dependency),
   2. resolves each anchor against the source MD (quote substring / page-or-

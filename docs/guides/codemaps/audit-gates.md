@@ -612,7 +612,7 @@ data_fidelity:
 1. **Ground-truth isolation** — G2 skeptic + G3 rigor 分别调用独立 seam，与生成器不相关
 2. **Multi-vote majority** — G2 默认 1 次（可调 3 次）；多数决定是否验证
 3. **Hard-block on fabrication** — 多数 skeptic 票说"未找到"→ 隔离，不重新执行
-4. **Three-layer anchoring** — G3 requires every empirical number to be traceable: equation → claim → evidence → MD
+4. **Anchor resolution (ADR-0012)** — G3 resolves the anchors PRESENT (the engine 核心结论 block) to real MD spans; the dropped per-prose-line requirement is now branch1_gate's 忠实门 ((b) grounding + (c) judge)
 5. **Bounded escalation** — G2/G3 失败最多重新执行 N 轮，然后隔离（无无限循环）
 6. **Deterministic equation check** — 等式计数是机械的（regex），无 LLM 参与
 

@@ -1,16 +1,18 @@
 <!--
 TEMPLATE — person_vault/{key}/report.md  (branch1, written by scripts/output/branch1_report.py::write_branch1)
 The human-facing illustrated Chinese report. Section ORDER and headings below match the writer.
-The anchor convention and the "number-free derivation" rule are LOAD-BEARING — see
-../references/branch1-quality.md (they keep the three-layer anchor gate green). Worked instance:
+The engine 核心结论-block anchor convention and the "number-free derivation" rule are
+LOAD-BEARING — see ../references/branch1-quality.md (they keep the branch1 忠实门 green,
+ADR-0012: prose numbers must be GROUNDED, not anchored). Worked instance:
 ../examples/worked-example.md.
 -->
 # {candidate.title} — 深度解读
 
 ## 摘要翻译
-<!-- analysis.claims, woven into prose. EVERY number that also appears in the frozen {ID}.md
-     MUST be anchored, or the anchor lint hard-fails a number+metric-cue claim (AnchorGateError).
-     Anchor shape (integers AND decimals, \d+(?:\.\d+)?): -->
+<!-- analysis.claims, woven into prose. ADR-0012 (忠实门): every prose number MUST be
+     GROUNDED — its value must appear in the frozen {ID}.md — or the gate hard-blocks
+     (AnchorGateError). Prose no longer needs a <!--ref--> marker; the engine 核心结论
+     block is still anchored (shape \d+(?:\.\d+)?, integers AND decimals) so 最终门 resolves it: -->
 本文方法在 Minecraft Diamond 上取得 9.1<!--ref:r1--><!--anchor:quote:9.1--> 的回合回报,强于最强基线的 7.1<!--ref:r2--><!--anchor:quote:7.1-->。…
 
 ## 整体架构
@@ -40,7 +42,7 @@ flowchart TB
 ### 数学方法
 <!-- analysis.math_intuition + analysis.math_toy_example + the $$…$$ pulled from analysis.algorithm.
      DELIBERATELY number-free / metric-cue-free so the section reads as illustration, not a
-     performance claim the anchor gate would demand grounding for. -->
+     performance claim the 忠实门 would demand grounding for. -->
 
 > ⚠ AI 推导,需人工复核(公式保真已对照 branch2 algorithm.md 源公式)。
 
