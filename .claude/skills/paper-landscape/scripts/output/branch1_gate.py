@@ -98,19 +98,19 @@ def check_report_faithfulness(
         )
 
     # (b) tolerant mechanical grounding of prose numbers. Numerator AND denominator
-    # share prose_numbers() — same stripped/skipped scope. STRICT (tolerant=False)
-    # hard-blocks ANY unconfirmed number, mirroring 数字门.
+    # share prose_numbers() — same stripped/skipped scope.
     bad = unconfirmed_report_numbers(report_text, source_md)
     total = len(prose_numbers(report_text)) or 1
-    # Count-primary: tolerate if bad count is within the absolute ceiling.
-    # Ratio is a secondary tighten-up: only applied when total is large enough that
-    # the ratio gate is meaningful (total > max_unconfirmed / max_unconfirmed_ratio).
-    # This avoids blocking small reports (e.g. 1 bad / 3 total with ratio=0.2=5/25)
-    # when the count ceiling alone says "fine".
-    ratio_limit = total * max_unconfirmed_ratio
-    within_tolerance = (
-        tolerant and len(bad) <= max_unconfirmed and len(bad) <= max(ratio_limit, max_unconfirmed)
-    )
+    # STRICT (tolerant=False, the gate primitive's default) hard-blocks ANY
+    # unconfirmed number. TOLERANT (the producers' default — the 理解阅读 is a LOOSE
+    # human-facing derivative per ADR-0012, NOT the strict ARA) softens within the
+    # LARGER of two limits: the absolute ceiling `max_unconfirmed` is a FLOOR that
+    # protects small reports (a 3-number report must not be quarantined over one
+    # ungrounded value — the exact false-quarantine ADR-0012 removes), and the ratio
+    # `max_unconfirmed_ratio * total` only TIGHTENS for large reports (it binds once
+    # total > max_unconfirmed / max_unconfirmed_ratio, e.g. > 25). This deliberately
+    # does NOT mirror 数字门's strict AND-of-both-limits — the report is looser by design.
+    within_tolerance = tolerant and len(bad) <= max(max_unconfirmed, max_unconfirmed_ratio * total)
     grounding_hard = bool(bad) and not within_tolerance
     for n in bad:
         findings.append(

@@ -64,6 +64,8 @@ def test_gate_passes_faithful_report(tmp_path) -> None:
 
 
 def test_gate_blocks_systematic_invented_numbers(tmp_path) -> None:
+    # 6 ungrounded of 6 → over BOTH the absolute floor (6>5) and the ratio
+    # (6 > max(5, 0.2*6=1.2)=5) even in tolerant mode → block.
     md = "Only 28.4 appears."
     report = "凭空: 11.1, 22.2, 33.3, 44.4, 55.5, 66.6 全是编的。"  # 6 ungrounded
     hard = check_report_faithfulness(
@@ -73,14 +75,15 @@ def test_gate_blocks_systematic_invented_numbers(tmp_path) -> None:
         judge=_ok_judge,
         tolerant=True,
         max_unconfirmed=5,
-        max_unconfirmed_ratio=1.0,
+        max_unconfirmed_ratio=0.2,
     )
     assert hard and all(f.is_hard_block for f in hard)
 
 
 def test_gate_tolerates_a_single_miss_when_tolerant(tmp_path) -> None:
-    md = "Real numbers 28.4 and 24.6 here."
-    report = "28.4 与 24.6 是真的,只有 99.9 手滑。"
+    # 1 bad of 6 total: within BOTH limits (1<=5 absolute AND 1<=0.2*6=1.2 ratio).
+    md = "Real numbers 28.4, 24.6, 1.1, 2.2, 3.3 here."
+    report = "28.4、24.6、1.1、2.2、3.3 都对,只有 99.9 手滑。"
     hard = check_report_faithfulness(
         report,
         md,
@@ -91,6 +94,39 @@ def test_gate_tolerates_a_single_miss_when_tolerant(tmp_path) -> None:
         max_unconfirmed_ratio=0.2,
     )
     assert hard == []
+
+
+def test_gate_ratio_loosens_large_reports_but_floor_protects_small(tmp_path) -> None:
+    # The ratio limit binds (TIGHTENS/loosens) only for large reports: the absolute
+    # `max_unconfirmed` is a FLOOR, and `max(floor, ratio*total)` lets a LARGE report
+    # tolerate proportionally MORE misses. 6 ungrounded of 30 (6 <= max(5, 0.2*30=6))
+    # is tolerated; the SAME 6 ungrounded standing alone (6 of 6, 6 > max(5, 1.2)=5)
+    # blocks — small reports are not over-quarantined, large ones scale by fraction.
+    grounded = [f"{i}.5" for i in range(10, 34)]  # 24 grounded values (10.5 … 33.5)
+    bad6 = ["88.8", "99.9", "11.1", "22.2", "33.3", "44.4"]  # 6 ungrounded
+    md = "Source: " + " ".join(grounded)
+    big = "正文:" + "、".join(grounded + bad6) + "。"  # 30 total, 6 bad → tolerated
+    small = "正文:" + "、".join(bad6) + "。"  # 6 total, 6 bad → blocked
+    ok = check_report_faithfulness(
+        big,
+        md,
+        tmp_path,
+        judge=_ok_judge,
+        tolerant=True,
+        max_unconfirmed=5,
+        max_unconfirmed_ratio=0.2,
+    )
+    blocked = check_report_faithfulness(
+        small,
+        md,
+        tmp_path,
+        judge=_ok_judge,
+        tolerant=True,
+        max_unconfirmed=5,
+        max_unconfirmed_ratio=0.2,
+    )
+    assert ok == []
+    assert blocked and all(f.is_hard_block for f in blocked)
 
 
 def test_gate_strict_blocks_a_single_miss(tmp_path) -> None:
