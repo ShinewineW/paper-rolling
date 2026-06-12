@@ -83,54 +83,93 @@ def test_run_g2_hard_blocks_a_fabricated_number(tmp_path: Path) -> None:
     assert hard.is_hard_block is True
 
 
-def test_run_g2_uses_majority_vote_not_single_skeptic(tmp_path: Path) -> None:
-    """1 skeptic crying fabrication out of 3 does NOT block (majority must agree)."""
-    ara = _make_ai_package(tmp_path)
+def test_run_g2_layer1_confirms_present_number_without_skeptic(tmp_path: Path) -> None:
+    """Layer-1 (deterministic lookup-channel): a number whose value is present in
+    the source MD is confirmed by CODE and NEVER sent to the skeptic. So an
+    unreliable LLM skeptic that false-flags a verbatim-present number (the qwen
+    false-positive that motivated this two-layer redesign) cannot hard-block a
+    clean paper."""
+    ara = _make_ai_package(tmp_path)  # evidence/claim carry 28.4 and 24.6
     md = tmp_path / "src.md"
-    md.write_text("BLEU of 28.4 versus 24.6.\n", encoding="utf-8")
+    md.write_text("The model achieves a BLEU of 28.4 versus 24.6 for the RNN.\n", encoding="utf-8")
+
+    calls = {"n": 0}
+
+    def lying_skeptic(numbers, source_md, claim_context):
+        calls["n"] += 1
+        # The LLM wrongly reports EVERYTHING missing — the exact qwen failure.
+        return tuple(SkepticVote(number=n, found_in_source=False) for n in numbers)
+
+    verdict = run_g2(ara.parent, md, skeptic_votes=lying_skeptic, n_skeptics=3)
+    assert verdict.blocked is False  # present values confirmed by code despite the lying LLM
+    assert calls["n"] == 0  # all numbers confirmed mechanically → skeptic never invoked
+
+
+def test_run_g2_layer1_canonicalizes_trailing_zero(tmp_path: Path) -> None:
+    """Layer-1 matches numeric VALUE, not surface form: an evidence value written
+    `28.40` is confirmed against a source `28.4` (and `1.0` against `1`) — a
+    cosmetic formatting difference is not escalated to the LLM."""
+    ara = _bare_ara(tmp_path, "tz", "28.40")
+    md = tmp_path / "tz.md"
+    md.write_text("Our model reaches a BLEU of 28.4.\n", encoding="utf-8")
+
+    def lying_skeptic(numbers, source_md, claim_context):
+        return tuple(SkepticVote(number=n, found_in_source=False) for n in numbers)
+
+    verdict = run_g2(ara.parent, md, skeptic_votes=lying_skeptic, n_skeptics=3)
+    assert verdict.blocked is False  # 28.40 == 28.4 by value → confirmed by code
+
+
+def test_run_g2_uses_majority_vote_not_single_skeptic(tmp_path: Path) -> None:
+    """1 skeptic crying fabrication out of 3 does NOT block (majority must agree).
+    Exercised on an ESCALATED number — one Layer-1 cannot confirm verbatim — so the
+    skeptic (Layer 2) is the decider and its majority vote governs the verdict."""
+    ara = _make_ai_package(tmp_path)  # candidates 28.4, 24.6
+    md = tmp_path / "src.md"
+    # 24.6 is verbatim present (Layer-1 confirms it); 28.4 is NOT, so it escalates
+    # to the skeptic, e.g. the source states it only as a derivable form.
+    md.write_text("BLEU of 24.6 for the RNN baseline; ours nearly doubles it.\n", encoding="utf-8")
 
     calls = {"n": 0}
 
     def flaky_skeptic(numbers, source_md, claim_context):
         calls["n"] += 1
-        # The 2nd skeptic invocation falsely claims 28.4 is missing; the other
-        # two correctly find it. Majority (2/3) = present, so no block.
+        # The 2nd skeptic invocation falsely claims 28.4 is missing; the other two
+        # judge it derivable. Majority (2/3) = present, so no block.
         lies = calls["n"] == 2
         return tuple(
-            SkepticVote(
-                number=n,
-                found_in_source=(False if (lies and n == "28.4") else (n in source_md)),
-            )
-            for n in numbers
+            SkepticVote(number=n, found_in_source=not (lies and n == "28.4")) for n in numbers
         )
 
     verdict = run_g2(ara.parent, md, skeptic_votes=flaky_skeptic, n_skeptics=3)
-    assert calls["n"] == 3
+    assert calls["n"] == 3  # the escalated number is judged across all three rounds
     assert verdict.blocked is False
 
 
 def test_run_g2_fails_closed_when_skeptic_returns_no_votes(tmp_path: Path) -> None:
     """Codex R17 (Final): G2 must FAIL CLOSED. A malformed skeptic seam that
-    returns no votes for a candidate number must NOT let it pass — an
-    unconfirmed (possibly fabricated) number is hard-blocked, not silently
-    accepted on zero coverage."""
+    returns no votes for an ESCALATED number must NOT let it pass — an unconfirmed
+    (possibly fabricated) number is hard-blocked, not silently accepted on zero
+    coverage."""
     ara = _make_ai_package(tmp_path)
     md = tmp_path / "src.md"
-    md.write_text("The model achieves a BLEU of 28.4 versus 24.6.\n", encoding="utf-8")
+    # 28.4 is absent (escalates to the skeptic); 24.6 is present (Layer-1 confirms).
+    md.write_text("The model achieves a BLEU of 24.6 baseline.\n", encoding="utf-8")
 
     def malformed_skeptic(numbers, source_md, claim_context):
-        return ()  # returns NOTHING — no confirmation for any number
+        return ()  # returns NOTHING — no confirmation for the escalated number
 
     verdict = run_g2(ara.parent, md, skeptic_votes=malformed_skeptic, n_skeptics=3)
-    assert verdict.blocked is True  # zero coverage → not confirmed → blocked
+    assert verdict.blocked is True  # zero coverage on 28.4 → not confirmed → blocked
 
 
 def test_run_g2_fails_closed_on_partial_skeptic_coverage(tmp_path: Path) -> None:
-    """A skeptic that confirms only SOME candidate numbers must not let the
+    """A skeptic that confirms only SOME escalated numbers must not let the
     unconfirmed ones through (fail closed on partial coverage)."""
     ara = _make_ai_package(tmp_path)
     md = tmp_path / "src.md"
-    md.write_text("The model achieves a BLEU of 28.4 versus 24.6.\n", encoding="utf-8")
+    # Neither 28.4 nor 24.6 is verbatim present → both escalate to the skeptic.
+    md.write_text("The model improves over the RNN baseline.\n", encoding="utf-8")
 
     def partial_skeptic(numbers, source_md, claim_context):
         # Only ever confirms 24.6; never votes on 28.4 → 28.4 is unconfirmed.

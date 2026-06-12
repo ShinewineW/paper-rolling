@@ -20,7 +20,7 @@ from test_spoke import (
     _entailed,
     _good_rigor,
     _mineru_emitting,
-    _resolve_analysis,
+    _resolve_analysis_fabricating,
     _tier2_http,
 )
 
@@ -38,7 +38,7 @@ def test_abort_at_g2_preserves_scene_and_reraises(tmp_path, fake_http, fake_cli)
         workspace=tmp_path,
         http=fake_http,
         run_cli=fake_cli,
-        resolve_analysis=_resolve_analysis,
+        resolve_analysis=_resolve_analysis_fabricating("888.88", "777.77"),
         skeptic_votes=_aborting_skeptic,
         rigor_scores=_good_rigor,
         entailment_judge=_entailed,

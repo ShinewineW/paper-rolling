@@ -139,6 +139,34 @@ def _nearest_source_number(number: str, source_md: str) -> str | None:
     return None
 
 
+def _source_value_set(source_md: str) -> set[float]:
+    """The distinct numeric VALUES present in the source MD (ground truth), parsed
+    from its number tokens. Layer-1 uses this to confirm an evidence number
+    mechanically — by value, so cosmetic forms match (28.40 == 28.4, 1.0 == 1) —
+    without consulting the (unreliable) LLM skeptic."""
+    values: set[float] = set()
+    for tok in extract_numbers(source_md):
+        try:
+            values.add(float(tok))
+        except ValueError:
+            continue
+    return values
+
+
+def _mechanically_present(number: str, source_values: set[float]) -> bool:
+    """True iff `number`'s VALUE appears in the source MD — the deterministic
+    lookup-channel check. Verbatim/normalized presence is CODE's job (a substring/
+    value check is exact where the LLM skeptic false-flags present numbers); only
+    a number NOT mechanically present escalates to the skeptic for the SEMANTIC
+    question (is it derivable via a trivial transform?). Conservative: a
+    non-numeric token or an absent value returns False, so a fabricated number is
+    never confirmed here — it escalates and is judged."""
+    try:
+        return float(number) in source_values
+    except ValueError:
+        return False
+
+
 def run_g2(
     ai_package_dir: Path,
     md_path: Path,
@@ -179,22 +207,34 @@ def run_g2(
     if not candidate_numbers:
         return GateVerdict(gate="G2", findings=())
 
+    # Layer 1 (deterministic, lookup-channel): confirm every candidate whose VALUE
+    # is present in the source MD by CODE. The LLM skeptic is unreliable at this
+    # mechanical "is the number present" task and false-flags verbatim-present
+    # numbers (the qwen failure that motivated this split); a value check does not.
+    # Only numbers NOT mechanically present escalate to the skeptic (Layer 2),
+    # which judges the SEMANTIC question — is it derivable via a trivial transform?
+    source_values = _source_value_set(source_md)
+    escalated = tuple(n for n in candidate_numbers if not _mechanically_present(n, source_values))
+    escalated_set = set(escalated)
+
     votes_per_round: list[tuple[SkepticVote, ...]] = []
-    for _ in range(n_skeptics):
-        votes_per_round.append(
-            skeptic_votes(candidate_numbers, source_md, claim_context="G2 data-fidelity audit")
-        )
     cross_votes: tuple[SkepticVote, ...] = ()
-    if cross_model_votes is not None:
-        cross_votes = tuple(
-            cross_model_votes(
-                candidate_numbers, source_md, claim_context="G2 cross-model verification"
+    if escalated:
+        for _ in range(n_skeptics):
+            votes_per_round.append(
+                skeptic_votes(escalated, source_md, claim_context="G2 data-fidelity audit")
             )
-        )
+        if cross_model_votes is not None:
+            cross_votes = tuple(
+                cross_model_votes(escalated, source_md, claim_context="G2 cross-model verification")
+            )
 
     # First pass: identify every unconfirmed number (the verification proper).
+    # Layer-1-confirmed numbers are skipped — they are present by construction.
     bad: list[tuple[int, str, bool, bool]] = []  # (idx, number, in_family_bad, cross_bad)
     for idx, number in enumerate(candidate_numbers, start=1):
+        if number not in escalated_set:
+            continue
         in_family_bad = _insufficiently_confirmed(votes_per_round, number, n_skeptics)
         cross_bad = _cross_model_flags(cross_votes, number)
         if in_family_bad or cross_bad:

@@ -334,6 +334,21 @@ def _resolve_analysis(md_path, candidate, *, prior_failure=None):
     return copy.deepcopy(_ANALYSIS)
 
 
+def _resolve_analysis_fabricating(*fabricated_numbers: str):
+    """Analyzer variant that injects a fabricated evidence row whose numbers are
+    ABSENT from _SOURCE_MD. Since G2 Layer-1 now confirms every verbatim-present
+    number by code (the skeptic is no longer consulted for them), a genuine G2
+    block requires a candidate the source does NOT contain — this is the only way
+    to drive one. The fabricated cells fill the 3-column (Method/NDS/mAP) row."""
+
+    def _resolve(md_path, candidate, *, prior_failure=None):
+        bundle = copy.deepcopy(_ANALYSIS)
+        bundle["evidence_tables"][0]["rows"].append(["Bogus", *fabricated_numbers])
+        return bundle
+
+    return _resolve
+
+
 def _all_found_skeptic(numbers, source_md, claim_context):
     """Happy-path seam: every evidence number grounds in the source (clean paper)."""
     return tuple(SkepticVote(number=n, found_in_source=True) for n in numbers)
@@ -424,13 +439,14 @@ def _make_spoke(
     skeptic_votes=_all_found_skeptic,
     rigor_scores=_good_rigor,
     max_gate_rounds=2,
+    resolve_analysis=_resolve_analysis,
 ):
     fake_cli.program(returncode=0, side_effect=_mineru_emitting(analysis_md))
     return make_spoke(
         workspace=tmp_path,
         http=fake_http,
         run_cli=fake_cli,
-        resolve_analysis=_resolve_analysis,
+        resolve_analysis=resolve_analysis,
         skeptic_votes=skeptic_votes,
         rigor_scores=rigor_scores,
         entailment_judge=_entailed,
@@ -527,16 +543,17 @@ def test_spoke_tier1_synthesizes_content_list_and_passes(tmp_path, fake_http, fa
 
 
 def test_spoke_g2_block_aborts_before_any_vault(tmp_path, fake_http, fake_cli):
-    # The majority of skeptics report the evidence number 0.61 as NOT found in
-    # the source MD (fabricated/mis-transcribed) -> G2 hard-blocks BEFORE
-    # branch1/promotion.
+    # The evidence carries a fabricated number (888.88) absent from the source MD;
+    # it escalates past Layer-1 and the honest skeptic flags it -> G2 hard-blocks
+    # BEFORE branch1/promotion.
     _tier2_http(fake_http, dict(_CANDIDATE))
     spoke = _make_spoke(
         tmp_path,
         fake_http,
         fake_cli,
         analysis_md=_SOURCE_MD,
-        skeptic_votes=_skeptic_missing("0.61"),
+        skeptic_votes=_honest_skeptic,
+        resolve_analysis=_resolve_analysis_fabricating("888.88", "777.77"),
     )
 
     result = spoke(dict(_CANDIDATE))
@@ -571,7 +588,8 @@ def test_spoke_forced_candidate_still_g2_blocked(tmp_path, fake_http, fake_cli):
         fake_http,
         fake_cli,
         analysis_md=_SOURCE_MD,
-        skeptic_votes=_skeptic_missing("0.61"),
+        skeptic_votes=_honest_skeptic,
+        resolve_analysis=_resolve_analysis_fabricating("888.88", "777.77"),
     )
 
     result = spoke(dict(forced))
