@@ -2,7 +2,7 @@
 
 > **范围**: `scripts/audit/` — types, g2_data_fidelity, g3_seal, entailment, rigor_rubric, gate_runner
 > **最后更新**: 2026-06-12
-> **关键特性**: Multi-vote skeptic (G2) 硬门、6-维严谨性评分 (G3)、LLM 回退集成、失败保留现场不删 ARA (ADR-0011)
+> **关键特性**: G2 两层数字门（Layer-1 代码核对存在性 → Layer-2 multi-vote skeptic 判语义变换）硬门、6-维严谨性评分 (G3)、失败保留现场不删 ARA (ADR-0011)
 
 <!-- Generated: 2026-06-08 | Files scanned: 10 | Token estimate: ~3500 -->
 
@@ -17,12 +17,15 @@ Per-paper spoke:
   │                                                     │
   │  Input: staged branch2 ARA (claims + evidence)    │
   │                                                     │
-  │  Logic:                                             │
+  │  Logic (two-layer):                                │
   │  ├─ Extract critical numbers from evidence tables │
-  │  ├─ For each number:                              │
-  │  │  └─ Call skeptic_votes(seam) × N_votes times  │
-  │  │     (each is independent LLM call)            │
-  │  ├─ Multi-vote majority: found_in_source?         │
+  │  ├─ Layer 1 (CODE): value present in source MD?   │
+  │  │  └─ confirm by canonical-float match           │
+  │  │     (28.40==28.4); NOT sent to the LLM         │
+  │  ├─ Layer 2 (LLM): only NOT-present numbers escala│
+  │  │  └─ skeptic_votes(seam) × N_votes (independent)│
+  │  │     judges trivial-transform derivability      │
+  │  ├─ Multi-vote majority on escalated: found?      │
   │  └─ Hard block if majority says "NOT found"       │
   │     (fabrication detector)                        │
   │                                                     │
@@ -123,12 +126,16 @@ def g2_gate(
     skeptic_votes: Callable[[tuple[str, ...], str, str], tuple[SkepticVote, ...]],
     config: dict,  # from config/audit.yaml
 ) → GateVerdict:
-    """G2: Data-fidelity adversarial gate.
-    
-    Multi-vote skeptic checks if critical numbers are ACTUALLY in the source MD.
-    Detects hallucinated/fabricated numbers. Hard-blocks if majority says
+    """G2: Data-fidelity adversarial gate (two-layer).
+
+    Layer 1 (deterministic, CODE): a number whose VALUE is present in the source
+    MD is confirmed by canonical-float match — never sent to the LLM, which is
+    unreliable at this mechanical "is the number present" task and false-flagged
+    verbatim-present numbers. Layer 2 (LLM skeptic): only numbers NOT mechanically
+    present escalate; the multi-vote skeptic judges the semantic question (is it
+    derivable via a trivial transform?). Hard-blocks if the majority says
     "I didn't find this number".
-    
+
     Tolerance mode (config/audit.yaml data_fidelity.mode: tolerant):
     - A few unverified numbers are FLAGGED but paper is kept.
     - Beyond max_unconfirmed OR max_unconfirmed_ratio → hard-block anyway.
@@ -142,25 +149,29 @@ def g2_gate(
     if not numbers:
         return GateVerdict(is_pass=True)  # No numbers, no check
     
-    # 3. Read source MD (to give skeptic context)
+    # 3. Read source MD (ground truth)
     source_md = (Path(ara["_md_path"])).read_text()
-    
-    # 4. Multi-vote skeptic (independent calls, uncorrelated with generator)
+
+    # 4. Layer 1 (CODE): confirm present-by-value numbers; escalate the rest.
+    source_values = {float(t) for t in extract_numbers(source_md)}
+    escalated = tuple(n for n in numbers if float(n) not in source_values)
+
+    # 5. Layer 2 (LLM): multi-vote skeptic on the ESCALATED set only (independent
+    #    calls, uncorrelated with generator). Skipped entirely if escalated is empty.
     n_votes = config.get("skeptic_votes", 1)
     votes = []
-    for vote_idx in range(n_votes):
-        # Each vote is an independent seam call (fresh sub-agent)
+    for vote_idx in range(n_votes) if escalated else ():
         vote_result = skeptic_votes(
-            numbers=tuple(numbers),  # candidate numbers
+            numbers=escalated,                # only numbers code could NOT confirm
             source_md=source_md[:200_000],  # capped at 200k chars
             claim_context=f"Paper claim (vote {vote_idx + 1}/{n_votes})",
         )
         votes.extend(vote_result)
     
-    # 5. Tally by majority
+    # 6. Tally by majority (Layer-1-confirmed numbers skipped — present by construction)
     findings = []
     unconfirmed_count = 0
-    for num in numbers:
+    for num in escalated:
         votes_for_num = [v for v in votes if v.number == num]
         confirmed_count = sum(1 for v in votes_for_num if v.found_in_source)
         majority_found = confirmed_count > len(votes_for_num) / 2
@@ -173,7 +184,7 @@ def g2_gate(
                 description=f"Number '{num}' not verified in source (votes: {votes_for_num})",
             ))
     
-    # 6. Decision based on mode
+    # 7. Decision based on mode
     mode = config.get("data_fidelity", {}).get("mode", "tolerant")
     max_unconfirmed = config.get("data_fidelity", {}).get("max_unconfirmed", 5)
     max_ratio = config.get("data_fidelity", {}).get("max_unconfirmed_ratio", 0.2)
@@ -188,7 +199,7 @@ def g2_gate(
             or unconfirmed_count > len(numbers) * max_ratio
         )
     
-    # 7. Write audit flags
+    # 8. Write audit flags
     if findings:
         _write_audit_flags(stage_ai, findings)
     
