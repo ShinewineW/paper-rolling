@@ -1,5 +1,7 @@
 # Wiring the model seams — how the runtime agent composes the engine
 
+<!-- Generated: 2026-06-13 | Updated: faithfulness_judge → prose note, fail-soft (ADR-0012 rev) -->
+
 This is the authoritative wiring contract for the `paper-landscape` Claude Code
 skill. The engine under `scripts/` is **deterministic Python**; it contains **no
 standalone `main()` and no hard-coded LLM call**. At runtime the host agent (the
@@ -80,14 +82,19 @@ and silently neuter G2/G3.
    Returns `(entailed, reason)`. The per-role HOW lives in
    `sub-skills/entailment-judge/SKILL.md`.
 
-5. **`faithfulness_judge(report_text: str, ara_dir: Path) -> dict`** — the branch1
-   忠实门 (c) judge (ADR-0012). Compares the human report against the verified ARA;
-   returns `{"faithful": bool, "findings": [{"claim": str, "issue": str}, ...]}` and
-   fails CLOSED (malformed/empty → `faithful=False`). Ground-truth-isolated from the
-   `write_report` writer (routed at tier=fast → a model ≠ the writer's). No sub-skill
-   role dir — it is a config-routed judge. **MANDATORY when `write_report` is wired**
-   (every production path): wiring the LLM writer without this judge aborts loudly so
-   the (c) gate is never silently skipped; optional only on the no-LLM deterministic path.
+5. **`faithfulness_judge(report_text: str, ara_dir: Path) -> str`** — the branch1
+   opening-assessment (c) note-writer (ADR-0012 rev). Compares the human report
+   against the verified ARA and returns a Chinese prose advisory note (e.g., flagging
+   misattribution, overclaim, or certifying "与 ARA 核对无问题"). **Fail-soft**: if
+   the judge fails or is absent, the note is simply omitted from the opening
+   `## 评价` — it NEVER blocks publication. The note is assembled with (b) the
+   ungrounded-number facts and (c) the ARA's AUDIT_FLAGS into a single
+   non-blocking `## 评价` section prepended to the report.
+   Ground-truth-isolated from the `write_report` writer (routed at tier=fast → a
+   model ≠ the writer's). No sub-skill role dir — it is a config-routed judge.
+   **Provide when `write_report` is wired** (every production path) for the
+   assessment note; omit → assessment skips the (c) note layer (still surfaces (b)
+   facts).
 
 ### (B) 3 infra adapters — real I/O, NOT LLM seams
 

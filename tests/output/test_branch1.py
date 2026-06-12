@@ -142,5 +142,6 @@ def test_branch1_prose_is_domain_agnostic_no_hardcoded_diffusion(
     paper_md = (ara / "PAPER.md").read_text(encoding="utf-8")
     assert "domain: natural language processing" in paper_md
     assert "domain: deep learning" not in paper_md
-    # The report still passes its own three-layer anchor gate.
+    # ADR-0012 rev: anchoring retired — the plain-prose report carries no anchors,
+    # so the (dead) anchor lint trivially finds nothing.
     assert lint_text(report) == []

@@ -1,4 +1,5 @@
-"""Three-layer citation anchor lint — HARD gate (吸收-D1)."""
+"""Unit tests for the RETIRED, dead anchor_lint module (ADR-0012 rev: no gate calls
+it; the three-layer anchor lint is kept only as unit-tested dead code)."""
 
 from __future__ import annotations
 

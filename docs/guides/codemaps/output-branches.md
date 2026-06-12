@@ -360,9 +360,8 @@ def write_branch1_llm(
 def _build_core_conclusions(ara: dict, md_path: Path) -> str:
     """Build the 核心结论 block from ARA claims.
     
-    Plain prose sentences (no <!--ref--> anchor syntax).
-    The engine 核心结论 block in the ARA itself may have anchors for G3 resolution,
-    but this prose-facing block is natural language only.
+    Plain prose sentences (ADR-0012 rev: NO <!--ref--> anchors anywhere — the whole
+    anchoring machinery is retired and G3 does no anchor-resolution).
     """
     
     claims = ara.get("claims", {})
@@ -525,7 +524,7 @@ def validate_ara(ara_dir: Path) -> bool:
 | `MAX_CURATED_FIGURES` | 5 | 强制 arch + 最多 4 个结果图 |
 | `CONFIDENCE_THRESHOLD` | 0.7 | 图选中的置信度最低值 |
 | `NO_EMOJI_IRON_RULE` | — | 所有报告必须无表情符号（确定性剥离） |
-| `ANCHOR_DEPTH` | 3 | 三层锚定：数字 → 声明 → 证据 → MD |
+| ~~`ANCHOR_DEPTH`~~ | — | 三层锚定已退役（ADR-0012 rev：整套 `<!--ref-->` 机制移除） |
 
 ---
 

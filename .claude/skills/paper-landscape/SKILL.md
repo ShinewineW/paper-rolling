@@ -21,9 +21,9 @@ The agent-facing knowledge lives in `references/` (load the doc you need),
 - `references/wiring-the-seams.md` — how to compose + **invoke** the engine (start here).
 - `references/ara-schema.md` — the ARA bundle `resolve_analysis` must return.
 - `references/discovery-and-authority.md` · `ingest-fidelity.md` · `naming-and-ledger.md` · `landscapes.md` — per-subsystem depth.
-- `references/branch1-quality.md` — quality bar + anchor discipline for the human report.
+- `references/branch1-quality.md` — quality bar + opening 「评价」 for the human report.
 - `references/glossary.md` — domain terms.
-- `sub-skills/{analyze-paper,g2-skeptic,g3-rigor-reviewer,entailment-judge}/` — the four sub-skill LLM-seam role docs (the 忠实门 `faithfulness_judge` seam is routed via config without a role dir).
+- `sub-skills/{analyze-paper,g2-skeptic,g3-rigor-reviewer,entailment-judge}/` — the four sub-skill LLM-seam role docs (the branch1 「评价」 `faithfulness_judge` note-writer seam is routed via config without a role dir).
 - `examples/worked-example.md` + `examples/sample-ara-bundle.json` — one paper end-to-end; the literal `resolve_analysis` output target.
 - `templates/{ara-paper,branch1-report,landscape}.md` — the output skeletons branch2 / branch1 / landscapes write.
 
@@ -136,10 +136,11 @@ ordinal sequence is discover → ingest → ledger → branch2 → **G2** → br
    branch2's staged ARA evidence. A hard block aborts before branch1 and any
    promotion (OT-5: nothing reaches the real vault).
 6. **branch1** — illustration author: `person_vault/{date}_{Name}_{idbase}/`
-   (Chinese report; Mermaid redraw + derivation + loss explainer; 忠实门 (ADR-0012):
-   prose MAY carry numbers grounded in the MD ((b)) + an LLM faithfulness judge
-   ((c)), while the engine 核心结论 block keeps its `<!--ref-->` anchors, 吸收-D1).
-7. **G3** — seal gate (branch1↔MD consistency + equation fidelity + 6-dim rigor
+   (Chinese report; Mermaid redraw + derivation + loss explainer). ADR-0012 rev: NO
+   hard gate — the report opens with a non-blocking 「评价」 note ((b) report numbers
+   not in the ARA + (c) an advisory LLM judge note); the 核心结论 block is plain prose
+   (the `<!--ref-->` anchoring is retired). branch1 always publishes.
+7. **G3** — seal gate (G3R0 branch1-presence + equation fidelity + 6-dim rigor
    seal): runs **after both branches**. Hard failures block + re-emit (max N
    rounds → escalate / flag for human).
 8. **landscapes** — `scripts/landscapes.py` (corpus-batch-comparator): after the
@@ -161,7 +162,7 @@ never a re-derived key.
 
 `make_spoke(...)` (and the `run_campaign(...)` driver that composes it) take five
 **injected analysis/audit model seams** (the four analysis/G2/G3 seams below plus
-the branch1 忠实门 (c) `faithfulness_judge`, item 5 — ADR-0012). The composition is
+the branch1 「评价」 (c) `faithfulness_judge` note-writer, item 5 — ADR-0012 rev). The composition is
 CODE; the runtime injects everything LLM-backed or I/O-backed. Besides these, the
 runtime also supplies the infrastructure adapters `discover` / `http` / `run_cli`,
 and the `discover` callable is itself built over a further LLM-backed seam — the
@@ -226,16 +227,18 @@ contract: `references/wiring-the-seams.md`; per-role: `sub-skills/<role>/SKILL.m
    - **Output**: `(entailed: bool, reason: str)`.
    - **MUST**: an independent Agent-tool invocation.
 
-5. **`faithfulness_judge(report_text, ara_dir) -> dict`** — the branch1 忠实门 (c)
-   judge (ADR-0012). Compares the human report against the verified ARA.
-   - **Input**: the composed Chinese `report_text` + the staged `ara/` dir.
-   - **Output**: `{"faithful": bool, "findings": [{"claim": str, "issue": str}, ...]}`.
-     Fails CLOSED (malformed/empty/errored → `faithful=False`).
-   - **MUST**: an independent Agent-tool invocation, ground-truth-isolated from the
+5. **`faithfulness_judge(report_text, ara_dir, *, ungrounded=None) -> str`** — the
+   branch1 「评价」 (c) note-writer (ADR-0012 rev). Writes a reader-facing Chinese prose
+   faithfulness note comparing the human report against the verified ARA. ADVISORY —
+   it does NOT block; branch1 always publishes.
+   - **Input**: the composed Chinese `report_text` + the staged `ara/` dir + the (b)
+     `ungrounded` number fact list (context).
+   - **Output**: a Chinese prose `str` (the 评价's semantic note). Fail-SOFT — any
+     seam/ARA error degrades to a neutral note, it never raises.
+   - **SHOULD**: an independent Agent-tool invocation, ground-truth-isolated from the
      `write_report` writer (routed at tier=fast → a model ≠ the writer's).
-   - **MANDATORY when `write_report` is wired** (every production path): omitting
-     the judge while the LLM writer is on aborts loudly — the (c) gate can't be
-     silently skipped. Optional only on the no-LLM deterministic path.
+   - **OPTIONAL on every path**: omit it (or on seam error) and the opening 「评价」 still
+     publishes with its machine number-facts, just without the prose note.
 
 ## Invoke the engine (quickstart)
 
@@ -262,8 +265,8 @@ campaign = load_campaign(Path("."))
 # is an independent provider call (ground-truth isolation preserved). write_report
 # is the human-chain writer — pass it so branch1 produces the RICH LLM report
 # (figures + sections); omit it and branch1 falls back to the thin renderer.
-# faithfulness_judge is the branch1 忠实门 (c) seam (report ↔ ARA, ADR-0012) — pass it
-# or the (c) layer is disabled (it defaults to None).
+# faithfulness_judge is the branch1 「评价」 (c) note-writer seam (report ↔ ARA, ADR-0012
+# rev) — advisory + fail-soft, never blocks; omit it and the 评价 just skips the prose note.
 from scripts.llm.seams import build_seams
 from scripts.output.repo_resolve import make_repo_resolver
 
@@ -275,7 +278,7 @@ result = run_campaign(
     rigor_scores=seams["rigor_scores"],
     entailment_judge=seams["entailment_judge"],
     write_report=seams["write_report"],  # DEFAULT: rich LLM human chain
-    faithfulness_judge=seams["faithfulness_judge"],  # branch1 忠实门 (c), ADR-0012
+    faithfulness_judge=seams["faithfulness_judge"],  # branch1 「评价」 (c) note, ADR-0012 rev
     discover=build_discover(
         llm=seams["expand_llm"],
         is_ad_domain=campaign.is_ad_domain if campaign else True,

@@ -240,8 +240,9 @@ def g3_gate(
     
     Runs AFTER both branches are built (before promotion).
     Hard blocks on structural violations.
-    NOTE (ADR-0012): anchor resolution on branch1 PROSE is RETIRED. Only the engine's
-    own ARA 核心结论 block (if it carries anchors) gets resolved; branch1 is plain prose.
+    NOTE (ADR-0012 rev): ALL branch1 anchor resolution is RETIRED — G3 does no
+    anchor-resolution at all. branch1 (incl. its 核心结论 block) is plain prose; G3's
+    branch1 check is only G3R0 (report.md must exist).
     """
     
     findings = []

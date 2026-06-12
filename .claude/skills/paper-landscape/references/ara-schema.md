@@ -1,5 +1,7 @@
 # ARA bundle schema — the `resolve_analysis` output contract
 
+<!-- Generated: 2026-06-13 | Updated: faithfulness_judge note (ADR-0012 rev) -->
+
 The single `dict` that `resolve_analysis(md_path, candidate) -> dict` (the analyzer
 LLM seam) MUST return. It is the **Agent-Native Research Artifact (ARA)** bundle:
 `scripts/output/branch2_ara.py` writes it into `ai_package/{key}/ara/`,
@@ -79,7 +81,7 @@ found in the source MD are hard-blocked as fabrication before promotion.
 - [wiring-the-seams.md](./wiring-the-seams.md) — the five LLM seams (analyzer
   `resolve_analysis`, the G2 skeptic `skeptic_votes` over the numbers in this
   bundle, `rigor_scores` over the 6 `DIMENSION_KEYS`, `entailment_judge`, and the
-  branch1 忠实门 `faithfulness_judge`).
+  branch1 opening-assessment `faithfulness_judge` — ADR-0012 rev, fail-soft).
 - `../sub-skills/g2-skeptic/SKILL.md` — the skeptic gate over the numbers in this bundle.
 - `../sub-skills/g3-rigor-reviewer/SKILL.md` — `rigor_scores` reads this same bundle over the 6 `DIMENSION_KEYS`.
 - Engine composition + the injected seams: `../SKILL.md` and `wiring-the-seams.md`.

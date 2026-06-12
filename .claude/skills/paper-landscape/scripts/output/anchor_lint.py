@@ -1,11 +1,18 @@
-"""Three-layer citation anchor lint — paper-rolling HARD gate (吸收-D1).
+"""Three-layer citation anchor lint — RETIRED, dead code (ADR-0012 rev).
+
+ADR-0012 rev retired the WHOLE `<!--ref-->`/`<!--anchor:-->` anchoring machinery:
+branch1 reports are plain prose (the 核心结论 block no longer carries anchors), branch1
+has no hard gate, and G3 no longer anchor-resolves. NO gate calls `lint_text` /
+`unanchored_empirical_lines` any more — this module is retained (still importable +
+unit-tested) only to avoid an API break; remove in a dedicated cleanup if confirmed
+unused. The original contract is preserved below for historical reference.
 
 NET-NEW paper-rolling module (Round 5/9): our own implementation of the
 documented v3.7.3 three-layer-anchor grammar + an empirical-performance-without-
 `<!--ref-->` clause. ARS ships only `lint_file(path)->list[str]`, so this is
 not a vendored file; it is original code covered by this repo's CC-BY-NC license.
 
-Contract (per branch1 report):
+Contract (HISTORICAL — when this WAS the branch1 gate):
   * Every `<!--ref:slug-->` MUST be immediately followed by a well-formed
     `<!--anchor:<kind>:<value>-->`, kind in {quote, page, section,
     paragraph, none}.
@@ -21,11 +28,10 @@ outperform/...), or a `%`/`个百分点`, or an English empirical verb — witho
 `<!--ref-->` marker USED to hard-block here (check 4 + the G3 mirror). **ADR-0012
 DROPPED that per-prose-line requirement from both gates**: the 理解阅读 may now
 carry numbers in natural prose, and faithfulness is checked instead by
-`branch1_gate` ((b) mechanical number-grounding + (c) LLM judge). `lint_text`
-keeps only checks 1-3 (well-formed / non-orphan anchors for the engine 核心结论
-block). `unanchored_empirical_lines` / `_is_empirical_assertion` remain defined
-(still unit-tested; `_is_empirical_assertion` is reused by `branch1_llm._ground_line`)
-but no gate calls `unanchored_empirical_lines` any more.
+`branch1_gate` ((b) number-grounding vs the ARA + (c) advisory judge), surfaced in the
+non-blocking opening 「评价」. `lint_text` (checks 1-3) and `unanchored_empirical_lines` /
+`_is_empirical_assertion` remain DEFINED + unit-tested, but ADR-0012 rev retired the
+anchoring entirely, so NO gate and no producer calls them any more (dead code).
 
 Detection is line-based and strips HTML-comment markers before the number
 scan, so decimals (`0.61`) and `-->` terminators never shred a sentence or
@@ -200,9 +206,9 @@ def lint_text(text: str) -> list[AnchorViolation]:
                 AnchorViolation(_line_of(scan, m.start()), f"orphan anchor marker: {m.group(0)!r}")
             )
 
-    # ADR-0012: prose no longer needs <!--ref--> — the 理解阅读 may carry numbers in
-    # natural prose; faithfulness is checked by branch1_gate ((b) grounding + (c)
-    # judge). Checks 1-3 above still validate the engine 核心结论 block's anchors.
+    # ADR-0012 rev: the whole anchoring is retired — the 理解阅读 (incl. its 核心结论
+    # block) is plain prose, and faithfulness is the non-blocking 「评价」's job. Checks
+    # 1-3 above are dead (no gate calls lint_text); kept only for the unit tests.
     return violations
 
 
@@ -216,7 +222,7 @@ def _main() -> int:
     from pathlib import Path
 
     parser = argparse.ArgumentParser(
-        description="paper-rolling three-layer citation lint (HARD gate)"
+        description="paper-rolling three-layer citation lint (RETIRED — ADR-0012 rev; dead code)"
     )
     parser.add_argument("paths", nargs="+", type=Path, help="markdown files to lint")
     args = parser.parse_args()

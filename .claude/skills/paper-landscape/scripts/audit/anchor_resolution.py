@@ -1,6 +1,13 @@
-"""branch1 <-> MD anchor resolution (吸收-D1, the K4 grounding fix).
+"""branch1 <-> MD anchor resolution — RETIRED, dead code (ADR-0012 rev).
 
-The bug being fixed: branch1 (the human report) is derived from branch2, and
+ADR-0012 rev retired the WHOLE `<!--ref-->`/`<!--anchor:-->` anchoring machinery:
+branch1 reports are plain prose (no anchors), and `g3_seal.py` no longer calls
+`check_branch1_md_anchors` (G3's branch1 check is only G3R0 — report.md must exist).
+This module is retained (still importable + unit-tested) only to avoid an API break;
+remove in a dedicated cleanup if confirmed unused. The original rationale follows for
+historical reference.
+
+The bug being fixed (historical): branch1 (the human report) is derived from branch2, and
 G3 originally only checked branch1<->branch2 — a self-referential loop. If
 branch2 mis-extracted a value, branch1 inherited it and the loop "self-verified"
 the error, severing the MD-only truth chain (branch1 never reads the MD).
