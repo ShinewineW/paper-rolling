@@ -1,6 +1,9 @@
 # 0006 — Gate-retry feedback boundary: content gates adapt, G2 stays blind
 
 > **Status**: accepted
+> **ADR-0012 修订(2026-06-13)**: branch1 不再是内容门(锚点门退役为开篇「评价」,永不拦),故下文
+> "content gates 反馈适应"中**关于 branch1 的部分作废**。本 ADR 余下的有效内核:**数字门(G2)永不吃
+> 反馈(盲重试)**、**branch2 的内容门(rigor/entailment)反馈适应**——不变。
 
 When a paper fails a gate, the bounded re-emit (`max_gate_rounds`) becomes a
 real correction loop instead of today's blind re-run (`on_reemit=lambda i:

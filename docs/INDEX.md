@@ -51,6 +51,7 @@
 - [`spec/2026-06-11-paper-list-input-mode-impl.md`](spec/2026-06-11-paper-list-input-mode-impl.md) — 指定列表输入模式(关闭自发查找、只跑操作者给的论文集),与自发查找二元切换实施计划(依据 ADR-0010)。
 - [`spec/2026-06-12-ara-delete-safety-impl.md`](spec/2026-06-12-ara-delete-safety-impl.md) — ARA 删除安全:失败/abort 一律移入 `_failed/`、绝不反射式 rm token-expensive 的 ARA,空壳/person/可再生临时物照删(依据 ADR-0011;已落地)。
 - [`spec/2026-06-12-branch1-faithfulness-gate-impl.md`](spec/2026-06-12-branch1-faithfulness-gate-impl.md) — 理解阅读忠实门:锚点门从"逼 LLM 给正文自贴 `<!--ref-->`"重构为"(b)机械落源 + (c)新语义判官 seam"两层忠实验收,正文允许有数字(依据 ADR-0012;已落地)。
+- [`spec/2026-06-13-human-chain-assessment-no-gate-impl.md`](spec/2026-06-13-human-chain-assessment-no-gate-impl.md) — 人链报告改「评价」、不设硬门:唯一真值参照=已验证 ARA、退役整套 MD 锚点机制、branch1 永不失败、开篇自带忠实性「评价」(依据 ADR-0012 rev;待落地)。
 
 ### spec/archive/ — 设计文档(归档)
 - [`spec/archive/2026-06-09-失败现场与复活赛-impl.md`](spec/archive/2026-06-09-失败现场与复活赛-impl.md) — 失败现场保全 + branch 级重试 + 批次复活赛实施计划(依据 ADR-0006~0009;已落地归档)。

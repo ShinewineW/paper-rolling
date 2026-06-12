@@ -2,6 +2,9 @@
 
 > **Status**: accepted
 > **修订**: 2026-06-09 — 粒度定为 **branch 级**(非 section 级,见 ADR-0009 修订)。
+> **ADR-0012 修订(2026-06-13)**: branch1 不再会失败(锚点门退役为开篇「评价」),故下文"最终门根在
+> branch1(anchor)→ 重跑 branch1"这一情形**作废**;branch2(rigor/entailment)重跑 + 数字门盲重试
+> 不变。
 
 A gate re-emit (and a 复活赛 replay) re-runs **only the branch that failed**,
 reusing the already-passed upstream stage-products verbatim — it does NOT re-run

@@ -1,6 +1,10 @@
 # 4. The LLM seam is a synchronous injected callable; default transport is locked-down `claude -p`, with a direct-API alternative; in-session Agent-tool only for interactive survey
 
-- Status: Accepted — 2026-06-07
+- Status: Accepted — 2026-06-07. **部分被取代(2026-06-12 provider 路由重构)**:决策 #1
+  (seam = 同步注入的 Python callable,非 in-session Agent-tool)与 #4(不可注入的 in-session
+  sub-agent 不用于强制流水线)**仍有效**;但 #2"**默认传输 = `claude -p`**"已被**取代**——
+  现状是 `config/llm.yaml` **必填、每个 seam 显式路由、无默认、无回退**(失败即 `EngineAbort`),
+  详见 `.claude/CLAUDE.md`「LLM provider routing」。
 - Amends: ADR-0003 (its decision #3 — "keep the LLM seams agent-provided, never as
   code" — is narrowed here; the other halves of 0003, the knowledge layer and the
   shipped infra adapters, stand unchanged).

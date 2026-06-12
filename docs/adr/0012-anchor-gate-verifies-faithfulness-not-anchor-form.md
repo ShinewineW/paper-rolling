@@ -1,59 +1,63 @@
-# 0012 — 锚点门 verifies report FAITHFULNESS, not anchor-form (amends ADR-0006)
+# 0012 — 人链报告不设硬门:开篇「评价」+ ARA 为唯一真值(取代原忠实门硬关)
 
-> **Status**: accepted + IMPLEMENTED (`feat/branch1-faithfulness-gate`, 2026-06-12; cross-reviewed by Codex, 4 rounds). Amends ADR-0006's "a number in prose instead of a table is a failure" premise.
+> **状态**: accepted — 2026-06-13。**实现待落地**(代码当前仍是旧的 branch1 忠实门硬关 +
+> 2026-06-12/13 会话的若干修复;本决策的落地另起)。
+> **取代**: 本 ADR 早先版本(2026-06-12 `feat/branch1-faithfulness-gate` 落地的「忠实门」——
+> 把 branch1 锚点门从"逐行 `<!--ref-->`"改为"(b) 机械落源 + (c) 判官"的两层**硬门**)。该版本
+> 仍会误杀人稿,故被本版取代。
+> **修订**: ADR-0006 / 0008 / 0009 中"锚点门是一道门 / branch1 是内容门反馈与复活根"的部分(锚点门
+> 自此不再是门)。
 
-The 锚点门 (inside branch1) was hard-blocking **content-perfect** papers: a 理解阅读
-whose ARA had already passed 结构门 + 数字门 (e.g. DiffusionForcing — ARA 70/70 numbers
-grounded, structure valid) was quarantined only because its **prose** carried numbers /
-percentages without a `<!--ref-->` marker (e.g. "视频实验只用约 10% 的总数据"). This is the
-same form-over-substance trap we removed from 数字门: a **mechanical discipline (self-attach
-an anchor to every empirical line)** was offloaded onto the LLM writer, which (a) fails it
-unreliably and (b) does not even prove the number is real — a bogus `<!--ref-->` passes the
-lint. The writer prompt's companion rule "don't put precise numbers in prose" also made
-reports stilted and was regularly **leaked verbatim into the report body**.
+## 背景
 
-## Decision
+把 branch1 的忠实门做成**硬门**,无论怎么调都在误杀**内容正确**的人稿:
 
-The 理解阅读 (human report) **MAY contain numbers in prose**. The 锚点门 stops gating on
-"did the LLM attach `<!--ref-->` to every empirical prose line" and instead verifies the
-report is **faithful**, in two layers (mirroring the 数字门 redesign):
+1. **参照物错位**:人稿是从**已验证 ARA** 派生的,门却拿它去对**原始 MD**((b) 数字落源、最终门
+   锚点解析都对 MD)。而 MD 是 MinerU 转出来的、带 OCR 错字(实测 ORION 的结果表里 `Traffic Sign`
+   被转成 `Traff c Sign`),于是任何引用表格/长句的锚点都对不上 → 必挂。这一类杀掉了
+   Genie / COMBAT / Cosmos / DriveDreamer / ORION。
+2. **(b) 黑名单永无止境**:对自由正文里**每个数字**落源,但正文天然含大量非数据数字(年份、arXiv 号、
+   GPU 型号、配置、列表序号、十六进制色…),每出一个假阳性就要加一条排除正则。
+3. **(c) 判官不可靠且 fail-closed**:实测 qwen 判官把 ARA 里**确实存在**的细节误判成"不在 ARA"
+   而硬拦;判官的传输/编码问题(latin-1 乱码、把思维链 `reasoning_content` 当答案)还会污染输出。
 
-- **(b) mechanical number-grounding** — every number in the report prose must appear in the
-  source MD (reuse 数字门's value-match machinery). Runs in **tolerant** mode: a stray miss is
-  flagged, only systematic ungrounded numbers hard-block.
-- **(c) semantic faithfulness judge** — a **new LLM seam, routed through `config/llm.yaml`**
-  like every seam (NOT hardcoded), comparing report ↔ ARA for misattribution / overclaim.
-  Bar = "would a reader be **materially misled**", not prose-precision nitpicks.
+根因不是"门松紧",而是"**给人看的衍生品被一道脆弱的自动硬门挡住**"。而严谨性本就该集中在 ARA,
+且 **publish 是 owner 手动触发**——真正的最后把关本来就是人。
 
-Both are **content gates**: on failure they feed the finding back to the branch1 writer
-(ADR-0006's content-gate-adapts path), bounded rounds, then `_failed/<key>/`. No laundering
-risk — unlike 数字门, the writer's truth source (the verified ARA) is in hand, so "correct the
-report to match the ARA" is the goal, not a fabrication launder; (c) backstops any number
-swapped in merely to pass (b).
+## 决策
 
-## Guiding principle — why the human chain can be loose
+**人链报告(理解阅读)不再设任何硬门;改为自带一段开篇「评价」,问题交给读者自己看。**
 
-Rigor concentrates in the **ARA (AI知识库)** — the AI-consumed SSOT, strictly held by
-结构门 + 数字门 + 最终门. The 理解阅读 is its **readable human derivative**, so it gets only a
-LIGHT faithfulness backstop, lenient **above a "do not seriously mislead" floor**. The floor
-is non-negotiable (理解阅读 is a published Release product), but precision/style above it is
-not gated.
+1. **唯一真值参照 = 已验证的 ARA**。人链彻底不碰原始 MD(MD↔ARA 那段已由数字门保证)。
+2. **退役整套 MD 锚点机制**:锚点语法 lint、核心结论块的 `<!--ref-->` 标记、最终门对 branch1 的
+   锚点解析,全部移除。`## 核心结论` 作为普通内容保留,不带锚点。
+3. **人链报告永不硬拦**:不再抛 `AnchorGateError`、不进 `_failed/`、branch1 不再是复活根。原子对
+   (报告 + ARA)永远一起晋升。
+4. **(b) 确定性数字核对仍跑,但只产出事实、不拦**:逐个找出报告里不在 ARA 数字集的数字(确定性),
+   作为「评价」的输入。
+5. **开篇「评价」**:judge 拿 [报告 + ARA + (b) 事实清单 + 数字门已产出的 `AUDIT_FLAGS`],写成报告的
+   **第一章节**——
+   - **数字事实由 (b) 机器写死**(判官改不动),
+   - **判官只写语义点评(张冠李戴 / 夸大 / 是否整体可信)+ 读者向措辞**,
+   - **判官永不拦**,只产出这段话;在 branch1 产出时就写,不依赖最终门(故不动流水线时序)。
+6. **ARA 仍是被严格硬关守住的 source of truth**:结构门 + 数字门 + 最终门**完全不变**,严谨性永远沉在
+   ARA。
 
-## Scope — surgical (ADR-0006's expression guard kept where it is mechanical)
+## 指导原则
 
-- Prose is freed: no `<!--ref-->` self-anchoring required; faithfulness via (b)+(c).
-- The engine-generated, **mechanically-anchored 核心结论 block KEEPS its anchors** (no LLM
-  burden); 最终门's anchor-resolution sub-check narrows to resolving THAT block.
-- **Name unchanged: still 锚点门** (ADR-0008 — canonical names are communication-only; code
-  identifiers `AnchorGateError` / 三层锚点 stay). The name is now a mild misnomer kept for
-  continuity; the gate's job is faithfulness.
+严谨硬关只守 **ARA**(AI 消费的 SSOT)。**理解阅读是它的可读人类衍生品**:不设硬门,改为**透明披露**
+自身的忠实性(开篇「评价」)。读者随时可回退到 ARA 这个真值。底线从"引擎硬拦"挪到"读者在『评价』中
+被告知 + owner 在手动 publish 时复核"。
 
-## Consequences
+## 后果
 
-- A faithful report with natural prose numbers passes — the DiffusionForcing / Genie class of
-  false-quarantine ends. Papers failed under the OLD 锚点门 are revivable once this lands.
-- 数字门 stays **blind / no-feedback** (ADR-0006 unchanged for it); only the branch1 gate's
-  premise changes here.
-- New seam to route in `config/llm.yaml`, default to a non-writer model (writer = qwen3.7-max
-  → judge = qwen3.7-plus today). **judge ⊥ writer** isolation is a routing discipline, not a
-  hardcode — escalatable to a cross-family provider if the judge starts rubber-stamping.
+- **人稿误杀 → 0**:Genie/ORION 那一整类"锚点对不上 OCR 错字 / 非数据数字被拦"从定义上消失;复活赛
+  不再服务 branch1。
+- **门从四道变三道**:结构门 / 数字门 / 最终门(全在 ARA);锚点门**不再是门**,转为 branch1 的「评价」
+  (见 ADR-0008 词表修订)。
+- **判官角色变化**:从"返回 faithful 布尔 + 硬拦"变为"写一段开篇评价";因不再拦,判官出错只影响这段
+  话的措辞,不再误杀整篇(判官仍应路由到可靠模型,如本地 claude-code haiku)。
+- **ADR-0006/0009 中的 branch1 反馈/复活路径作废**(branch1 不会失败);其 G2 盲重试 + branch2 内容门
+  反馈部分不变。
+- **实现待落地**:本 ADR 是决策;代码落地(退役锚点、(b) 改对 ARA 且只产事实、新增「评价」装配、移除
+  branch1 硬拦)另起。
