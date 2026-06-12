@@ -21,6 +21,7 @@ from pathlib import Path
 import yaml
 
 from scripts import paths
+from scripts.failure_scene import FAILED_REL
 
 # Negative-cache TTL by failure class (§3.2). not_indexed_yet re-attempted
 # after the OpenAlex-lag estimate; below_threshold re-checked after citation
@@ -297,12 +298,25 @@ class Ledger:
         for key in demoted:
             self.record_status(key, status="failed", failure_class="convert_error")
         # (b) prune any vault entry dir not claimed by a complete `done` row.
+        # ADR-0011: an ai_package orphan still holding a non-empty ARA is
+        # token-expensive — MOVE it to _failed/_orphans/ (debug-preserve) rather
+        # than rm. person_vault orphans (cheap, ARA-derived) and empty/garbage
+        # ai_package orphans are still hard-deleted ("该删的不受影响").
+        orphans_dir = self.topic_dir / FAILED_REL / "_orphans"
         for dirname, _field in paths.VAULT_BRANCHES:
             branch_dir = self.topic_dir / dirname
             if not branch_dir.exists():
                 continue
             for entry in branch_dir.iterdir():
-                if entry.is_dir() and entry.resolve() not in claimed:
+                if not entry.is_dir() or entry.resolve() in claimed:
+                    continue
+                if dirname == paths.AI_PACKAGE_DIRNAME and paths.ara_is_nonempty(entry / "ara"):
+                    orphans_dir.mkdir(parents=True, exist_ok=True)
+                    dest = orphans_dir / entry.name
+                    if dest.exists():
+                        shutil.rmtree(dest, ignore_errors=True)  # latest orphan wins
+                    shutil.move(str(entry), str(dest))
+                else:
                     shutil.rmtree(entry, ignore_errors=True)
         return demoted
 
