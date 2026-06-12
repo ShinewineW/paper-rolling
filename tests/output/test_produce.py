@@ -205,6 +205,34 @@ def test_produce_gate_block_carries_staged_dir(tmp_path, candidate, ledger, md_p
     )
 
 
+def test_llm_writer_without_faithfulness_judge_aborts_loudly(
+    tmp_path, candidate, ledger, md_path, analyzer
+):
+    """Codex R16 (Final fresh-eyes gate): wiring the rich LLM writer (write_report)
+    without a faithfulness_judge would silently disable the (c) 忠实门 layer in every
+    production path (config routes the writer seam). stage_branch1 now aborts loudly
+    on that misconfiguration instead of running judge=None (ADR-0012 + fail-loud)."""
+
+    def fake_write_report(ara_dir, *, md_path=None, outdir=None):  # noqa: ARG001
+        return {"sections": {}, "figures": []}
+
+    with pytest.raises(ValueError, match="faithfulness_judge"):
+        produce_outputs(
+            md_path,
+            candidate,
+            ledger,
+            root=tmp_path,
+            resolve_analysis=analyzer,
+            write_report=fake_write_report,
+            faithfulness_judge=None,
+        )
+    # OT-5: nothing promoted.
+    assert not (tmp_path / "person_vault").exists() or not any(
+        (tmp_path / "person_vault").iterdir()
+    )
+    assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
+
+
 def test_branch2_reemit_threads_repo_resolver(tmp_path, candidate, ledger, md_path, analyzer):
     """审计 R10:branch2 re-emit(prior_failure_analyzer)必须把注入的 repo_resolver
     透传到 write_branch2,不回退默认(否则丢 T2b/T4 码链解析)。"""

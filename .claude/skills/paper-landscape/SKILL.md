@@ -233,6 +233,9 @@ contract: `references/wiring-the-seams.md`; per-role: `sub-skills/<role>/SKILL.m
      Fails CLOSED (malformed/empty/errored → `faithful=False`).
    - **MUST**: an independent Agent-tool invocation, ground-truth-isolated from the
      `write_report` writer (routed at tier=fast → a model ≠ the writer's).
+   - **MANDATORY when `write_report` is wired** (every production path): omitting
+     the judge while the LLM writer is on aborts loudly — the (c) gate can't be
+     silently skipped. Optional only on the no-LLM deterministic path.
 
 ## Invoke the engine (quickstart)
 

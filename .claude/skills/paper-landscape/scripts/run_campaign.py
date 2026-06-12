@@ -193,7 +193,11 @@ blindly from the shell:
   skeptic_votes      — model seam #2: the G2 ground-truth-isolated skeptic
   rigor_scores       — model seam #3: the G3 6-dim rigor reviewer
   entailment_judge   — model seam #4: the G3 type-aware entailment judge
-  faithfulness_judge — model seam #5: the branch1 忠实门 (c) report<->ARA judge
+  faithfulness_judge — model seam #5: the branch1 忠实门 (c) report<->ARA judge.
+                       MANDATORY whenever write_report (the LLM writer) is wired —
+                       i.e. every production path; omitting it there aborts loudly
+                       (no silent (c) no-op). Optional only on the no-LLM
+                       deterministic path (write_report=None).
   http               — HTTP fetch seam used by ingest (Tier-1 arXiv-HTML)
   run_cli            — CLI runner seam used by ingest (Tier-2 MinerU / pandoc)
 

@@ -85,7 +85,9 @@ and silently neuter G2/G3.
    returns `{"faithful": bool, "findings": [{"claim": str, "issue": str}, ...]}` and
    fails CLOSED (malformed/empty → `faithful=False`). Ground-truth-isolated from the
    `write_report` writer (routed at tier=fast → a model ≠ the writer's). No sub-skill
-   role dir — it is a config-routed judge.
+   role dir — it is a config-routed judge. **MANDATORY when `write_report` is wired**
+   (every production path): wiring the LLM writer without this judge aborts loudly so
+   the (c) gate is never silently skipped; optional only on the no-LLM deterministic path.
 
 ### (B) 3 infra adapters — real I/O, NOT LLM seams
 

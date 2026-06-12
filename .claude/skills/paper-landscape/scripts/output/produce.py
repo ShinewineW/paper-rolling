@@ -182,9 +182,26 @@ def stage_branch1(
     ``staging`` so callers that bypass produce_outputs (G3 branch1 re-emit, revival)
     still get a self-contained scene (audit R4 Finding 1).
 
+    The (c) 忠实门 judge is MANDATORY whenever the rich LLM writer is wired
+    (``write_report`` set) — i.e. every production path, since config routes the
+    ``writer`` seam. Wiring the LLM writer but omitting ``faithfulness_judge`` is a
+    misconfiguration that would silently disable the semantic gate, so it aborts
+    loudly here (no silent (c) no-op — ADR-0012 + the project's fail-loud
+    convention). The no-LLM deterministic fallback (write_report=None) grounds by
+    construction and keeps (c) optional.
+
     Raises:
         AnchorGateError: the report failed the 忠実门.
+        ValueError: the LLM writer is wired but no faithfulness_judge was supplied.
     """
+    if write_report is not None and faithfulness_judge is None:
+        raise ValueError(
+            "branch1 忠实门 (ADR-0012): write_report (LLM writer) is wired but "
+            "faithfulness_judge is None — the (c) semantic gate would be silently "
+            "skipped. Pass seams['faithfulness_judge'] (build_seams routes it via "
+            "config/llm.yaml) into run_campaign/revival, or run the no-LLM "
+            "deterministic path (write_report=None)."
+        )
     stage_person = staging / "person"
     try:
         if write_report is not None:
