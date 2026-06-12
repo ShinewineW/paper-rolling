@@ -67,10 +67,19 @@ providers:
     type: openai_compatible
     base_url: https://api-hub.hellorobotaxi.top/v1
     api_key_env: HELLOROBOTAXI_API_KEY
-    strong_model: qwen3.7-max        # tier=strong 的 seam 用 (writer)
+    strong_model: qwen3.7-max        # tier=strong 的 seam 用 (rigor)
     fast_model: qwen3.7-plus         # tier=fast 的 seam 用 (skeptic/entailment/expand)
     no_proxy: true                   # 内网平台必须绕开 env 代理直连 (否则 TLS 被代理链掐断)
-    max_concurrent: 8                # gates(skeptic/rigor/entailment)+writer 的并发上限,独立于 analyzer
+    max_concurrent: 8                # gates(skeptic/rigor/entailment) 的并发上限,独立于 analyzer
+
+  hellorobotaxi-writer:              # 人链 writer 专用:qwen3.6-plus(与 rigor 的 qwen3.7-max 隔离;2026-06-13)
+    type: openai_compatible          # 同一内网 Hub,只换写手模型
+    base_url: https://api-hub.hellorobotaxi.top/v1
+    api_key_env: HELLOROBOTAXI_API_KEY
+    strong_model: qwen3.6-plus       # writer 走 tier=strong → 此模型
+    fast_model: qwen3.6-plus
+    no_proxy: true
+    max_concurrent: 8
 
   # Ready-to-use alternatives — uncomment + set the key env in .env to switch.
   # NOT bound to opencode: same code path, different base_url + token.
@@ -106,5 +115,5 @@ seams:
   rigor: hellorobotaxi         # G3 6-dim rigor (tier=strong → qwen3.7-max);analyzer 走 claude+codex,审计在 qwen,跨模型不破
   entailment: hellorobotaxi    # G3 entailment — tiny in/out (tier=fast → qwen3.7-plus)
   expand: hellorobotaxi        # discovery query expansion (tier=fast → qwen3.7-plus)
-  writer: hellorobotaxi        # human chain (tier=strong → qwen3.7-max)
+  writer: hellorobotaxi-writer # human chain (tier=strong → qwen3.6-plus;2026-06-13 从 qwen3.7-max 换)
   faithfulness: hellorobotaxi  # ADR-0012: branch1 忠实门 judge (tier=fast → qwen3.7-plus)
