@@ -77,6 +77,15 @@ class EngineAbort(RuntimeError):
     """
 
 
+def ara_is_nonempty(ara_dir: Path) -> bool:
+    """True iff ``ara_dir`` is an existing directory holding at least one FILE —
+    the litmus for "this dir holds a token-expensive ARA worth preserving"
+    (ADR-0011). An absent or file-empty ``ara/`` means nothing was built, so the
+    enclosing dir is safe to hard-delete ("该删的不受影响")."""
+    ara_dir = Path(ara_dir)
+    return ara_dir.is_dir() and any(p.is_file() for p in ara_dir.rglob("*"))
+
+
 def repo_root() -> Path:
     """Return the paper-rolling repo root (used by the scaffold/campaign tests).
 
