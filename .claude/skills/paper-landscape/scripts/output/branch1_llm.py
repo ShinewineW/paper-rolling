@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.output.anchor_lint import _is_empirical_assertion
-from scripts.output.branch1_gate import check_report_faithfulness
+from scripts.output.branch1_gate import _prepend_assessment, build_assessment
 from scripts.output.branch1_report import AnchorGateError, _anchor, _find_in_md
 from scripts.output.figures import Figure, copy_figures, is_architecture_caption
 
@@ -302,20 +302,10 @@ def write_branch1_llm(
     assembled = _strip_emoji("\n".join(parts) + "\n")  # no-emoji iron rule
     assembled = _quote_mermaid_labels(assembled)  # make LLM mermaid parse-safe
     report = _ground_report(assembled, md_text)
-    hard = check_report_faithfulness(
-        report,
-        md_text,
-        ara_dir,
-        judge=faithfulness_judge,
-        tolerant=report_tolerant,
-        max_unconfirmed=report_max_unconfirmed,
-        max_unconfirmed_ratio=report_max_unconfirmed_ratio,
+    # ADR-0012 rev: prepend the opening 「评价」 (faithfulness note) — NEVER blocks.
+    report = _prepend_assessment(
+        report, build_assessment(report, ara_dir, judge=faithfulness_judge)
     )
-    if hard:
-        raise AnchorGateError(
-            "branch1 (LLM) report failed 忠实门 (ADR-0012): "
-            + "; ".join(f.observation for f in hard[:5])
-        )
     # Every SELECTED figure must be embedded...
     missing = [f.ref for f in copied if f"({f.ref})" not in report]
     if missing:

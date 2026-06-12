@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from scripts.output.branch1_gate import check_report_faithfulness
+from scripts.output.branch1_gate import _prepend_assessment, build_assessment
 
 # Cherry-picked unified Mermaid classDef palette (双输出-D1). Source:
 # scientific-agent-skills markdown-mermaid-writing/references/mermaid_style_guide.md
@@ -255,19 +255,10 @@ def write_branch1(
 
     report = "\n".join(sections) + "\n"
 
-    hard = check_report_faithfulness(
-        report,
-        md_text,
-        ara_dir,
-        judge=faithfulness_judge,
-        tolerant=report_tolerant,
-        max_unconfirmed=report_max_unconfirmed,
-        max_unconfirmed_ratio=report_max_unconfirmed_ratio,
+    # ADR-0012 rev: prepend the opening 「评价」 (faithfulness note) — NEVER blocks.
+    report = _prepend_assessment(
+        report, build_assessment(report, ara_dir, judge=faithfulness_judge)
     )
-    if hard:
-        raise AnchorGateError(
-            "branch1 report failed 忠实门 (ADR-0012): " + "; ".join(f.observation for f in hard[:5])
-        )
 
     (person_dir / "report.md").write_text(report, encoding="utf-8")
     (person_dir / "report.html").write_text(

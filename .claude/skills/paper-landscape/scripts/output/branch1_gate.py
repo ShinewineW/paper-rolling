@@ -1,20 +1,18 @@
-"""branch1 忠实门 (ADR-0012) — verify the 理解阅读 is FAITHFUL to its verified ARA,
-not that prose carries `<!--ref-->` anchors. Two layers assembled here:
-(b) mechanical number-grounding of the report against the source MD (this module),
-(c) a config-routed LLM judge (report ↔ ARA), assembled in check_report_faithfulness.
-The report MAY carry numbers in natural prose; only an UNGROUNDED prose number is suspect.
+"""branch1 「评价」 (ADR-0012 rev) — the 理解阅读's opening faithfulness note, NOT a
+gate. The report has NO hard门 and NEVER fails. Assembled here:
+(b) mechanical number-grounding of the report against the verified ARA (this module),
+(c) a config-routed LLM judge's prose note (report ↔ ARA), assembled in build_assessment.
+The report MAY carry numbers in natural prose; an UNGROUNDED prose number is surfaced
+in the 评价 as a fact for the reader — it does not block publication.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from pathlib import Path
 
 from scripts.audit.ara_tree import extract_numbers, number_present, source_value_set
 from scripts.audit.g3_seal import load_ara_bundle
-from scripts.audit.types import Finding, Severity
-from scripts.output.anchor_lint import lint_text
 
 _FENCE = re.compile(r"^\s*```")
 # Strip HTML comments BEFORE number extraction. The engine 核心结论 block carries
@@ -95,89 +93,50 @@ def ungrounded_report_numbers(report_text: str, ara_dir: Path) -> list[str]:
     return [n for n in prose_numbers(report_text) if not number_present(n, vals)]
 
 
-def check_report_faithfulness(
-    report_text: str,
-    source_md: str,
-    ara_dir: Path,
-    *,
-    judge: Callable[[str, Path], dict] | None = None,
-    tolerant: bool = False,
-    max_unconfirmed: int = 5,
-    max_unconfirmed_ratio: float = 0.2,
-) -> list[Finding]:
-    """The branch1 忠实门 (ADR-0012): kept anchor-form lint + (b) tolerant number
-    grounding + (c) optional LLM judge. Returns the HARD-BLOCK findings (empty =
-    pass). `judge` is the (c) seam; None (deterministic fallback path) skips it."""
-    findings: list[Finding] = []
+def _read_audit_flags(ara_dir: Path) -> str:
+    """The ARA's own AUDIT_FLAGS.md (numbers 数字门 flagged-but-kept in tolerant mode),
+    surfaced in the 评价 so the reader sees the verified pack's own caveats too."""
+    f = ara_dir / "AUDIT_FLAGS.md"
+    return f.read_text(encoding="utf-8").strip() if f.exists() else ""
 
-    # Kept anchor-form checks (well-formed engine 核心结论 block anchors).
-    for v in lint_text(report_text):
-        findings.append(
-            Finding(
-                finding_id=f"AF{len(findings) + 1:02d}",
-                severity=Severity.CRITICAL,
-                target="report.md",
-                observation=v.message,
-                is_hard_block=True,
-                reasoning="A malformed/orphan <!--ref--> anchor breaks the core-block truth chain.",
-                suggestion="Fix or remove the malformed anchor.",
-            )
-        )
 
-    # (b) tolerant mechanical grounding of prose numbers. Numerator AND denominator
-    # share prose_numbers() — same stripped/skipped scope.
-    bad = [
-        n for n in prose_numbers(report_text) if not number_present(n, source_value_set(source_md))
-    ]
-    total = len(prose_numbers(report_text)) or 1
-    # STRICT (tolerant=False, the gate primitive's default) hard-blocks ANY
-    # unconfirmed number. TOLERANT (the producers' default — the 理解阅读 is a LOOSE
-    # human-facing derivative per ADR-0012, NOT the strict ARA) softens within the
-    # LARGER of two limits: the absolute ceiling `max_unconfirmed` is a FLOOR that
-    # protects small reports (a 3-number report must not be quarantined over one
-    # ungrounded value — the exact false-quarantine ADR-0012 removes), and the ratio
-    # `max_unconfirmed_ratio * total` only TIGHTENS for large reports (it binds once
-    # total > max_unconfirmed / max_unconfirmed_ratio, e.g. > 25). This deliberately
-    # does NOT mirror 数字门's strict AND-of-both-limits — the report is looser by design.
-    within_tolerance = tolerant and len(bad) <= max(max_unconfirmed, max_unconfirmed_ratio * total)
-    grounding_hard = bool(bad) and not within_tolerance
-    for n in bad:
-        findings.append(
-            Finding(
-                finding_id=f"AF{len(findings) + 1:02d}",
-                severity=Severity.CRITICAL if grounding_hard else Severity.MAJOR,
-                target="report.md",
-                observation=f"prose number {n!r} not grounded in the source MD"
-                + ("" if grounding_hard else " [TOLERATED]"),
-                is_hard_block=grounding_hard,
-                reasoning="A report number absent from the source MD is narration drift.",
-                suggestion="Re-state the number from the ARA, or cut the claim.",
-            )
-        )
-
-    # (c) semantic faithfulness judge (LLM path only).
+def build_assessment(report_text: str, ara_dir: Path, *, judge=None) -> str:
+    """branch1 opening 「评价」 (ADR-0012 rev) — NEVER raises, NEVER blocks.
+    Deterministic facts ((b) report numbers not in the ARA + 数字门 AUDIT_FLAGS) plus
+    the judge's semantic note, assembled into a `## 评价` block prepended to the report.
+    `judge` is the (c) prose seam (None => facts-only)."""
+    ungrounded = ungrounded_report_numbers(report_text, ara_dir)
+    note = ""
     if judge is not None:
-        verdict = judge(report_text, ara_dir)
-        if not verdict.get("faithful", False):
-            for jf in verdict.get("findings", []) or [
-                {"claim": "", "issue": "report materially misleads vs ARA"}
-            ]:
-                findings.append(
-                    Finding(
-                        finding_id=f"AF{len(findings) + 1:02d}",
-                        severity=Severity.CRITICAL,
-                        target="report.md",
-                        observation=(
-                            f"materially misleading vs ARA: {jf.get('claim', '')}"
-                            f" — {jf.get('issue', '')}"
-                        ),
-                        is_hard_block=True,
-                        reasoning=(
-                            "The human report misrepresents the verified ARA"
-                            " (misattribution/overclaim)."
-                        ),
-                        suggestion="Correct the claim to match the ARA.",
-                    )
-                )
+        try:
+            note = str(judge(report_text, ara_dir, ungrounded=ungrounded)).strip()
+        except Exception:  # noqa: BLE001 — 评价 never blocks; a judge failure just drops the note
+            note = ""
+    lines = ["## 评价", ""]
+    if note:
+        lines += [note, ""]
+    if ungrounded:
+        lines.append(
+            "> 机器核对:以下正文数字未在已验证知识包(ARA)中找到,读者请留意——"
+            + "、".join(ungrounded)
+            + "。"
+        )
+    else:
+        lines.append("> 机器核对:正文数字均可在已验证知识包(ARA)中对应。")
+    if _read_audit_flags(ara_dir):
+        lines += ["", "> 知识包自身另有数字门标记的存疑项(详见 ai_package 的 AUDIT_FLAGS.md)。"]
+    return "\n".join(lines) + "\n"
 
-    return [f for f in findings if f.is_hard_block]
+
+def _prepend_assessment(report: str, assessment: str) -> str:
+    """Insert the `## 评价` block right after the `# 标题` (+ 导读 blockquote, if any),
+    before the first content section. Shared by both branch1 paths."""
+    lines = report.splitlines()
+    i = 0
+    while i < len(lines) and not lines[i].startswith("# "):  # skip to H1
+        i += 1
+    i += 1
+    while i < len(lines) and (not lines[i].strip() or lines[i].lstrip().startswith(">")):
+        i += 1  # skip blank lines + 导读 blockquote
+    head, tail = lines[:i], lines[i:]
+    return "\n".join(head) + "\n\n" + assessment.rstrip() + "\n\n" + "\n".join(tail) + "\n"

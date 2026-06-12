@@ -1125,22 +1125,17 @@ def test_spoke_branch1_passes_faithful_prose_numbers(tmp_path, fake_http, fake_c
     assert result.status == "done"
 
 
-def test_spoke_branch1_blocks_on_judge_drift(tmp_path, fake_http, fake_cli):
-    """ADR-0012: (c) faithfulness judge firing → 锚点门 hard-block on the LLM path.
-
-    The fake write_report emits ONLY qualitative prose (zero bare numbers), so the
-    (b) mechanical grounding layer PASSES unconditionally. The _drift_judge then
-    returns faithful=False, which is the ONLY cause of the 锚点门 block — proving
-    that the (c) judge seam is correctly wired through the full spoke pipeline.
+def test_spoke_branch1_judge_note_never_blocks(tmp_path, fake_http, fake_cli):
+    """ADR-0012 rev: the (c) faithfulness judge writes an opening 「评价」 note and
+    NEVER blocks. Even a judge that voices a misgiving cannot fail the human report —
+    the spoke still publishes, and its prose note is prepended to the report.
     """
     _tier2_http(fake_http, dict(_CANDIDATE))
 
-    def _drift_judge(report_text, ara_dir):
-        return {"faithful": False, "findings": [{"claim": "x", "issue": "misattributed vs ARA"}]}
+    def _wary_judge(report_text, ara_dir, *, ungrounded=None):
+        return "总体忠实,但个别表述可更贴近知识包。"
 
     def fake_write_report(ara_dir, *, md_path=None, outdir=None):  # noqa: ARG001
-        # Qualitative prose only — no bare performance numbers. The (b) grounding
-        # layer sees nothing to flag, so the block is attributable to _drift_judge.
         return {
             "sections": {
                 "01_导读": "本文提出一种方法,在整体质量上领先所有对比基线。",
@@ -1154,8 +1149,9 @@ def test_spoke_branch1_blocks_on_judge_drift(tmp_path, fake_http, fake_cli):
         fake_cli,
         analysis_md=_SOURCE_MD,
         write_report=fake_write_report,
-        faithfulness_judge=_drift_judge,
+        faithfulness_judge=_wary_judge,
     )
     result = spoke(dict(_CANDIDATE))
-    assert result.status == "failed"
-    assert result.failure_class == FAILURE_AUDIT_BLOCK
+    assert result.status == "done"
+    report = (Path(result.person_vault_path) / "report.md").read_text(encoding="utf-8")
+    assert "## 评价" in report and "总体忠实" in report
