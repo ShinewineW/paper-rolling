@@ -103,8 +103,9 @@ def make_spoke(
     """Build the production SpokeFn that runs the full gated pipeline per paper.
 
     All model-facing decisions are injected seams (resolve_analysis / skeptic /
-    rigor / entailment) so the pipeline is deterministic and testable; production
-    wires them to Agent-tool invocations.
+    rigor / entailment / faithfulness_judge — the branch1 忠实门 (c), ADR-0012) so
+    the pipeline is deterministic and testable; production wires them to Agent-tool
+    invocations.
     """
     workspace = Path(workspace)
     failed_dir = workspace / "_failed"

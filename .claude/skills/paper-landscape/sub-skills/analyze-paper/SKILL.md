@@ -82,4 +82,5 @@ for a complete, copy-pasteable instance.
   in the full pipeline; [`../../examples/sample-ara-bundle.json`](../../examples/sample-ara-bundle.json)
   is the literal target dict.
 - Sibling audit seams back the gates that check this analyzer's output: G2
-  skeptic, G3 rigor reviewer, G3 entailment judge.
+  skeptic, G3 rigor reviewer, G3 entailment judge; and the branch1 忠实门
+  `faithfulness_judge` audits the human report derived from this ARA (ADR-0012).

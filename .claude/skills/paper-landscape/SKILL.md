@@ -171,7 +171,7 @@ per call) so the audit votes are uncorrelated with the generator that produced t
 numbers. The entry point the `/loop` tick drives,
 once the seams are constructed, is **`scripts/run_campaign.py`** →
 `run_campaign(workspace, discover, resolve_analysis, skeptic_votes, rigor_scores,
-entailment_judge, http, run_cli, ...)`; it builds the ledger, wires the seams into
+entailment_judge, faithfulness_judge, http, run_cli, ...)`; it builds the ledger, wires the seams into
 `make_spoke`, and calls `run_campaign_tick` (which raises `GateRequired` if the
 campaign Hard Gate is not
 satisfied). Do **not** hard-code an LLM call — the seams are provider-agnostic.
