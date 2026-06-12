@@ -1,8 +1,8 @@
 # Output Branches (Branch2 + Branch1) 代码地图
 
-> **范围**: `scripts/output/` — branch1_llm.py, branch1_report.py, branch2_ara.py, ara_schema.py, naming.py, figures.py, produce.py
-> **最后更新**: 2026-06-08
-> **关键特性**: 双链原子产出 (OT-5)、LLM 写入人链、图形策展、vault 命名权威
+> **范围**: `scripts/output/` — branch1_llm.py, branch1_report.py, branch1_gate.py, branch2_ara.py, ara_schema.py, naming.py, figures.py, produce.py
+> **最后更新**: 2026-06-13
+> **关键特性**: 双链原子产出 (OT-5)、LLM 写入人链、非阻塞评价 (ADR-0012)、图形策展、vault 命名权威
 
 <!-- Generated: 2026-06-08 | Files scanned: 9 | Token estimate: ~3500 -->
 
@@ -29,15 +29,15 @@ G2 gate (data-fidelity on evidence)
 branch1 (human report)
     ├─ LLM-written path (if write_report seam provided):
     │  ├─ write_report(ara, figures) → vivid Chinese sections
-    │  ├─ build core-conclusions (mechanically grounded, <!--ref--> anchored)
-    │  ├─ 忠实门 (ADR-0012): (b) prose numbers grounded vs MD + (c) judge
+    │  ├─ build core-conclusions (plain prose, no <!--ref--> syntax)
+    │  ├─ prepend 评价 section (ADR-0012, fail-soft): (b) ungrounded numbers vs ara_value_set + (c) judge note + ARA AUDIT_FLAGS
     │  ├─ curate figures (arch mandatory + top-N results)
     │  ├─ self-contained HTML (MathJax + mermaid + base64)
     │  └─ output: person_vault/{key}/report.html
     │
     └─ thin deterministic path (if no write_report):
        ├─ format analysis → markdown template
-       ├─ 忠实门 (ADR-0012): kept anchor-form lint + (b) grounding + (c) judge (if supplied)
+       ├─ prepend 评价 section (ADR-0012, fail-soft): (b) number grounding check + (c) judge note (if supplied)
        └─ output: person_vault/{key}/report.md
     ↓
 G3 gate (seal: anchor + eq fidelity + rigor + entailment)
@@ -231,7 +231,7 @@ def write_branch1(
     md_path: Path,
     analysis: dict,
     key: str,
-    faithfulness_judge: Callable | None = None,  # branch1 忠实门 (c), ADR-0012
+    faithfulness_judge: Callable | None = None,  # branch1 评价 (c), ADR-0012, fail-soft
 ) → None:
     """Render branch1 (human report) deterministically from analysis.
     
@@ -247,10 +247,6 @@ def write_branch1(
 **Authors**: {', '.join(candidate.get('authors', []))}
 **Year**: {candidate.get('year')}
 **arXiv**: {candidate.get('arxiv_id')}
-
-## Core Conclusions
-
-{analysis.get('overview', '')}
 
 ## Problem
 
@@ -269,12 +265,11 @@ def write_branch1(
 {analysis.get('related_work', '')}
 """
     
-    # branch1 忠实门 (ADR-0012): kept anchor-form lint (engine 核心结论 block) +
-    # (b) mechanical prose-number grounding vs source MD + (c) optional judge.
-    # Prose may carry numbers; only an UNGROUNDED number (or judge drift) blocks.
-    hard = check_report_faithfulness(report, md_text, ara_dir, judge=faithfulness_judge)
-    if hard:
-        raise AnchorGateError(f"忠实门: {[f.observation for f in hard]}")
+    # branch1 评价 (ADR-0012, fail-soft): prepend `## 评价` section
+    # (b) check prose numbers vs ARA value set + (c) optional judge diagnostic note
+    assessment_text = build_assessment(report, stage_ai / "ara", judge=faithfulness_judge)
+    report = _prepend_assessment(report, assessment_text)
+    # NOTE: NO hard gate; assessment is diagnostic prose, never blocks
     
     # Write
     (stage_person / "report.md").write_text(report)
@@ -304,13 +299,13 @@ def write_branch1_llm(
     md_path: Path,
     write_report: Callable,  # LLM seam
     key: str,
-    faithfulness_judge: Callable | None = None,  # LLM seam — branch1 忠实门 (c), ADR-0012
+    faithfulness_judge: Callable | None = None,  # LLM seam — branch1 评价 (c), ADR-0012, fail-soft
 ) → None:
     """Render branch1 (human report) via LLM writer.
     
     LLM-written path: analysis → vivid Chinese prose (from write_report seam).
-    Faithfulness-checked (ADR-0012): prose numbers grounded vs MD ((b)) + (c) judge;
-    the engine 核心结论 block stays triple-anchored.
+    Assessment (ADR-0012, fail-soft): (b) number grounding vs ARA value set + (c) judge diagnostic note;
+    the report never blocks (评价 is prose note, not verdict).
     """
     
     # 1. Load ARA + figures
@@ -326,7 +321,7 @@ def write_branch1_llm(
     #   "results": "实验结果...",
     # }
     
-    # 3. Build core-conclusions block (mechanically grounded)
+    # 3. Build core-conclusions block (plain prose, no <!--ref--> syntax)
     core_block = _build_core_conclusions(ara, md_path)
     
     # 4. Assemble report
@@ -337,21 +332,17 @@ def write_branch1_llm(
         figures=curated_figs,
     )
     
-    # 5. Anchor the engine 核心结论 block (so 最终门 resolves it); ADR-0012: prose
-    #    numbers are GROUNDED vs MD by the 忠实门, not required to self-anchor.
-    report = _ground_empirical_claims(report, md_path)
-    
-    # 6. Deterministic normalization
+    # 5. Deterministic normalization
     report = _strip_emoji(report)  # 铁律：无 emoji
     report = _quote_mermaid_labels(report)
     
-    # 7. branch1 忠实门 (ADR-0012): kept anchor-form lint + (b) prose-number
-    #    grounding + (c) judge. Prose numbers allowed if grounded in the MD.
-    hard = check_report_faithfulness(report, md_text, ara_dir, judge=faithfulness_judge)
-    if hard:
-        raise AnchorGateError(...)
+    # 6. branch1 评价 (ADR-0012, fail-soft): prepend `## 评价` section
+    #    (b) check prose numbers vs ara_value_set + (c) judge diagnostic note
+    assessment_text = build_assessment(report, stage_ai / "ara", judge=faithfulness_judge)
+    report = _prepend_assessment(report, assessment_text)
+    # NOTE: NO hard gate; assessment is diagnostic prose, never blocks
     
-    # 8. Convert to self-contained HTML
+    # 7. Convert to self-contained HTML
     html = _to_html_self_contained(report, figures=curated_figs)
     
     # 9. Write
@@ -369,25 +360,17 @@ def write_branch1_llm(
 def _build_core_conclusions(ara: dict, md_path: Path) -> str:
     """Build the 核心结论 block from ARA claims.
     
-    Every claim statement is mechanically three-layer-anchored:
-      claim_text <!--ref anchor_O1--> [equation → evidence → MD]
+    Plain prose sentences (no <!--ref--> anchor syntax).
+    The engine 核心结论 block in the ARA itself may have anchors for G3 resolution,
+    but this prose-facing block is natural language only.
     """
     
     claims = ara.get("claims", {})
     lines = ["## 核心结论\n"]
     
     for claim_id, claim_text in claims.items():
-        # Find evidence for this claim
-        evidence = ara.get("evidence_tables", {}).get(claim_id, {})
-        
-        # Build anchor trail: claim → evidence → equation
-        anchor_id = f"anchor_{claim_id}"
-        eq_ref = f"equation_{claim_id}"
-        
-        # Three-layer anchor: <!--ref anchor_O1 to evidence_O1 to equation_5-->
-        anchored_claim = f"{claim_text} <!--ref {anchor_id} to {eq_ref}-->"
-        
-        lines.append(f"- {anchored_claim}")
+        # Plain prose statement (no anchors)
+        lines.append(f"- {claim_text}")
     
     return "\n".join(lines)
 ```
@@ -551,10 +534,11 @@ def validate_ara(ara_dir: Path) -> bool:
 1. **Single vault-key authority** — `naming.py` 中的 `vault_key()` 是唯一来源
 2. **Atomic dual-output** — Branch2 + Branch1 同时成功或同时失败（OT-5）
 3. **Deterministic naming** — Key = `{intake_date}_{Name}_{arxiv_base}`（可重现）
-4. **忠实门 (ADR-0012)** — 正文数字允许自然书写，但必须机械落源到 MD（(b)）+ 不得相对 ARA 实质误导（(c) 判官）；引擎 `核心结论` 块仍保留 `<!--ref-->` 三层锚点
+4. **评价 (ADR-0012, fail-soft)** — 前置 `## 评价` section，含 (b) 未落源数字发现 vs ara_value_set + (c) 诊断判官意见 + ARA AUDIT_FLAGS；branch1 NEVER blocks
 5. **Mandatory architecture** — Branch1 中强制包含架构图
 6. **NO emoji** — 所有报告确定性剥离表情符号（项目铁律）
 7. **Self-contained HTML** — Branch1 HTML 报告中的图片 base64 inline（不外链）
+8. **Plain prose core block** — 核心结论块采用平铺 markdown（无 <!--ref--> 锚点语法）；引擎内部 ARA 可能保有锚点供 G3 解析
 
 ---
 

@@ -1,7 +1,7 @@
 # paper-landscape 代码地图
 
 > **范围**: `paper-rolling` 工程 — engine + skill + 集成工作流
-> **最后更新**: 2026-06-08
+> **最后更新**: 2026-06-13
 
 本索引汇总按领域分区的架构地图。每份地图聚焦一个关键子系统，记录其模块拓扑、数据流、关键决策和外部依赖。
 
@@ -9,17 +9,17 @@
 
 ## 📋 地图清单
 
-| 地图 | 覆盖范围 | 关键变更（2026-06-07） |
+| 地图 | 覆盖范围 | 关键变更（2026-06-07 ~ 06-12） |
 |-----|--------|----------------------|
 | [`llm-pipeline.md`](llm-pipeline.md) | 新增可插拔 LLM 提供商层 + 人链 LLM 写入器 | `scripts/llm/`（6 个新模块）+ `branch1_llm.py` + 2 个配置文件 |
-| [`engine-core.md`](engine-core.md) | 核心管道：发现 → 摄入 → 分支2 → G2 → 分支1 → G3 → 景观 | `scripts/spoke.py` / `scripts/output/produce.py` 中的 `write_report` 注入 |
-| [`audit-gates.md`](audit-gates.md) | G2 数据保真 + G3 6 维严谨性密封 | EngineAbort 集成（总线中止；`scripts/paths.py`） |
+| [`engine-core.md`](engine-core.md) | 核心管道：发现 → 摄入 → 分支2 → G2 → 分支1 → G3 → 景观 | 分支1 支持 LLM 写入；忠实门已落地为非阻塞 `build_assessment` + `评价` note (ADR-0012) |
+| [`audit-gates.md`](audit-gates.md) | G2 数据保真 + G3 6 维严谨性密封 | EngineAbort 集成；G3 不再进行分支1 锚点解析；G3R0 = 分支1 presence check |
 | [`discovery-sources.md`](discovery-sources.md) | 多源排序：OpenAlex + S2 + arXiv + DBLP + HF Papers | `query_expand` 支持 LLM 路由 |
-| [`output-branches.md`](output-branches.md) | 双链原子产出（分支2 ARA + 分支1 人类报告） | 分支1 现已支持 LLM 写入（富文本中文段落 + 图形策展） |
+| [`output-branches.md`](output-branches.md) | 双链原子产出（分支2 ARA + 分支1 人类报告） | 分支1 支持 LLM 写入（富文本中文段落 + 图形策展）；评价 section 非阻塞 |
 
 ---
 
-## 🔑 2026-06-07 ~ 06-08 重点变更
+## 🔑 2026-06-07 ~ 06-12 重点变更
 
 ### 1. **新增 LLM 提供商层** （`scripts/llm/` 新增 6 个模块）
 
@@ -49,16 +49,16 @@ write_branch1_llm(stage_person, candidate, stage_ai, md_path, write_report, key=
 
 **流程**：
 1. LLM writer 生成富文本中文段落（来自 `write_report` seam）
-2. **力学锚定** `## 核心结论` 块（每个数字三层锚定 = 源文本 → Tier1/2 → 证据表）
-3. **忠实门 (ADR-0012)**：正文数字允许自然书写，但其值必须出现在 MD（(b) 机械落源），否则 `AnchorGateError`（促进前失败）
-4. **忠实门 (c) 判官**：报告不得相对已验证 ARA 实质误导（与分支1 确定性路径共用同一门）
+2. **核心结论块** 采用机械 `build_assessment()` + `_prepend_assessment()` 组装：前置非阻塞 `## 评价` section，含 (b) 数字落源检验结果 + (c) 诊断判官意见 + ARA 的 AUDIT_FLAGS.md 体
+3. **评价 (ADR-0012, 非阻塞)**：(b) 数字落源（报告内数字与已验证 ARA 值集对照）+ (c) 诊断判官（独立 LLM 按规范评析）；**分支1 NEVER blocks** —— gate 已退役，改为进展笔记
+4. **核心结论块** 采用平铺 markdown（无 `<!--ref-->` anchor 语法）；引擎仍保有锚点形态的结论块需要 G3 anchor-resolution，但不要求外部分支1 anchor
 5. **图形策展**：强制架构图 + 几个结果图（base64 内联到自包含 HTML）
 6. **NO emoji 铁律**：确定性剥离表情符号 + mermaid 标签引用
 7. **MathJax** 数学 + **parse-safe mermaid 11** 引用
 
 **相比之前的确定性 `write_branch1`**：
 - 旧方法：数据 → 固定 markdown 模板
-- 新方法：分析 ARA → LLM 生成活泼中文 → 接地 + 门控
+- 新方法：分析 ARA → LLM 生成活泼中文 → 非阻塞评价 + 图形策展
 
 ### 3. **配置文件**（新增或重新定义）
 
@@ -85,7 +85,7 @@ seams:
   entailment: opencode         # G3 蕴含
   expand: opencode             # discovery 查询扩展
   writer: opencode             # human chain（便宜）
-  faithfulness: opencode       # branch1 忠实门 (c) judge（ADR-0012；每个 seam 都必须路由）
+  faithfulness: opencode       # branch1 评价 (c) judge 诊断（ADR-0012；每个 seam 都必须路由；fail-soft）
 ```
 
 #### `config/audit.yaml` — 审计旋钮（用户可调）
@@ -166,4 +166,5 @@ data_fidelity:
 3. **Mandatory gates** — G2 + G3 每次都运行；无跳过选项
 4. **NO silent degradation** — LLM 两层都失败 → `EngineAbort`（中止，不静默退化）
 5. **Atomic dual-output** — 分支2 + 分支1 一起成功或一起失败（OT-5）
+6. **分支1 never blocks (ADR-0012)** — 忠实门已退役；评价 section 是进展笔记（fail-soft）；ARA-side gates (结构门/Seal-1, G2, G3 entailment+rigor+equation) 保持硬门
 

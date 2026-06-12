@@ -62,11 +62,9 @@ _Avoid_: incremental-only (分量版 includes updated papers, e.g. a v2 reproces
 ## Gates
 
 Canonical names for the per-paper checkpoints (communication only — code
-keeps `Seal-1` / `G2` / `G3`; see ADR-0008). Current code order: 结构门 → 数字门 → 锚点门 → 最终门.
-
-> **▶ ADR-0012(已决策,实现待落地)**:锚点门将**退役**——branch1 不再设硬门,改为生成报告
-> **开篇的「评价」**(见下「评价」词条),永不拦。落地后规范门只剩**三道,全在 ARA**:结构门 →
-> 数字门 → 最终门。下面 `锚点门` 词条暂记**当前代码行为**,带此前向标注。
+keeps `Seal-1` / `G2` / `G3`; see ADR-0008). Code order (ADR-0012 rev landed):
+结构门 → 数字门 → 最终门 — **three gates, all on the ARA**. branch1 (理解阅读) carries
+NO gate; it opens with a 「评价」 note instead (see below).
 
 **结构门 (structural gate)**:
 After branch2. Mechanical validation that the SSOT exploration tree is
@@ -84,28 +82,28 @@ firewall. Code: `G2`.
 _Avoid_: G2 (code-only name), data-fidelity gate, "LLM checks every number" (the
 pre-two-layer behavior)
 
-**锚点门 (anchor gate)**:
-Inside branch1. Verifies the 理解阅读 is **faithful** to its verified ARA (ADR-0012),
-NOT that prose carries anchors — the report MAY contain numbers in prose. Two layers:
-(b) mechanical — every report number grounds in the source MD (tolerant: only
-systematic misses block); (c) a config-routed LLM judge comparing report ↔ ARA for
-material misattribution / overclaim. The engine-anchored 核心结论 block keeps its
-`<!--ref-->` markers (resolved by 最终门). Name kept for continuity (ADR-0008) though
-now a mild misnomer — the gate's job is faithfulness. Code: three-layer anchor /
-`AnchorGateError`. **(当前代码行为;ADR-0012 已决定退役它为「评价」、不再硬拦,实现待落地。)**
-_Avoid_: treating it as a "`<!--ref-->` on every empirical prose line" check (the
-pre-ADR-0012 behavior); 将其当作长期 checkpoint(ADR-0012 起它退役为「评价」)
+**锚点门 (anchor gate)** — **RETIRED (ADR-0012 rev, landed)**:
+Formerly a branch1 hard gate. It is gone: branch1 no longer hard-blocks, the whole
+`<!--ref-->`/`<!--anchor:-->` machinery is retired, and faithfulness is now carried by
+the opening 「评价」 note (below). The `AnchorGateError` class survives only as
+documented dead code. Entry kept so the retired name remains searchable.
+_Avoid_: treating 锚点门 as a live checkpoint (it is retired); 把 branch1 当作会失败的链
 
 **评价 (faithfulness assessment)**:
-(ADR-0012,已决策、实现待落地)取代锚点门:branch1 报告**不设硬门**,改为在报告**第一章节**自带
-一段忠实性「评价」。机器确定性地核出"报告里不在 ARA 的数字"(只产事实、不拦),judge 拿 [报告 +
-ARA + 该事实清单 + 数字门 `AUDIT_FLAGS`] 写出读者向的语义点评(张冠李戴/夸大/整体可信度),**永不拦**。
-唯一真值参照是已验证的 **ARA**(不碰原始 MD)。落地后人稿无误杀,问题由读者看「评价」自行判断。
-_Avoid_: 结语(它在开篇不在结尾);把它当一道会拦截的门(它永不拦)
+(ADR-0012 rev, landed) replaces 锚点门: the branch1 report has **NO hard gate** and
+opens with a faithfulness 「评价」 as its **first section**. The machine deterministically
+lists "report numbers not in the ARA" (facts only, never blocks); the judge takes
+[report + ARA + that fact list + 数字门 `AUDIT_FLAGS` body] and writes a reader-facing
+semantic note (misattribution / overclaim / overall trust), **never blocks** and is
+fail-soft (any seam/ARA error degrades to a neutral note). The sole truth reference is
+the verified **ARA** (never the raw MD). branch1 is never false-quarantined — the reader
+judges from the 评价. Code: `branch1_gate.build_assessment`.
+_Avoid_: 结语(it opens, not closes); 把它当一道会拦截的门(it never blocks)
 
 **最终门 (final gate)**:
-After both chains. Composite seal of sub-checks: entailment, 6-dim rigor, equation
-fidelity (+ anchor resolution **当前仍在**,ADR-0012 落地后移除). Code: `G3` / seal.
+After both chains. Composite seal on the ARA: entailment, 6-dim rigor, equation
+fidelity. A MISSING branch1 `report.md` still hard-blocks (finding `G3R0`); ADR-0012 rev
+RETIRED the old branch1↔MD anchor-resolution sub-check. Code: `G3` / seal.
 _Avoid_: G3 (code-only name), 封缄门, seal gate
 
 ## Failure handling

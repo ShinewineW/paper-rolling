@@ -1,8 +1,8 @@
 # Engine Core Pipeline 代码地图
 
-> **范围**: `scripts/{campaign,hub,spoke,run_campaign}.py` + `scripts/output/{produce,branch1_llm,branch1_report}.py`
-> **最后更新**: 2026-06-12
-> **关键特性**: Per-paper gated pipeline、双链原子产出、LLM writer 集成、失败不删 ARA（ADR-0011）
+> **范围**: `scripts/{campaign,hub,spoke,run_campaign}.py` + `scripts/output/{produce,branch1_llm,branch1_report,branch1_gate}.py`
+> **最后更新**: 2026-06-13
+> **关键特性**: Per-paper gated pipeline、双链原子产出、LLM writer 集成、分支1 非阻塞评价（ADR-0012）、失败不删 ARA（ADR-0011）
 
 <!-- Generated: 2026-06-08 | Files scanned: 8 | Token estimate: ~4000 -->
 
@@ -136,7 +136,7 @@ def make_spoke(
     rigor_scores: Callable[[dict], dict],
     entailment_judge: Callable[[...], tuple[bool, str]],
     write_report: Callable[..., dict] | None = None,
-    faithfulness_judge: Callable[..., dict] | None = None,   # branch1 忠实门 (c), ADR-0012
+    faithfulness_judge: Callable[..., str] | None = None,   # branch1 评价 (c) 诊断, ADR-0012, fail-soft
     cancel: threading.Event | None = None,
 ) → SpokeFn:
     """Build the production spoke that runs the full gated pipeline per paper.
@@ -176,14 +176,15 @@ def make_spoke(
    └─ Failure → re-emit (bounded_gate_runner) or quarantine
 
 4. branch1 = write_branch1_llm(..., write_report) OR write_branch1(...)
-   ├─ If write_report: LLM-written vivid Chinese + figures + grounded assembly
+   ├─ If write_report: LLM-written vivid Chinese + figures + non-blocking assessment
    ├─ Else: thin deterministic markdown (from analysis)
-   ├─ 忠实门 (ADR-0012): prose numbers grounded vs MD ((b)) + judge ((c))
-   ├─ Engine 核心结论 block still <!--ref--> anchored: equation → claim → evidence (吸收-D1)
+   ├─ 评价 (ADR-0012, fail-soft): prepend `## 评价` section w/ (b) ungrounded-number findings + (c) judge note
+   ├─ NO hard-gate; branch1 generation never blocks (assessment is prose note, not verdict)
    └─ Stages to person_vault/{key}/ (not yet promoted)
 
 5. G3 = seal_gate(branch1, branch2, md_path)
-   ├─ anchor-lint: three-layer consistency check
+   ├─ G3R0: branch1 presence (must exist, no anchor-resolution on branch1 prose)
+   ├─ Anchor-resolution: resolve anchors PRESENT in engine 核心结论 block (NOT per-prose-line check)
    ├─ Equation fidelity: content_list.json count vs claims
    ├─ Entailment: claim vs experiment text semantically sound
    ├─ 6-dim rigor rubric (D1-D6)
@@ -199,7 +200,7 @@ def make_spoke(
 - `skeptic_votes` — LLM seam（G2 multi-vote）
 - `rigor_scores` — LLM seam（G3 6-dim）
 - `entailment_judge` — LLM seam（G3 蕴含）
-- `faithfulness_judge` — LLM seam（branch1 忠实门 (c)，report↔ARA，ADR-0012）
+- `faithfulness_judge` — LLM seam（branch1 评价 (c) 诊断，report↔ARA，ADR-0012, fail-soft）；返回诊断文本或 None
 - `write_report` — LLM seam (可选，人链)；None = 使用 thin 确定性
 - `cancel` — threading.Event，如果设置 → abort spoke（stall timeout）
 
@@ -219,7 +220,7 @@ def run_campaign(
     rigor_scores: Callable,  # LLM seam
     entailment_judge: Callable,  # LLM seam
     write_report: Callable | None = None,  # LLM seam (optional)
-    faithfulness_judge: Callable | None = None,  # LLM seam — branch1 忠实门 (c), ADR-0012
+    faithfulness_judge: Callable | None = None,  # LLM seam — branch1 评价 (c) 诊断, ADR-0012, fail-soft
     http: Callable,  # infra adapter
     run_cli: Callable,  # infra adapter
     cross_model_votes: dict | None = None,  # future
@@ -286,7 +287,7 @@ def produce_outputs(
     resolve_analysis: Callable[[Path, dict], dict],
     g2_gate: Callable[[Path], GateVerdict] | None = None,
     write_report: Callable[..., dict] | None = None,
-    faithfulness_judge: Callable[..., dict] | None = None,  # branch1 忠实门 (c), ADR-0012
+    faithfulness_judge: Callable[..., str] | None = None,  # branch1 评价 (c), ADR-0012, fail-soft
     cancel: threading.Event | None = None,
 ) → ProduceResult:
     """Produce branch2 + branch1 atomically (OT-5 both-or-neither).
@@ -296,7 +297,7 @@ def produce_outputs(
     branch1); G3 最终门 runs AFTER promote, in the SPOKE's bounded gate-runner.
     Failure (gate OR transport-abort): the staged ARA is PRESERVED as a
     _failed/<key>/ scene, NOT deleted (ADR-0011). Only success + SpokeCancelled
-    clean staging.
+    clean staging. Branch1 is never hard-blocked (评价 is fail-soft).
     """
 
     key = vault_key(intake=ledger.intake_date(), title=…, arxiv_id=…, doi=…)
@@ -308,11 +309,11 @@ def produce_outputs(
         if g2_gate and g2_gate(staging / "ai").blocked:          # G2 数字门 (before branch1)
             raise ProduceGateBlocked(verdict, staged_dir=staging)
         stage_branch1(staging, candidate, stage_ai, md_path, write_report, analysis, key,
-                      faithfulness_judge=faithfulness_judge)  # 忠实门 self-gate (ADR-0012)
+                      faithfulness_judge=faithfulness_judge)  # 评价 assessment (ADR-0012, fail-soft; never blocks)
         if cancel and cancel.is_set():           # stall 砍单 last safe point
             raise SpokeCancelled(…)
         return promote(staging, key, …)          # move BOTH → vaults, atomic
-    except (StructuralSealFailed, ProduceGateBlocked, AnchorGateError):
+    except (StructuralSealFailed, ProduceGateBlocked, EngineAbort):
         handed_off = True; raise                 # spoke scenes staging → _failed/<key>/
     except EngineAbort as exc:                   # ADR-0011: transport abort
         if ara_is_nonempty(staging / "ai" / "ara"):
@@ -344,19 +345,20 @@ def write_branch1_llm(
     md_path: Path,
     write_report: Callable[..., dict],
     key: str,
-    faithfulness_judge: Callable[..., dict] | None = None,  # branch1 忠实门 (c), ADR-0012
+    faithfulness_judge: Callable[..., str] | None = None,  # branch1 评价 (c), ADR-0012, fail-soft
 ) → None:
     """生成 branch1（人链 LLM 写入版本）。
     
     Flow:
       1. 从 stage_ai/ara/ 读 ARA bundle
       2. 调用 write_report(ara, figures) → {section: rich_markdown, ...}
-      3. 组装 report（header + sections + grounded assembly）
-      4. EMOJI 剥离 + mermaid 标签引用
-      5. 忠实门（kept anchor-form lint + (b) 数字落源 + (c) 判官）
+      3. 组装 report（header + sections）
+      4. 前置非阻塞 `## 评价` section：(b) 未落源数字 + (c) 诊断判官意见 + ARA AUDIT_FLAGS
+      5. EMOJI 剥离 + mermaid 标签引用
       6. 图形策展（强制 arch + 部分结果）
       7. 转换为白主题自包含 HTML（MathJax + mermaid）
       8. 写 person_vault/{key}/report.html + metadata.json
+      9. 永不阻塞（评价是诊断笔记，不是 hard gate）
     """
     
     # Load ARA from staged branch2
@@ -369,16 +371,12 @@ def write_branch1_llm(
     # Call LLM writer
     sections = write_report(ara=ara, figures=curated_figs)
     
-    # Build core block: 核心结论（mechanically grounded）
+    # Build core block: 核心结论（plain prose, NO <!--ref--> anchor syntax）
     core_block = _build_core_conclusions(ara, md_path)
     
     # Assemble report
     report = f"""
 # {candidate.get("title", "Paper")}
-
-## 核心结论
-
-{core_block}
 
 ## Introduction
 
@@ -394,20 +392,15 @@ def write_branch1_llm(
 ...
 """
     
-    # Engine 核心结论 block anchoring (so 最终门 can resolve them); ADR-0012: prose
-    # numbers are GROUNDED vs MD by branch1_gate, not required to self-anchor.
-    report = _ground_empirical_claims(report, md_path)
-    
-    # Strip emoji + quote mermaid labels
+    # Strip emoji + quote mermaid labels (deterministic normalization)
     report = _strip_emoji(report)
     report = _quote_mermaid_labels(report)
     
-    # branch1 忠实门 (ADR-0012): kept anchor-form lint + (b) prose-number grounding
-    # + (c) faithfulness judge (report ↔ ARA). Prose may carry numbers; an
-    # ungrounded prose number or a materially-misleading report hard-blocks.
-    hard = check_report_faithfulness(report, md_text, ara_dir, judge=faithfulness_judge)
-    if hard:
-        raise AnchorGateError(f"忠实门: {[f.observation for f in hard]}")
+    # branch1 评价 (ADR-0012, fail-soft): build_assessment + _prepend_assessment
+    # Prepend `## 评价` section with: (b) ungrounded numbers vs ARA value set + (c) judge note
+    assessment_text = build_assessment(report, stage_ai / "ara", judge=faithfulness_judge)
+    report = _prepend_assessment(report, assessment_text)
+    # NOTE: NO hard gate raised; assessment is diagnostic prose, never blocks
     
     # Convert to self-contained HTML (MathJax + mermaid 11)
     html = _to_html_self_contained(report, figures=curated_figs)
@@ -426,8 +419,8 @@ def write_branch1_llm(
 **关键特性**：
 - **LLM-generated**: 来自 write_report seam（路由到 config/llm.yaml 中的提供商）
 - **Vivid prose**: 不是数据 → markdown 的机械映射，而是活泼的叙述
-- **Core block**: механически 从 ARA 派生（claim statement + three-layer anchors）
-- **Grounded assembly**: 忠实门 (ADR-0012) 机械校验正文每个数字的值都出现在 MD（(b)），核心结论块仍带 `<!--ref-->` 锚点
+- **Core block**: 平铺 markdown（plain prose, no anchors）
+- **Assessment (ADR-0012)**: 前置 `## 评价` section，含 (b) 数字落源检查 + (c) 诊断判官意见；fail-soft，永不阻塞
 - **Emoji stripping**: 确定性去除所有表情符号（项目铁律）
 - **Figure curation**: 架构图强制，选中几个高优结果图
 - **Self-contained HTML**: 所有图 base64 inlined，MathJax 嵌入，独立可浏览
@@ -446,7 +439,7 @@ def write_branch1(
     md_path: Path,
     analysis: dict,
     key: str,
-    faithfulness_judge: Callable | None = None,  # branch1 忠实门 (c), ADR-0012
+    faithfulness_judge: Callable | None = None,  # branch1 评价 (c), ADR-0012, fail-soft
 ) → None:
     """生成 branch1（确定性简版，从 analysis 直接派生）。
     
@@ -462,11 +455,13 @@ def write_branch1(
         ...
     }
     
-    # Same branch1 忠实门 (ADR-0012): (b) prose-number grounding + (c) judge
+    # Format base report
     report = _format_report(sections, analysis)
-    hard = check_report_faithfulness(report, md_text, ara_dir, judge=faithfulness_judge)
-    if hard:
-        raise AnchorGateError(...)
+    
+    # branch1 评价 (ADR-0012, fail-soft): (b) number grounding vs ARA value set + (c) judge note
+    assessment_text = build_assessment(report, stage_ai / "ara", judge=faithfulness_judge)
+    report = _prepend_assessment(report, assessment_text)
+    # NOTE: NO hard gate raised; assessment is diagnostic prose, never blocks
     
     # Write
     (stage_person / "report.md").write_text(report)
@@ -476,7 +471,7 @@ def write_branch1(
 - write_branch1: 确定性，可审计，可重现
 - write_branch1_llm: 生动，自然语言，可能有创意但不可重现
 
-两者都通过相同的 忠实门（ADR-0012：保留的锚点形态 lint + (b) 数字落源 + (c) 判官），确保精度。
+两者都通过相同的 评价组件（ADR-0012：(b) 数字落源检查 + (c) 诊断判官），生成非阻塞进展笔记。
 
 ---
 

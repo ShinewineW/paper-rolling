@@ -1,8 +1,8 @@
 # LLM Pipeline & Provider Layer 代码地图
 
 > **范围**: `scripts/llm/` + `config/llm.yaml` + `config/audit.yaml`
-> **最后更新**: 2026-06-09
-> **关键特性**: Vendor-neutral 提供商路由、**无兜底**(provider 失败 → `EngineAbort` loudly,绝不静默回落主订阅)、Per-seam 独立调用、每 seam 必须显式路由
+> **最后更新**: 2026-06-13
+> **关键特性**: Vendor-neutral 提供商路由、**无兜底**(provider 失败 → `EngineAbort` loudly,绝不静默回落主订阅)、Per-seam 独立调用、每 seam 必须显式路由、faithfulness_judge 改为 fail-soft 诊断 (ADR-0012)
 
 <!-- Generated: 2026-06-08 | Files scanned: 9 | Token estimate: ~3500 -->
 
@@ -41,9 +41,9 @@ Execution Flow:
             │   Provider: routed (default opencode)
             │   Role: 人链 LLM（生成 vivid 中文 + 图形注释）
             │
-            └─ faithfulness_judge(report_text, ara_dir) → {faithful, findings}
+            └─ faithfulness_judge(report_text, ara_dir) → str
                 Provider: routed (default opencode); tier=fast (≠ writer)
-                Role: branch1 忠实门 (c) — report↔ARA 语义判官，fail-closed（ADR-0012）
+                Role: branch1 评价 (c) — report↔ARA 诊断判官，fail-soft（ADR-0012；返回诊断文本或 None）
 
   Each seam = independent provider call
            ↓
@@ -161,7 +161,7 @@ seams:
   entailment: opencode
   expand: opencode
   writer: opencode
-  faithfulness: opencode   # branch1 忠实门 (c) judge — ADR-0012 (every seam MUST be routed)
+  faithfulness: opencode   # branch1 评价 (c) 诊断 — ADR-0012 (every seam MUST be routed; fail-soft, returns str)
 ```
 
 **特性**：
@@ -184,7 +184,7 @@ def build_seams() → dict[str, Callable]
     #   "entailment_judge": seam_fn,
     #   "expand_llm": seam_fn,
     #   "write_report": seam_fn,
-    #   "faithfulness_judge": seam_fn,   # branch1 忠实门 (c), ADR-0012
+    #   "faithfulness_judge": seam_fn,   # branch1 评价 (c), ADR-0012, fail-soft (returns str)
     # }
 
 def _provider_for(seam: str) → StrictProvider
@@ -209,7 +209,7 @@ def _ask_json(prompt, *, seam, tier="strong", retries=2, ...) → dict | list
 | `entailment_judge` | (claim, experiment) | (bool, reason) | inline | 低 |
 | `expand_llm` | (topic) | [query, ...] | inline | 低 |
 | `write_report` | (ara_bundle, figures) | rich HTML str | inline | 中 |
-| `faithfulness_judge` | (report_text, ara_dir) | {faithful, findings} | inline | 低 |
+| `faithfulness_judge` | (report_text, ara_dir) | str \| None | inline | 低 |
 
 **Global state**:
 

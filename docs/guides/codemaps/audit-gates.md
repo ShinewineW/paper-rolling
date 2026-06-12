@@ -1,8 +1,8 @@
 # Adversarial Audit Gates (G2 + G3) 代码地图
 
 > **范围**: `scripts/audit/` — types, g2_data_fidelity, g3_seal, entailment, rigor_rubric, gate_runner
-> **最后更新**: 2026-06-12
-> **关键特性**: G2 两层数字门（Layer-1 代码核对存在性 → Layer-2 multi-vote skeptic 判语义变换）硬门、6-维严谨性评分 (G3)、失败保留现场不删 ARA (ADR-0011)
+> **最后更新**: 2026-06-13
+> **关键特性**: G2 两层数字门（Layer-1 代码核对存在性 → Layer-2 multi-vote skeptic 判语义变换）硬门、G3 3 部分检查（G3R0 + anchor-resolution + equation + entailment + rigor）、失败保留现场不删 ARA (ADR-0011)
 
 <!-- Generated: 2026-06-08 | Files scanned: 10 | Token estimate: ~3500 -->
 
@@ -237,27 +237,27 @@ def g3_gate(
     entailment_judge: Callable,
     rigor_scores: Callable,
 ) → GateVerdict:
-    """G3: Seal gate — three-layer anchor consistency + equation fidelity +
-    entailment + 6-dim rigor rubric.
+    """G3: Seal gate — presence check (G3R0) + equation fidelity + entailment + 6-dim rigor rubric.
     
     Runs AFTER both branches are built (before promotion).
-    Hard blocks on anchor consistency violations.
+    Hard blocks on structural violations.
+    NOTE (ADR-0012): anchor resolution on branch1 PROSE is RETIRED. Only the engine's
+    own ARA 核心结论 block (if it carries anchors) gets resolved; branch1 is plain prose.
     """
     
     findings = []
     
-    # 1. Anchor RESOLUTION (ADR-0012): 最终门 only resolves the anchors PRESENT
-    #    (the engine 核心结论 block) to real MD spans; the dropped check 2 no longer
-    #    demands a <!--ref--> on every empirical prose line (prose faithfulness is
-    #    branch1_gate's job now, via check_branch1_md_anchors).
-    branch1_text = (stage_person / "report.html").read_text()  # or .md
-    anchor_verdict = check_branch1_md_anchors(branch1_text, md_path)
-    if not anchor_verdict.is_pass:
-        findings.extend(anchor_verdict.findings)
+    # 1. G3R0: branch1 presence check (hard requirement)
+    branch1_path = stage_person / "report.html"  # or .md
+    if not branch1_path.exists():
         return GateVerdict(
             is_pass=False,
             is_hard_block=True,
-            findings=findings,
+            findings=[Finding(
+                severity=Severity.CRITICAL,
+                finding_type="branch1_missing",
+                description="branch1 report.html not found",
+            )],
             severity_max=Severity.CRITICAL,
         )
     
@@ -309,18 +309,17 @@ def g3_gate(
 
 ---
 
-### `scripts/audit/anchor_resolution.py` — Three-layer anchor lint
+### `scripts/audit/anchor_resolution.py` — Three-layer anchor lint (RETIRED per branch1, survives for engine core block)
 
-> **ADR-0012 update (2026-06-12, implemented):** the "every empirical PROSE line must
-> carry a `<!--ref-->`" requirement was REMOVED from both `anchor_lint.lint_text`
-> (check 4) and `check_branch1_md_anchors` (check 2). The 理解阅读 may now carry
-> numbers in natural prose; prose faithfulness moved to the branch1 **忠实门**
-> (`scripts/output/branch1_gate.py::check_report_faithfulness` — (b) mechanical
-> number-grounding vs source MD + (c) a config-routed LLM judge vs the ARA). What
-> SURVIVES here: anchor RESOLUTION (check 1) — every `<!--ref-->` in the
-> engine-mechanical 核心结论 block must still resolve to a real source-MD span. The
-> pseudocode below describes the PRE-ADR-0012 prose-anchor behavior and is retained
-> only for historical context (resync pending via `/ecc-update-docs`).
+> **ADR-0012 (2026-06-13, landed):** the hard-gated `check_report_faithfulness` seam was DELETED.
+> The per-prose-line anchor requirement on branch1 is GONE. The 理解阅读 branch1 is now
+> plain prose (no <!--ref--> anchors required). Prose faithfulness moved to the optional
+> non-blocking **评价** assessment in `branch1_gate.py::build_assessment()` — (b) mechanical
+> number-grounding vs ara_value_set + (c) a config-routed LLM judge (advisory note, never blocks).
+>
+> What SURVIVES here: anchor RESOLUTION in the ARA's own engine 核心结论 block (the internal
+> machine-generated block, not the branch1 prose). The pseudocode below illustrates the concept,
+> retained only for reference on how the engine's own anchors are resolved by G3.
 
 **三层锚定架构**：
 
@@ -342,14 +341,12 @@ Layer 3: Evidence table (from ARA)
 
 ```python
 def lint_text(text: str, md_path: Path) -> LintResult:
-    """Three-layer anchor check on branch1 text against source MD.
+    """Three-layer anchor check on engine 核心结论 block (if present) against source MD.
 
-    NOTE (ADR-0012): this illustrates the PRE-忠实门 model where every empirical
-    PROSE number had to be anchored. That per-prose-line requirement was DROPPED —
-    the real `check_branch1_md_anchors` now only RESOLVES the anchors present (the
-    engine 核心结论 block) to MD spans; prose-number faithfulness moved to
-    `branch1_gate.check_report_faithfulness` ((b) grounding + (c) judge). The
-    per-number trace below is retained only as historical illustration.
+    NOTE (ADR-0012): branch1 prose is plain text (no anchors required). The anchors
+    that G3 resolves are only those in the engine's own ARA 核心结论 block (the
+    machine-generated internal summary). This function resolves those anchors to
+    real MD spans. The per-number trace below illustrates the anchor-resolution concept.
     """
     
     md = md_path.read_text()
@@ -612,9 +609,10 @@ data_fidelity:
 1. **Ground-truth isolation** — G2 skeptic + G3 rigor 分别调用独立 seam，与生成器不相关
 2. **Multi-vote majority** — G2 默认 1 次（可调 3 次）；多数决定是否验证
 3. **Hard-block on fabrication** — 多数 skeptic 票说"未找到"→ 隔离，不重新执行
-4. **Anchor resolution (ADR-0012)** — G3 resolves the anchors PRESENT (the engine 核心结论 block) to real MD spans; the dropped per-prose-line requirement is now branch1_gate's 忠实门 ((b) grounding + (c) judge)
-5. **Bounded escalation** — G2/G3 失败最多重新执行 N 轮，然后隔离（无无限循环）
-6. **Deterministic equation check** — 等式计数是机械的（regex），无 LLM 参与
+4. **G3 structure (ADR-0012)** — G3R0 (branch1 presence) + equation + entailment + rigor；不再对分支1 prose 进行逐行锚点检查（branch1 is plain prose; 评价 assessment is fail-soft diagnostic note）
+5. **Branch1 never blocks** — 分支1 评价是进展笔记，不是 hard gate；ARA-side gates (结构门/Seal-1, G2, G3 entailment+rigor+equation) 保持硬门
+6. **Bounded escalation** — G2/G3 失败最多重新执行 N 轮，然后隔离（无无限循环）
+7. **Deterministic equation check** — 等式计数是机械的（regex），无 LLM 参与
 
 ---
 

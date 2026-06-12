@@ -136,8 +136,22 @@ def test_assessment_fails_soft_when_judge_raises(tmp_path) -> None:
     assert note.startswith("## 评价") and "99.9" in note
 
 
+def test_assessment_never_raises_on_unreadable_ara(tmp_path, monkeypatch) -> None:
+    # ADR-0012 rev: build_assessment NEVER raises — even a corrupt/unreadable ARA
+    # (the (b) reader throwing) must degrade to a valid 评价, not fail the report.
+    import scripts.output.branch1_gate as bg
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("corrupt ARA")
+
+    monkeypatch.setattr(bg, "ungrounded_report_numbers", _boom)
+    note = build_assessment("本文达到 28.4 NDS。", tmp_path / "ara", judge=None)
+    assert note.startswith("## 评价")
+
+
 def test_assessment_includes_ara_audit_flags_when_present(tmp_path) -> None:
     ara = _mk_ara(tmp_path, "28.4")
-    (ara / "AUDIT_FLAGS.md").write_text("flagged: 77.7 unconfirmed", encoding="utf-8")
+    (ara / "AUDIT_FLAGS.md").write_text("- **[major] G2X** — unconfirmed 77.7", encoding="utf-8")
     note = build_assessment("本文达到 28.4 NDS。", ara, judge=_note_judge)
-    assert "AUDIT_FLAGS.md" in note
+    # The actual flag BODY must be carried inline, not just a pointer to the file.
+    assert "G2X" in note and "77.7" in note

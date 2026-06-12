@@ -185,7 +185,7 @@ def write_branch1(
         _body(analysis),
         "",
         "## 模型结构图",
-        "原图见论文 Figure(忠实锚点,ground truth)。下为统一风格简化重绘(简化示意,以原图为准):",
+        "原图见论文 Figure(以原图为准,ground truth)。下为统一风格简化重绘(简化示意,以原图为准):",
         "",
         _mermaid_redraw(analysis["architecture"]),
         "",

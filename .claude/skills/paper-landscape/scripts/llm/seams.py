@@ -416,27 +416,29 @@ def faithfulness_judge(
     a model ≠ the writer's). Fail-soft: any seam error returns a neutral note,
     never raises.
     """
-    bundle = load_ara_bundle(ara_dir)  # reuse g3_seal's reader (claims + evidence)
-    ara_text = "\n\n".join(f"=== {name} ===\n{text}" for name, text in bundle.items())
-    if len(ara_text) > _MD_CHAR_CAP:
-        ara_text = ara_text[:_MD_CHAR_CAP] + "\n[...TRUNCATED...]"
-    nums = "、".join(ungrounded or []) or "(无)"
-    _log("faithfulness: writing 评价 (report ↔ ARA)")
-    prompt = (
-        "你在为一篇中文科普报告写一段简短「忠实性评价」(给读者看)。已验证知识包(ARA)是真值。"
-        "只点出会让读者实质误导的地方:把某系统的指标安到别的系统、夸大到 ARA 不支持、"
-        "或与 ARA 矛盾。不要挑措辞/取整/定性表达。机器已另行核出「报告里不在 ARA 的数字」:"
-        f"{nums}——你不必复述这串,只在它们确实造成误导时点评。\n"
-        "用 2-4 句中文,客观、给读者拿捏。若整体忠实,就说整体与知识包一致。\n\n"
-        "=== 已验证 ARA ===\n" + ara_text + "\n=== END ARA ===\n\n"
-        "=== 报告 ===\n" + report_text + "\n=== END 报告 ==="
-    )
+    # Fail-soft contract: EVERY step (ARA read included) is inside the guard so a
+    # corrupt ARA / dead seam / empty reply degrades to a neutral note — never raises.
     try:
+        bundle = load_ara_bundle(ara_dir)  # reuse g3_seal's reader (claims + evidence)
+        ara_text = "\n\n".join(f"=== {name} ===\n{text}" for name, text in bundle.items())
+        if len(ara_text) > _MD_CHAR_CAP:
+            ara_text = ara_text[:_MD_CHAR_CAP] + "\n[...TRUNCATED...]"
+        nums = "、".join(ungrounded or []) or "(无)"
+        _log("faithfulness: writing 评价 (report ↔ ARA)")
+        prompt = (
+            "你在为一篇中文科普报告写一段简短「忠实性评价」(给读者看)。已验证知识包(ARA)是真值。"
+            "只点出会让读者实质误导的地方:把某系统的指标安到别的系统、夸大到 ARA 不支持、"
+            "或与 ARA 矛盾。不要挑措辞/取整/定性表达。机器已另行核出「报告里不在 ARA 的数字」:"
+            f"{nums}——你不必复述这串,只在它们确实造成误导时点评。\n"
+            "用 2-4 句中文,客观、给读者拿捏。若整体忠实,就说整体与知识包一致。\n\n"
+            "=== 已验证 ARA ===\n" + ara_text + "\n=== END ARA ===\n\n"
+            "=== 报告 ===\n" + report_text + "\n=== END 报告 ==="
+        )
         note = _ask_text(prompt, seam="faithfulness", tier="fast", timeout=600.0, effort="medium")
-    except Exception as exc:  # noqa: BLE001 — 永不拦:任何 seam 故障都降级为中性句
-        _log(f"faithfulness: seam error, neutral note: {exc}")
+    except Exception as exc:  # noqa: BLE001 — 永不拦:任何故障(含 ARA 读取)都降级为中性句
+        _log(f"faithfulness: error, neutral note: {exc}")
         return "(判官暂不可用,本节仅含机器核对结果。)"
-    return note.strip() or "整体与已验证知识包一致。"
+    return (note or "").strip() or "整体与已验证知识包一致。"
 
 
 def build_seams() -> dict:

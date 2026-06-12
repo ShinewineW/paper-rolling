@@ -104,12 +104,17 @@ def build_assessment(report_text: str, ara_dir: Path, *, judge=None) -> str:
     """branch1 opening 「评价」 (ADR-0012 rev) — NEVER raises, NEVER blocks.
     Deterministic facts ((b) report numbers not in the ARA + 数字门 AUDIT_FLAGS) plus
     the judge's semantic note, assembled into a `## 评价` block prepended to the report.
-    `judge` is the (c) prose seam (None => facts-only)."""
-    ungrounded = ungrounded_report_numbers(report_text, ara_dir)
+    `judge` is the (c) prose seam (None => facts-only). Every ARA-touching step is
+    guarded: a corrupt/unreadable ARA degrades the note, it can never fail the report."""
+    try:
+        ungrounded = ungrounded_report_numbers(report_text, ara_dir)
+    except Exception:  # noqa: BLE001 — 评价 never blocks; an unreadable ARA drops the fact list
+        ungrounded = []
     note = ""
     if judge is not None:
         try:
-            note = str(judge(report_text, ara_dir, ungrounded=ungrounded)).strip()
+            out = judge(report_text, ara_dir, ungrounded=ungrounded)
+            note = str(out).strip() if out else ""
         except Exception:  # noqa: BLE001 — 评价 never blocks; a judge failure just drops the note
             note = ""
     lines = ["## 评价", ""]
@@ -123,8 +128,15 @@ def build_assessment(report_text: str, ara_dir: Path, *, judge=None) -> str:
         )
     else:
         lines.append("> 机器核对:正文数字均可在已验证知识包(ARA)中对应。")
-    if _read_audit_flags(ara_dir):
-        lines += ["", "> 知识包自身另有数字门标记的存疑项(详见 ai_package 的 AUDIT_FLAGS.md)。"]
+    try:
+        flags = _read_audit_flags(ara_dir)
+    except Exception:  # noqa: BLE001 — 评价 never blocks
+        flags = ""
+    if flags:
+        # Carry the 数字门's own flag body inline (quoted) so the reader sees the
+        # flagged items here, not just a pointer to a sibling file.
+        quoted = "\n".join("> " + ln for ln in flags.splitlines())
+        lines += ["", "> 知识包自身的数字门存疑项(摘自 AUDIT_FLAGS.md):", ">", quoted]
     return "\n".join(lines) + "\n"
 
 

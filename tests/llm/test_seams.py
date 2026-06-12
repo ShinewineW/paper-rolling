@@ -43,3 +43,24 @@ def test_faithfulness_judge_empty_response_falls_back(monkeypatch, tmp_path) -> 
     monkeypatch.setattr(S, "load_ara_bundle", lambda _d: {"claims.md": "x"})
     monkeypatch.setattr(S, "_ask_text", lambda *_a, **_k: "   ")
     assert S.faithfulness_judge("r", tmp_path).strip()
+
+
+def test_faithfulness_judge_none_response_falls_back(monkeypatch, tmp_path) -> None:
+    # A None seam reply must NOT raise (no .strip() on None) — neutral note instead.
+    from scripts.llm import seams as S
+
+    monkeypatch.setattr(S, "load_ara_bundle", lambda _d: {"claims.md": "x"})
+    monkeypatch.setattr(S, "_ask_text", lambda *_a, **_k: None)
+    assert S.faithfulness_judge("r", tmp_path).strip()
+
+
+def test_faithfulness_judge_fails_soft_when_ara_unreadable(monkeypatch, tmp_path) -> None:
+    # The ARA read is INSIDE the fail-soft guard: a corrupt ARA degrades to a neutral
+    # note, it does not raise (the judge never blocks the report).
+    from scripts.llm import seams as S
+
+    def _boom(_d):
+        raise RuntimeError("corrupt ARA")
+
+    monkeypatch.setattr(S, "load_ara_bundle", _boom)
+    assert S.faithfulness_judge("r", tmp_path).strip()
