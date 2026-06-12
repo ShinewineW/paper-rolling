@@ -12,6 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from scripts.audit.ara_tree import extract_numbers, number_present, source_value_set
+from scripts.audit.g3_seal import load_ara_bundle
 from scripts.audit.types import Finding, Severity
 from scripts.output.anchor_lint import lint_text
 
@@ -78,10 +79,20 @@ def prose_numbers(report_text: str) -> list[str]:
     return nums
 
 
-def unconfirmed_report_numbers(report_text: str, source_md: str) -> list[str]:
-    """Prose numbers whose VALUE is NOT present in `source_md`. Order-preserving."""
-    source_values = source_value_set(source_md)
-    return [n for n in prose_numbers(report_text) if not number_present(n, source_values)]
+def ara_value_set(ara_dir: Path) -> set[float]:
+    """The distinct numeric VALUES present in the verified ARA bundle (claims +
+    evidence tables + logic). The branch1 「評価」 grounds report prose numbers
+    against THIS — the ARA is the writer's only source and the verified SoT, so a
+    report number absent here is what we surface (ADR-0012 rev)."""
+    bundle = load_ara_bundle(ara_dir)
+    return source_value_set("\n".join(bundle.values()))
+
+
+def ungrounded_report_numbers(report_text: str, ara_dir: Path) -> list[str]:
+    """Report prose numbers whose VALUE is NOT present in the verified ARA.
+    Order-preserving, deterministic — produces FACTS for the 「評価」, never blocks."""
+    vals = ara_value_set(ara_dir)
+    return [n for n in prose_numbers(report_text) if not number_present(n, vals)]
 
 
 def check_report_faithfulness(
@@ -115,7 +126,9 @@ def check_report_faithfulness(
 
     # (b) tolerant mechanical grounding of prose numbers. Numerator AND denominator
     # share prose_numbers() — same stripped/skipped scope.
-    bad = unconfirmed_report_numbers(report_text, source_md)
+    bad = [
+        n for n in prose_numbers(report_text) if not number_present(n, source_value_set(source_md))
+    ]
     total = len(prose_numbers(report_text)) or 1
     # STRICT (tolerant=False, the gate primitive's default) hard-blocks ANY
     # unconfirmed number. TOLERANT (the producers' default — the 理解阅读 is a LOOSE
