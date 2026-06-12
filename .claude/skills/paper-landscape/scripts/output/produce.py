@@ -211,6 +211,7 @@ def stage_branch1(
                 md_path,
                 analysis,
                 key=key,
+                faithfulness_judge=faithfulness_judge,
                 report_tolerant=report_tolerant,
                 report_max_unconfirmed=report_max_unconfirmed,
                 report_max_unconfirmed_ratio=report_max_unconfirmed_ratio,

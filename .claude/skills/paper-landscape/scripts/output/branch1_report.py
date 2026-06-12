@@ -10,11 +10,13 @@ Composition (v1 structure + this layer's three highlights):
   4. loss: 4-section explainer 修复方向/机制/对比基线/证据 (双输出-D3);证据
      points into ai_package evidence, never copies exact numbers.
 
-Three-layer citation (吸收-D1): every empirical PERFORMANCE sentence carries
-`<!--ref:slug--><!--anchor:quote|page:value-->` anchored into `{ID}.md`. The
-producer self-checks with the anchor lint and RAISES on any violation (HARD
-gate) — it will not ship an unanchored report. Illustrative numbers in the
-math/loss sections (no performance cue) do not require anchors.
+忠实门 (ADR-0012): the producer self-checks the composed report with
+`branch1_gate.check_report_faithfulness` and RAISES `AnchorGateError` on a hard
+block. Prose MAY carry numbers in natural language — the old per-prose-line
+`<!--ref-->` requirement was DROPPED; instead each prose number must be
+mechanically grounded in `{ID}.md` ((b) layer), and on the LLM path the report
+must not materially mislead vs the verified ARA ((c) judge). The engine 核心结论
+block still carries `<!--ref-->` anchors and 最终门 still resolves them.
 """
 
 from __future__ import annotations
@@ -37,7 +39,9 @@ _CLASSDEF = (
 
 
 class AnchorGateError(RuntimeError):
-    """Raised when the report contains an unanchored empirical assertion."""
+    """Raised when the branch1 忠实门 (ADR-0012) hard-blocks: an ungrounded prose
+    number, a malformed engine 核心结论 anchor, or — on the LLM path — a report that
+    materially misleads vs the verified ARA. Identifier kept per ADR-0008."""
 
 
 def _anchor(snippet: str) -> str:
@@ -193,6 +197,7 @@ def write_branch1(
     *,
     key: str | None = None,
     _force_unanchored: bool = False,
+    faithfulness_judge: Any = None,
     report_tolerant: bool = True,
     report_max_unconfirmed: int = 5,
     report_max_unconfirmed_ratio: float = 0.2,
@@ -209,6 +214,9 @@ def write_branch1(
             (produce_outputs passes the real key; when omitted, falls back to
             the person_dir name).
         _force_unanchored: Test hook to inject an unanchored performance claim.
+        faithfulness_judge: Optional (c) 忠实门 LLM judge (report ↔ ARA). When the
+            caller supplies one it is honored here too, so the deterministic path
+            never silently drops a configured judge (ADR-0012 — no silent no-op).
         report_tolerant: If True, apply count/ratio tolerance to prose-number
             grounding (ADR-0012 tolerant mode).
         report_max_unconfirmed: Absolute ceiling for tolerated unconfirmed numbers.
@@ -251,7 +259,7 @@ def write_branch1(
         report,
         md_text,
         ara_dir,
-        judge=None,
+        judge=faithfulness_judge,
         tolerant=report_tolerant,
         max_unconfirmed=report_max_unconfirmed,
         max_unconfirmed_ratio=report_max_unconfirmed_ratio,

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
 from scripts.output.anchor_lint import lint_text
-from scripts.output.branch1_report import write_branch1
+from scripts.output.branch1_report import AnchorGateError, write_branch1
 from scripts.output.branch2_ara import write_branch2
 
 
@@ -73,6 +74,24 @@ def test_unanchored_prose_number_no_longer_raises_gate_error(
     # Should succeed without raising.
     write_branch1(person, candidate, ara, md_path, analysis, _force_unanchored=True)
     assert (person / "report.md").exists()
+
+
+def test_deterministic_path_honors_a_supplied_judge(tmp_path, candidate, analysis, md_path):
+    # Codex R1 finding 1 regression: write_branch1 (the deterministic fallback) must
+    # NOT silently drop a supplied (c) faithfulness judge — when one is passed and it
+    # reports drift, the 忠实门 must hard-block (ADR-0012; no silent no-op).
+    calls = {"n": 0}
+
+    def _drift_judge(report_text, ara_dir):
+        calls["n"] += 1
+        return {"faithful": False, "findings": [{"claim": "x", "issue": "misattributed"}]}
+
+    ara = tmp_path / "ara"
+    write_branch2(ara, candidate, analysis)
+    person = tmp_path / "person"
+    with pytest.raises(AnchorGateError):
+        write_branch1(person, candidate, ara, md_path, analysis, faithfulness_judge=_drift_judge)
+    assert calls["n"] == 1  # the judge was actually invoked on the deterministic path
 
 
 def test_branch1_prose_is_domain_agnostic_no_hardcoded_diffusion(
