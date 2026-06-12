@@ -304,7 +304,7 @@ Expected: FAIL — lint currently returns one `unanchored empirical assertion` v
 
 - [ ] **Step 3: Remove check 4 from `lint_text`** — at `anchor_lint.py`:
 
-OLD (lines 197-206):
+OLD (lines 197-208 — the check-4 block through the function's final `return`):
 ```python
     # 4. paper-rolling addition — unanchored empirical PERFORMANCE assertions
     #    hard-block, via the SHARED line-based scan (skips fences / ref-lines /
@@ -414,7 +414,7 @@ def faithfulness_judge(report_text: str, ara_dir: Path) -> dict:
     Returns {"faithful": bool, "findings": [{"claim": str, "issue": str}, ...]}.
     Fails CLOSED: a malformed/empty judge response => faithful=False.
     """
-    bundle = _load_ara_bundle(ara_dir)  # reuse g3_seal's reader (claims + evidence)
+    bundle = load_ara_bundle(ara_dir)  # reuse g3_seal's reader (claims + evidence)
     ara_text = "\n\n".join(f"=== {name} ===\n{text}" for name, text in bundle.items())
     if len(ara_text) > _MD_CHAR_CAP:
         ara_text = ara_text[:_MD_CHAR_CAP] + "\n[...TRUNCATED...]"
@@ -443,7 +443,7 @@ def faithfulness_judge(report_text: str, ara_dir: Path) -> dict:
     return {"faithful": bool(obj["faithful"]), "findings": findings}
 ```
 
-> Read `seams.py` first to confirm: the exact import name of the ARA bundle reader (`_load_ara_bundle` is defined in `scripts/audit/g3_seal.py` — import it at the top of `seams.py`: `from scripts.audit.g3_seal import _load_ara_bundle`), and that `_ask_json` / `_provider_for` / `_log` / `_MD_CHAR_CAP` are module-level in `seams.py` (they are — used by `skeptic_votes`/`rigor_scores`).
+> **Promote the ARA bundle reader first (avoids a ruff `PLC2701` private-import error).** The reader is `_load_ara_bundle` in `scripts/audit/g3_seal.py:55`. As a preceding sub-step, rename it to a public `load_ara_bundle` (update its 1-2 internal callers inside `g3_seal.py` — `grep -n _load_ara_bundle scripts/audit/g3_seal.py`), then import the public name at the top of `seams.py`: `from scripts.audit.g3_seal import load_ara_bundle`. Confirm `_ask_json` / `_provider_for` / `_log` / `_MD_CHAR_CAP` are module-level in `seams.py` (they are — used by `skeptic_votes`/`rigor_scores`).
 
 OLD (`build_seams` return, lines 400-407):
 ```python
@@ -651,8 +651,9 @@ At the signature (line ~212), add a keyword param `faithfulness_judge=None` (aft
             + "; ".join(f.observation for f in hard[:5])
         )
 ```
-Update `branch1_llm.py:27` import — drop the now-unused `_is_empirical_assertion`, drop `lint_text`, add the gate:
+Update `branch1_llm.py:27` import — **`_is_empirical_assertion` is STILL used by `_ground_line` (line 119), so KEEP it**; only drop `lint_text`. Result:
 ```python
+from scripts.output.anchor_lint import _is_empirical_assertion
 from scripts.output.branch1_gate import check_report_faithfulness
 ```
 
