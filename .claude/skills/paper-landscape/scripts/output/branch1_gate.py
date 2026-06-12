@@ -36,6 +36,11 @@ _LOCATOR = re.compile(
 # not parsed as ungrounded data numbers (they are infrastructure references, not
 # scientific claims).
 _MD_LINK_TARGET = re.compile(r"\]\([^)]*\)")
+# Inline code spans `...` — the assembler/writer wraps vault-key paths, file
+# names, and code refs in backticks (e.g. `ai_package/2026-06-12_..._2503.19755/`);
+# those are infrastructure references, not prose data. Strip them like fenced code
+# and link targets (ADR-0012 demo, ORION: a backticked vault path leaked 2026/2503).
+_INLINE_CODE = re.compile(r"`[^`]*`")
 # Bibliographic IDENTIFIERS — an arXiv id (`2503.19755`, YYMM.NNNNN) or a DOI
 # (`10.1234/...`). These are paper-identity metadata, never scientific data, so a
 # report that names the paper's own arXiv id in prose must not be number-grounded
@@ -49,8 +54,9 @@ def prose_numbers(report_text: str) -> list[str]:
     """Distinct DATA numbers in report PROSE. Stripped/skipped before extraction:
     HTML-comment anchor payloads, fenced code blocks, markdown table rows (the
     paper's own figures, gated by 数字门 on the ARA), ordered-list indices,
-    markdown link targets (vault-key paths / hrefs), bibliographic identifiers
-    (arXiv id / DOI), and provenance locators (Table 1 / 图1 / §4). The SINGLE
+    inline `code` spans, markdown link targets (vault-key paths / hrefs),
+    bibliographic identifiers (arXiv id / DOI), and provenance locators
+    (Table 1 / 图1 / §4). The SINGLE
     scope used by both the grounding check and its ratio denominator, so they can
     never diverge."""
     nums: list[str] = []
@@ -62,6 +68,7 @@ def prose_numbers(report_text: str) -> list[str]:
         if in_fence or raw.lstrip().startswith("|"):
             continue
         line = _OL_PREFIX.sub("", _COMMENT.sub("", raw))  # drop anchors + list index
+        line = _INLINE_CODE.sub(" ", line)  # drop inline `code` (vault paths, file/code refs)
         line = _MD_LINK_TARGET.sub(" ", line)  # drop link targets (vault-key paths, hrefs)
         line = _IDENTIFIER.sub(" ", line)  # drop arXiv id / DOI (paper-identity metadata)
         line = _LOCATOR.sub(" ", line)  # drop Table 1 / 图1 / §4

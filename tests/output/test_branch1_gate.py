@@ -39,6 +39,14 @@ def test_arxiv_id_and_doi_in_prose_are_not_data_numbers() -> None:
     assert unconfirmed_report_numbers(report, md) == []
 
 
+def test_inline_code_vault_path_is_not_a_data_number() -> None:
+    # ADR-0012 demo (ORION): the report's intro backticks a vault-key path
+    # `ai_package/2026-06-12_..._2503.19755/ara/`; inline code is infra, not data.
+    md = "Our model reaches 28.4 NDS."
+    report = "事实源见 `ai_package/2026-06-12_ORION_2503.19755/ara/`,本文达到 28.4 NDS。"
+    assert unconfirmed_report_numbers(report, md) == []
+
+
 def test_real_metric_decimal_is_not_mistaken_for_an_arxiv_id() -> None:
     # The identifier shape is 4-int.4–5-decimal; a normal metric (28.4 / 0.61) is
     # unaffected, and a genuinely ungrounded metric still flags.
