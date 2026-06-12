@@ -88,8 +88,7 @@ systematic misses block); (c) a config-routed LLM judge comparing report ↔ ARA
 material misattribution / overclaim. The engine-anchored 核心结论 block keeps its
 `<!--ref-->` markers (resolved by 最终门). Name kept for continuity (ADR-0008) though
 now a mild misnomer — the gate's job is faithfulness. Code: three-layer anchor /
-`AnchorGateError`. (Per ADR-0012; implementation pending — current code still does the
-old `<!--ref-->`-per-line check.)
+`AnchorGateError`. (ADR-0012, implemented.)
 _Avoid_: treating it as a "`<!--ref-->` on every empirical prose line" check (the
 pre-ADR-0012 behavior)
 

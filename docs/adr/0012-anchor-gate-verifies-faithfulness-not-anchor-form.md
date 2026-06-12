@@ -1,6 +1,6 @@
 # 0012 — 锚点门 verifies report FAITHFULNESS, not anchor-form (amends ADR-0006)
 
-> **Status**: accepted — amends ADR-0006's "a number in prose instead of a table is a failure" premise. Decision recorded; implementation pending.
+> **Status**: accepted + IMPLEMENTED (`feat/branch1-faithfulness-gate`, 2026-06-12; cross-reviewed by Codex, 4 rounds). Amends ADR-0006's "a number in prose instead of a table is a failure" premise.
 
 The 锚点门 (inside branch1) was hard-blocking **content-perfect** papers: a 理解阅读
 whose ARA had already passed 结构门 + 数字门 (e.g. DiffusionForcing — ARA 70/70 numbers

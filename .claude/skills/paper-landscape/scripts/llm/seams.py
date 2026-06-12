@@ -3,7 +3,7 @@
 
 `run_campaign(...)` injects LLM-backed seams; this module builds the REAL ones on
 top of the provider layer: resolve_analysis / skeptic_votes / rigor_scores /
-entailment_judge / expand_llm / write_report. Each seam picks its transport via
+entailment_judge / expand_llm / write_report / faithfulness_judge. Each seam picks its transport via
 config/llm.yaml (LLMConfig.resolve -> StrictProvider), so it is provider-routed
 with NO fallback: a failing/misconfigured provider raises EngineAbort (loud) and
 aborts the tick, never silently degrading to the Claude Code subscription.

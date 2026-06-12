@@ -308,6 +308,17 @@ def g3_gate(
 
 ### `scripts/audit/anchor_resolution.py` — Three-layer anchor lint
 
+> **ADR-0012 update (2026-06-12, implemented):** the "every empirical PROSE line must
+> carry a `<!--ref-->`" requirement was REMOVED from both `anchor_lint.lint_text`
+> (check 4) and `check_branch1_md_anchors` (check 2). The 理解阅读 may now carry
+> numbers in natural prose; prose faithfulness moved to the branch1 **忠实门**
+> (`scripts/output/branch1_gate.py::check_report_faithfulness` — (b) mechanical
+> number-grounding vs source MD + (c) a config-routed LLM judge vs the ARA). What
+> SURVIVES here: anchor RESOLUTION (check 1) — every `<!--ref-->` in the
+> engine-mechanical 核心结论 block must still resolve to a real source-MD span. The
+> pseudocode below describes the PRE-ADR-0012 prose-anchor behavior and is retained
+> only for historical context (resync pending via `/ecc-update-docs`).
+
 **三层锚定架构**：
 
 ```
