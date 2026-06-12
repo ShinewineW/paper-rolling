@@ -66,7 +66,7 @@ write_branch1_llm(stage_person, candidate, stage_ai, md_path, write_report, key=
 
 ```yaml
 providers:
-  claude-code:                       # 默认 + 回退（必须存在）
+  claude-code:                       # 一个 grounded-capable 本地 agent provider（无默认/无回退）
     type: claude_code
     strong_model: claude-sonnet-4-6
     fast_model: claude-haiku-4-5-20251001
@@ -152,7 +152,7 @@ data_fidelity:
 ## 🔗 相关文档
 
 - **SKILL.md** — `/paper-landscape` 技能合约 + 硬门 + 每日 /loop 运行约定
-- **ADR-0004** — LLM seam = 同步注入 callable；默认传输锁死 `claude -p`
+- **ADR-0004** — LLM seam = 同步注入 callable；`claude -p` 传输（注:后续约定改为 `config/llm.yaml` 必需路由、无默认/无回退）
 - **`references/wiring-the-seams.md`** — 引擎组成合约（7 个 LLM seam，含 faithfulness）
 - **`references/human-report-writing.md`** — 人链写入器的语言风格 + anchor 规范
 - **`references/ara-schema.md`** — 分析束输出格式

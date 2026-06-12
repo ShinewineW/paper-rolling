@@ -115,7 +115,7 @@ class StrictProvider:
 - 所有 Provider 实现都是 `@dataclass(frozen=True)` — immutable, stateless
 - Timeout 默认 900 秒（15 分钟，大型论文分析）
 - Token 从 env 读取（`.env` 中定义，gitignored）；never hardcoded
-- Grounded mode 仅 claude-code 支持（API 后端没有文件访问）
+- Grounded mode 需 grounded-capable 本地 agent（claude_code 或 codex_cli,或两者的 round_robin 池）；API 后端没有文件访问,不支持 grounded
 
 ### `scripts/llm/config.py` — Configuration management
 
@@ -166,7 +166,7 @@ seams:
 
 **特性**：
 - `config/llm.yaml` 必需；缺文件 / 任一 seam 未路由 / provider 未定义 → `ValueError` 硬报错（无默认回落）
-- `grounded` 模式仍要求 claude_code provider（本地 Read/Grep 能力校验,与额度无关）
+- `grounded` 模式要求 grounded-capable 本地 agent（claude_code 或 codex_cli,或全 grounded 成员的 round_robin 池;本地 Read/Grep 能力校验,与额度无关）
 - Per-seam override via `_SEAM_OVERRIDE` dict（测试用）
 - Future: seam 值可能变成 provider 列表（多模型 A/B，暂未活跃）
 
