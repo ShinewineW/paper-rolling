@@ -71,9 +71,14 @@ real node). Code: `Seal-1` / `validate_ara_tree`.
 _Avoid_: Seal-1 (code-only name)
 
 **数字门 (number gate)**:
-Between branch2 and branch1. LLM skeptic (N votes) verifying every evidence
-number appears in the source MD — the anti-poisoning firewall. Code: `G2`.
-_Avoid_: G2 (code-only name), data-fidelity gate
+Between branch2 and branch1. Verifies every ARA evidence number is grounded in the
+source MD, in **two layers**: (1) mechanical — a number whose value is present in the
+source is **code-confirmed** (canonical float; 28.40 == 28.4) and never sent to the
+LLM; (2) LLM skeptic (N votes) judges only the numbers code could NOT confirm
+(trivial-transform derivability), majority-vote hard-block. The anti-poisoning
+firewall. Code: `G2`.
+_Avoid_: G2 (code-only name), data-fidelity gate, "LLM checks every number" (the
+pre-two-layer behavior)
 
 **锚点门 (anchor gate)**:
 Inside branch1. Verifies the 理解阅读 is **faithful** to its verified ARA (ADR-0012),
