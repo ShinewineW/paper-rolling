@@ -137,14 +137,18 @@ def test_revive_threads_repo_resolver_into_branch2(tmp_path):
     assert calls, "复活 branch2 重生未调用注入的 repo_resolver(R10 回归)"
 
 
-def test_revive_anchor_gate_scene_promotes(tmp_path):
+def test_revive_g3r0_branch1_scene_promotes(tmp_path):
     led = Ledger(tmp_path)
-    # 锚点门 → branch1 root: reuse the real branch2 ara + the seeded analysis.
+    # ADR-0012 rev: 锚点门 retired. The only branch1 G3 root left is G3R0 (missing
+    # report.md) under 最终门 → branch1 revival REUSES the real branch2 ara + seeded
+    # analysis (re-emits report.md), then promotes.
     scene, lk = _seed_scene(
         tmp_path,
         led,
-        failed_gate="锚点门",
-        findings=[{"target": "report.md", "observation": "unresolved anchor", "severity": "hard"}],
+        failed_gate="最终门",
+        findings=[
+            {"target": "report.md", "observation": "missing branch1 report.md", "severity": "hard"}
+        ],
         with_real_ara=True,
         analysis=_ANALYSIS,
     )

@@ -38,7 +38,6 @@ from scripts.engine_version import current_commit
 from scripts.failure_scene import FAILED_REL, write_scene
 from scripts.hub import SpokeFn, SpokeResult, _candidate_key
 from scripts.ingest.ingest import IngestFailed, IngestResult, ingest, quarantine
-from scripts.output.branch1_report import AnchorGateError
 from scripts.output.produce import (
     ProduceGateBlocked,
     ProduceResult,
@@ -184,9 +183,6 @@ def make_spoke(
                 g2_gate=_g2,
                 write_report=write_report,
                 faithfulness_judge=faithfulness_judge,
-                report_tolerant=g2_tolerant,
-                report_max_unconfirmed=g2_max_unconfirmed,
-                report_max_unconfirmed_ratio=g2_max_unconfirmed_ratio,
                 cancel=cancel,
                 repo_resolver=repo_resolver,
                 reuse_analysis=reuse,
@@ -285,16 +281,6 @@ def make_spoke(
                     reason="G2 data-fidelity hard-block: "
                     + "; ".join(f.observation for f in exc.verdict.hard_findings[:3]),
                 )
-            except AnchorGateError as exc:
-                # branch1's 锚点门 — now the 忠实门 (ADR-0012: kept anchor-form lint +
-                # (b) prose-number grounding + (c) judge) — hard-failed in staging
-                # BEFORE promotion (OT-5). Preserve as a scene, not a tick crash.
-                return _pre_promote_scene(
-                    failed_gate="锚点门",
-                    findings=[{"target": "report.md", "observation": str(exc)}],
-                    staged_dir=getattr(exc, "staged_dir", None),
-                    reason=f"branch1 锚点门 (忠实门) hard-block: {exc}",
-                )
             except EngineAbort as exc:
                 # ADR-0011: pre-promote transport abort with a built ARA → scene it,
                 # then re-raise (tick still aborts; cost guard unchanged).
@@ -362,6 +348,8 @@ def make_spoke(
             for f in verdict.hard_findings:
                 t = f.target
                 if t.endswith("report.md"):
+                    # ADR-0012 rev: the only report.md-rooted G3 hard error left is
+                    # G3R0 (missing report.md); branch1 re-emit re-creates it.
                     roots.add("branch1")
                 elif t.endswith("level2_report.json") or "claims.md" in t.split(":")[0]:
                     roots.add("branch2")
@@ -374,7 +362,7 @@ def make_spoke(
                 return [{"target": "ara", "observation": e} for e in exc.errors]
             if isinstance(exc, ProduceGateBlocked):
                 return [f.as_dict() for f in exc.verdict.hard_findings]
-            return [{"target": "report.md", "observation": str(exc)}]  # AnchorGateError
+            return [{"target": "report.md", "observation": str(exc)}]  # generic fallback
 
         def _reemit_for_g3(verdict) -> ProduceResult:
             roots = _classify(verdict)
@@ -382,8 +370,8 @@ def make_spoke(
             # audit R1 Finding 5: ANY ingest root (e.g. equation fidelity) is unfixable
             # by re-running a branch — bail to a scene rather than burn the whole budget
             # re-emitting a branch that can't move that finding. G3 aggregates equation
-            # (ingest) + anchor (branch1) + entailment/rigor (branch2) into one verdict,
-            # so a {ingest, branch1/branch2} mix is reachable.
+            # (ingest) + missing-report.md G3R0 (branch1) + entailment/rigor (branch2)
+            # into one verdict, so a {ingest, branch1/branch2} mix is reachable.
             if "ingest" in roots:
                 raise _Unfixable(verdict)
             if "branch2" in roots:
@@ -423,8 +411,10 @@ def make_spoke(
         except _Unfixable as exc:
             # An ingest-rooted G3 finding → don't spin the budget; land the 最终门 scene.
             return _g3_to_scene(exc.verdict)
-        except (StructuralSealFailed, ProduceGateBlocked, AnchorGateError) as exc:
+        except (StructuralSealFailed, ProduceGateBlocked) as exc:
             # A re-emitted branch hit its own downstream gate before re-promotion.
+            # (ADR-0012 rev: branch1 no longer raises AnchorGateError — it never hard-
+            # blocks; only branch2's 结构门/数字门 can fail a re-emit here.)
             # `produced` still points at the PRIOR round's promoted product (the
             # _on_g3_reemit assignment never completed). ADR-0011 scene-before-rm:
             # land the re-emit scene FIRST, THEN remove the prior promoted product
@@ -433,7 +423,6 @@ def make_spoke(
             gate = {
                 "StructuralSealFailed": "结构门",
                 "ProduceGateBlocked": "数字门",
-                "AnchorGateError": "锚点门",
             }[type(exc).__name__]
             write_scene(
                 workspace=workspace,

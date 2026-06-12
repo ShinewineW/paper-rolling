@@ -24,7 +24,6 @@ from scripts.audit_config import load_audit_config
 from scripts.engine_version import current_commit
 from scripts.failure_scene import FAILED_REL, write_scene
 from scripts.ingest.contract import corpus_readiness_problems
-from scripts.output.branch1_report import AnchorGateError
 from scripts.output.naming import vault_key
 from scripts.output.produce import (
     ProduceGateBlocked,
@@ -249,10 +248,12 @@ def _revive_one(
             key=scene_dir.name, ledger_key=ledger_key, status="manual", failed_gate=failed_gate
         )
 
-    # 失败门 → 复活根:锚点门/最终门(branch1根)→ branch1;数字门/结构门/最终门(branch2根)→ branch2。
+    # 失败门 → 复活根:最终门(branch1根=G3R0 缺 report.md)→ branch1;数字门/结构门/
+    # 最终门(branch2根)→ branch2。ADR-0012 rev:锚点门已退役、branch1 永不失败,故
+    # branch1 复活仅服务 G3R0(最终门下 report.md 缺失),与 spoke._classify 对称。
     src_ai = scene_dir / "ai"
     use_branch1 = (
-        (failed_gate == "锚点门" or (failed_gate == "最终门" and "branch1" in roots))
+        (failed_gate == "最终门" and "branch1" in roots)
         and ("branch2" not in roots)
         and src_ai.is_dir()
     )
@@ -306,9 +307,6 @@ def _revive_one(
                 key,
                 prior_failure=fb,
                 faithfulness_judge=seams.get("faithfulness_judge"),
-                report_tolerant=cfg.data_fidelity_tolerant,
-                report_max_unconfirmed=cfg.data_fidelity_max_unconfirmed,
-                report_max_unconfirmed_ratio=cfg.data_fidelity_max_unconfirmed_ratio,
             )
         else:
             # branch2 整条重跑:重调 analyzer(带反馈)+ G2 复核 + branch1(R10:透传 repo_resolver)。
@@ -341,9 +339,6 @@ def _revive_one(
                 key,
                 prior_failure=fb,
                 faithfulness_judge=seams.get("faithfulness_judge"),
-                report_tolerant=cfg.data_fidelity_tolerant,
-                report_max_unconfirmed=cfg.data_fidelity_max_unconfirmed,
-                report_max_unconfirmed_ratio=cfg.data_fidelity_max_unconfirmed_ratio,
             )
 
         # 复核一律对 staging 跑、promote 只在通过后(审计 R2 Finding 3:严禁先 promote 再复核)。
@@ -412,12 +407,8 @@ def _revive_one(
             [f.as_dict() for f in exc.verdict.hard_findings],
             getattr(exc, "staged_dir", staging),
         )
-    except AnchorGateError as exc:
-        return _append_failed(
-            "锚点门",
-            [{"target": "report.md", "observation": str(exc)}],
-            getattr(exc, "staged_dir", staging),
-        )
+    # ADR-0012 rev: branch1 no longer raises AnchorGateError (锚点门 retired) — only
+    # branch2's 结构门/数字门 can fail a re-run here; branch1 always publishes.
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 

@@ -25,7 +25,7 @@ from typing import Any
 
 from scripts.output.ara_schema import validate_ara_tree
 from scripts.output.branch1_llm import write_branch1_llm
-from scripts.output.branch1_report import AnchorGateError, write_branch1
+from scripts.output.branch1_report import write_branch1
 from scripts.output.branch2_ara import write_branch2
 from scripts.output.naming import find_existing_entries, vault_key
 from scripts.paths import EngineAbort, ara_is_nonempty
@@ -170,72 +170,40 @@ def stage_branch1(
     *,
     prior_failure: str | None = None,
     faithfulness_judge: Any = None,
-    report_tolerant: bool = True,
-    report_max_unconfirmed: int = 5,
-    report_max_unconfirmed_ratio: float = 0.2,
 ) -> None:
-    """Stage branch1 (human report) into ``staging/person``, self-gating on the
-    忠实门 (ADR-0012).
+    """Stage branch1 (human report) into ``staging/person``.
 
-    The deterministic ``write_branch1`` fallback (write_report=None) is preserved
-    (audit R4 Finding 2 — test_produce monkeypatches it). AnchorGateError carries
-    ``staging`` so callers that bypass produce_outputs (G3 branch1 re-emit, revival)
-    still get a self-contained scene (audit R4 Finding 1).
-
-    The (c) 忠实门 judge is MANDATORY whenever the rich LLM writer is wired
-    (``write_report`` set) — i.e. every production path, since config routes the
-    ``writer`` seam. Wiring the LLM writer but omitting ``faithfulness_judge`` is a
-    misconfiguration that would silently disable the semantic gate, so it aborts
-    loudly here (no silent (c) no-op — ADR-0012 + the project's fail-loud
-    convention). The no-LLM deterministic fallback (write_report=None) grounds by
-    construction and keeps (c) optional.
-
-    Raises:
-        AnchorGateError: the report failed the 忠実门.
-        ValueError: the LLM writer is wired but no faithfulness_judge was supplied.
+    ADR-0012 rev: branch1 has NO hard gate — it ALWAYS publishes. Faithfulness is
+    carried by the opening 「评价」 note (build_assessment), written inside
+    write_branch1/_llm. The (c) judge is OPTIONAL and fail-soft: a missing or failing
+    judge degrades the note, it NEVER blocks. The deterministic ``write_branch1``
+    fallback (write_report=None) is preserved (audit R4 Finding 2 — test_produce
+    monkeypatches it).
     """
-    if write_report is not None and faithfulness_judge is None:
-        raise ValueError(
-            "branch1 忠实门 (ADR-0012): write_report (LLM writer) is wired but "
-            "faithfulness_judge is None — the (c) semantic gate would be silently "
-            "skipped. Pass seams['faithfulness_judge'] (build_seams routes it via "
-            "config/llm.yaml) into run_campaign/revival, or run the no-LLM "
-            "deterministic path (write_report=None)."
-        )
     stage_person = staging / "person"
-    try:
-        if write_report is not None:
-            # audit R5 Finding 1: conditional kwarg keeps older write_report fakes working.
-            extra = {"prior_failure": prior_failure} if prior_failure is not None else {}
-            write_branch1_llm(
-                stage_person,
-                candidate,
-                stage_ai,
-                md_path,
-                write_report,
-                key=key,
-                faithfulness_judge=faithfulness_judge,
-                report_tolerant=report_tolerant,
-                report_max_unconfirmed=report_max_unconfirmed,
-                report_max_unconfirmed_ratio=report_max_unconfirmed_ratio,
-                **extra,
-            )
-        else:
-            write_branch1(
-                stage_person,
-                candidate,
-                stage_ai,
-                md_path,
-                analysis,
-                key=key,
-                faithfulness_judge=faithfulness_judge,
-                report_tolerant=report_tolerant,
-                report_max_unconfirmed=report_max_unconfirmed,
-                report_max_unconfirmed_ratio=report_max_unconfirmed_ratio,
-            )
-    except AnchorGateError as exc:
-        exc.staged_dir = staging
-        raise
+    if write_report is not None:
+        # audit R5 Finding 1: conditional kwarg keeps older write_report fakes working.
+        extra = {"prior_failure": prior_failure} if prior_failure is not None else {}
+        write_branch1_llm(
+            stage_person,
+            candidate,
+            stage_ai,
+            md_path,
+            write_report,
+            key=key,
+            faithfulness_judge=faithfulness_judge,
+            **extra,
+        )
+    else:
+        write_branch1(
+            stage_person,
+            candidate,
+            stage_ai,
+            md_path,
+            analysis,
+            key=key,
+            faithfulness_judge=faithfulness_judge,
+        )
 
 
 def promote(
@@ -296,9 +264,6 @@ def produce_outputs(
     prior_failure_analyzer: str | None = None,
     prior_failure_branch1: str | None = None,
     faithfulness_judge: Any = None,
-    report_tolerant: bool = True,
-    report_max_unconfirmed: int = 5,
-    report_max_unconfirmed_ratio: float = 0.2,
 ) -> ProduceResult:
     """Produce branch2 + branch1 atomically into the two top-level vaults.
 
@@ -328,7 +293,6 @@ def produce_outputs(
     Raises:
         ProduceGateBlocked: G2 hard-blocked the staged branch2 (nothing promoted).
         StructuralSealFailed: branch2 failed the Seal-1 structural validator.
-        AnchorGateError: branch1's 忠实门 (锚点门, ADR-0012) hard-failed.
         Exception: Any other failure aborts BEFORE either vault is touched (OT-5).
     """
     root = (root or Path.cwd()).resolve()
@@ -378,9 +342,6 @@ def produce_outputs(
             key,
             prior_failure=prior_failure_branch1,
             faithfulness_judge=faithfulness_judge,
-            report_tolerant=report_tolerant,
-            report_max_unconfirmed=report_max_unconfirmed,
-            report_max_unconfirmed_ratio=report_max_unconfirmed_ratio,
         )
 
         # Last safe point before any real-vault write (Codex R17): if the guard
@@ -399,7 +360,7 @@ def produce_outputs(
         )
         # Surface the branch2 bundle so a branch1-only G3 re-emit can reuse it.
         return replace(result, analysis=analysis)
-    except (StructuralSealFailed, ProduceGateBlocked, AnchorGateError):
+    except (StructuralSealFailed, ProduceGateBlocked):
         # A gate hard-failed: its exception carries `staging` (the failure scene),
         # so do NOT let `finally` delete it. SpokeCancelled + success keep this
         # False, so their staging is still cleaned up (no temp leak).

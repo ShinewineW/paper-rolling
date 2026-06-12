@@ -2,13 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from scripts.output.branch1_llm import (
     _quote_mermaid_labels,
     _strip_emoji,
     write_branch1_llm,
 )
-from scripts.output.branch1_report import AnchorGateError
 
 
 def _ara(tmp_path: Path) -> Path:
@@ -135,8 +133,9 @@ def test_quote_mermaid_labels_only_inside_blocks() -> None:
     assert "[另一个链接](http://y)" in out
 
 
-def test_write_branch1_llm_requires_architecture_figure(tmp_path: Path) -> None:
-    """If the paper has an architecture figure, it MUST be embedded (mandatory)."""
+def test_write_branch1_llm_missing_architecture_figure_is_a_soft_note(tmp_path: Path) -> None:
+    """ADR-0012 rev: a missing mandatory architecture figure NO LONGER hard-blocks —
+    the report still publishes and the gap is surfaced as a 配图提示 in the 评价."""
     ara = _ara(tmp_path)
     md = tmp_path / "src.md"
     md.write_text("Method overview; BLEU of 28.4.\n", encoding="utf-8")
@@ -159,8 +158,10 @@ def test_write_branch1_llm_requires_architecture_figure(tmp_path: Path) -> None:
             ],
         }
 
-    with pytest.raises(AnchorGateError, match="core method/model-structure figure"):
-        write_branch1_llm(person, {"title": "P"}, ara, md, fake_write_report, key="k")
+    write_branch1_llm(person, {"title": "P"}, ara, md, fake_write_report, key="k")
+    report = (person / "report.md").read_text(encoding="utf-8")
+    assert "## 评价" in report
+    assert "配图提示" in report and "核心方法" in report
 
 
 def test_write_branch1_llm_prose_perf_number_no_longer_blocked(tmp_path: Path) -> None:

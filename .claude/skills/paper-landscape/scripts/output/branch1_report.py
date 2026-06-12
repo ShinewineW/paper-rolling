@@ -36,9 +36,10 @@ _CLASSDEF = (
 
 
 class AnchorGateError(RuntimeError):
-    """Raised when the branch1 忠实门 (ADR-0012) hard-blocks: an ungrounded prose
-    number, a malformed engine 核心结论 anchor, or — on the LLM path — a report that
-    materially misleads vs the verified ARA. Identifier kept per ADR-0008."""
+    """DEAD CODE (ADR-0012 rev): branch1 no longer hard-blocks — it always publishes,
+    opening with a 「评价」 note. Nothing raises this anymore (the 锚点门 is retired).
+    The class is retained, unraised, to avoid an API break for any out-of-tree
+    importer; remove in a dedicated cleanup if confirmed unused. Identifier per ADR-0008."""
 
 
 def _mermaid_redraw(architecture_md: str) -> str:
@@ -157,32 +158,23 @@ def write_branch1(
     key: str | None = None,
     _force_unanchored: bool = False,
     faithfulness_judge: Any = None,
-    report_tolerant: bool = True,
-    report_max_unconfirmed: int = 5,
-    report_max_unconfirmed_ratio: float = 0.2,
 ) -> None:
-    """Write the branch1 report; RAISE if the 忠实门 (ADR-0012) hard-blocks.
+    """Write the branch1 report. ADR-0012 rev: NEVER raises — branch1 always publishes,
+    opening with a 「评价」 faithfulness note (build_assessment).
 
     Args:
         person_dir: Target person_vault entry directory.
         candidate: Discovery record.
-        ara_dir: The already-written branch2 ara/ directory.
-        md_path: The frozen {ID}.md (anchor target).
+        ara_dir: The already-written branch2 ara/ directory (the 评价's truth source).
+        md_path: The frozen {ID}.md (kept for signature parity with the LLM path).
         analysis: Analyzer-spoke bundle.
         key: The shared vault key used to link to the paired ai_package
             (produce_outputs passes the real key; when omitted, falls back to
             the person_dir name).
-        _force_unanchored: Test hook to inject an unanchored performance claim.
-        faithfulness_judge: Optional (c) 忠实门 LLM judge (report ↔ ARA). When the
-            caller supplies one it is honored here too, so the deterministic path
-            never silently drops a configured judge (ADR-0012 — no silent no-op).
-        report_tolerant: If True, apply count/ratio tolerance to prose-number
-            grounding (ADR-0012 tolerant mode).
-        report_max_unconfirmed: Absolute ceiling for tolerated unconfirmed numbers.
-        report_max_unconfirmed_ratio: Ratio ceiling for tolerated unconfirmed numbers.
-
-    Raises:
-        AnchorGateError: If the composed report fails the 忠实门.
+        _force_unanchored: Test hook to inject a bare prose performance claim.
+        faithfulness_judge: Optional (c) 评价 judge (report ↔ ARA). When the caller
+            supplies one it is honored here too (no silent no-op); it writes the
+            prose note and NEVER blocks.
     """
     person_dir.mkdir(parents=True, exist_ok=True)
     key = key or person_dir.name

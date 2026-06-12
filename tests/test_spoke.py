@@ -861,51 +861,6 @@ def test_g3_branch2_reemit_hits_seal1_lands_scene(tmp_path, fake_http, fake_cli,
     assert (scenes[0].parent / "ai" / "ara").is_dir()
 
 
-def test_g3_branch1_reemit_hits_anchor_lands_scene(tmp_path, fake_http, fake_cli, monkeypatch):
-    """branch1 re-emit (anchor root) hits AnchorGateError in stage_branch1 → 锚点门
-    scene with staged ai/ + person/ (R4 Finding 1: staged_dir set inside stage_branch1)."""
-    import scripts.audit.g3_seal as g3
-    import scripts.output.produce as prod
-    from scripts.output.branch1_report import AnchorGateError
-
-    monkeypatch.setattr(
-        g3,
-        "check_branch1_md_anchors",
-        lambda *a, **k: _hard_verdict("G3-anchor", "report.md", "unresolvable anchor"),
-    )
-    real_wb1 = prod.write_branch1
-    wcalls = {"n": 0}
-
-    def flaky_wb1(*a, **k):
-        wcalls["n"] += 1
-        out = real_wb1(*a, **k)  # writes staging/person/report.md (so the scene has person/)
-        if wcalls["n"] >= 2:  # the branch1 re-emit fails its own anchor lint
-            raise AnchorGateError("re-emit branch1 unanchorable")
-        return out
-
-    monkeypatch.setattr(prod, "write_branch1", flaky_wb1)
-    _tier2_http(fake_http, dict(_CANDIDATE))
-    fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
-    spoke = make_spoke(
-        workspace=tmp_path,
-        http=fake_http,
-        run_cli=fake_cli,
-        resolve_analysis=_resolve_analysis,
-        skeptic_votes=_all_found_skeptic,
-        rigor_scores=_good_rigor,
-        entailment_judge=_entailed,
-        ledger=_ledger(tmp_path),
-        n_skeptics=3,
-        max_gate_rounds=2,
-    )
-    result = spoke(dict(_CANDIDATE))
-    assert result.status == "failed"
-    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
-    m = json.loads(scenes[0].read_text())
-    assert m["failed_gate"] == "锚点门"
-    assert (scenes[0].parent / "ai").is_dir() and (scenes[0].parent / "person").is_dir()
-
-
 def test_g3_branch2_root_recalls_analyzer_with_feedback(tmp_path, fake_http, fake_cli):
     """rigor (branch2) root → _attempt(prior_failure_analyzer=...) re-samples the
     analyzer WITH the feedback injected (audit R8, moved from 4.3)."""
@@ -936,15 +891,16 @@ def test_g3_branch2_root_recalls_analyzer_with_feedback(tmp_path, fake_http, fak
 
 
 def test_g3_branch1_root_reuses_branch2(tmp_path, fake_http, fake_cli, monkeypatch):
-    """anchor (branch1) root → _attempt(prior_failure_branch1=...) REUSES the branch2
-    SSOT: the analyzer is NOT re-sampled (audit R8, moved from 4.3)."""
-    import scripts.audit.g3_seal as g3
+    """ADR-0012 rev: the only branch1 G3 root left is G3R0 (missing report.md). It →
+    _attempt(prior_failure_branch1=...) REUSES the branch2 SSOT: the analyzer is NOT
+    re-sampled (audit R8, retargeted from the retired anchor root to G3R0)."""
+    import scripts.output.produce as prod
 
-    monkeypatch.setattr(
-        g3,
-        "check_branch1_md_anchors",
-        lambda *a, **k: _hard_verdict("G3-anchor", "report.md", "unresolvable anchor"),
-    )
+    def noop_wb1(person_dir, *a, **k):
+        # person/ exists but report.md is NEVER written → G3R0 (missing report.md).
+        person_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(prod, "write_branch1", noop_wb1)
     _tier2_http(fake_http, dict(_CANDIDATE))
     fake_cli.program(returncode=0, side_effect=_mineru_emitting(_SOURCE_MD))
     acalls = {"n": 0}
@@ -966,7 +922,7 @@ def test_g3_branch1_root_reuses_branch2(tmp_path, fake_http, fake_cli, monkeypat
         max_gate_rounds=2,
     )
     result = spoke(dict(_CANDIDATE))
-    assert result.status == "failed"  # anchor always fails → escalates to a scene
+    assert result.status == "failed"  # report.md never written → G3R0 always → scene
     assert acalls["n"] == 1  # branch1 re-emit reused branch2 — analyzer NOT re-sampled
 
 

@@ -24,7 +24,6 @@ from pathlib import Path
 from typing import Any
 
 from scripts.output.branch1_gate import _prepend_assessment, build_assessment
-from scripts.output.branch1_report import AnchorGateError
 from scripts.output.figures import Figure, copy_figures, is_architecture_caption
 
 # Project IRON RULE: NO emoji in ANY report. Strip them (and a trailing space)
@@ -184,18 +183,13 @@ def write_branch1_llm(
     key: str | None = None,
     prior_failure: str | None = None,
     faithfulness_judge: Any = None,
-    report_tolerant: bool = True,
-    report_max_unconfirmed: int = 5,
-    report_max_unconfirmed_ratio: float = 0.2,
 ) -> None:
     """Write the LLM human report into ``person_dir`` (report.md + report.html).
 
     Calls the ``write_report`` seam (gated ARA -> vivid Chinese sections), stitches
-    a mechanically-anchored 核心结论 + the real evidence tables + the sections,
-    grounds the whole thing, and HARD-GATES on the 忠实门 (ADR-0012).
-
-    Raises:
-        AnchorGateError: the composed report failed the 忠实門.
+    the 核心结论 + the real evidence tables + the curated figures, and prepends the
+    opening 「评价」 note. ADR-0012 rev: NEVER raises — branch1 always publishes; a
+    missing/incomplete figure set is surfaced as a note in the 评价, not a hard block.
     """
     title = candidate["title"]
     key = key or person_dir.name
@@ -262,23 +256,25 @@ def write_branch1_llm(
 
     assembled = _strip_emoji("\n".join(parts) + "\n")  # no-emoji iron rule
     report = _quote_mermaid_labels(assembled)  # make LLM mermaid parse-safe
-    # ADR-0012 rev: prepend the opening 「评价」 (faithfulness note) — NEVER blocks.
-    report = _prepend_assessment(
-        report, build_assessment(report, ara_dir, judge=faithfulness_judge)
-    )
-    # Every SELECTED figure must be embedded...
+
+    # ADR-0012 rev: figure completeness is a SOFT concern — surfaced in the 评价 as a
+    # note, NEVER a hard block (branch1 always publishes; a human补图 is the remedy).
+    fig_notes: list[str] = []
     missing = [f.ref for f in copied if f"({f.ref})" not in report]
     if missing:
-        raise AnchorGateError(f"branch1 (LLM) missing selected figures: {missing}")
-    # ...and MANDATORY: the core method / model-structure figure must be present.
+        fig_notes.append("以下选定原图未能嵌入:" + "、".join(missing))
     copied_refs = {f.ref for f in copied}
     arch_in = any(f.get("role") == "architecture" and f["ref"] in copied_refs for f in selected)
     paper_has_arch = any(is_architecture_caption(f.get("caption", "")) for f in figures_meta)
     if paper_has_arch and not arch_in:
-        raise AnchorGateError(
-            "branch1 (LLM): the core method/model-structure figure is mandatory "
-            "but none was embedded"
-        )
+        fig_notes.append("论文的核心方法/模型结构图未能嵌入,建议人工补图。")
+
+    # Prepend the opening 「评价」 (faithfulness note + any figure caveats) — NEVER blocks.
+    assessment = build_assessment(report, ara_dir, judge=faithfulness_judge)
+    if fig_notes:
+        assessment = assessment.rstrip() + "\n" + "\n".join(f"> 配图提示:{n}" for n in fig_notes)
+        assessment += "\n"
+    report = _prepend_assessment(report, assessment)
 
     (person_dir / "report.md").write_text(report, encoding="utf-8")
     (person_dir / "report.html").write_text(_html(title, report, person_dir), encoding="utf-8")
