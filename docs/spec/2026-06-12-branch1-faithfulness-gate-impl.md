@@ -1,9 +1,9 @@
 # 理解阅读忠实门(branch1)实现计划 — ADR-0012
 
 > **日期**: 2026-06-12
-> **状态**: 草稿
+> **状态**: 草稿(已通过 Codex 交叉审计,4 轮)
 > **作者**: Claude (Opus 4.8) + ShinewineW
-> **基准版本**: `paper-rolling@f64c9d4`
+> **基准版本**: `paper-rolling@a002daf`
 > **目的**: 把 branch1 锚点门从"逼 LLM 给每条经验正文自贴 `<!--ref-->`"重构为"机械落源(b)+ 语义判官(c)"两层忠实验收,终结 DiffusionForcing/Genie 那类内容满分却被形式门误杀的论文。
 > 范围: `.claude/skills/paper-landscape/scripts/`(output / llm / audit),`config/llm.yaml`,`config/audit.yaml`,镜像 `tests/`
 
@@ -15,7 +15,7 @@
 
 **Goal:** Replace branch1's "every empirical prose line must carry a `<!--ref-->` anchor" gate with a two-layer faithfulness check — (b) tolerant mechanical number-grounding of the report against the source MD, and (c) a config-routed LLM judge comparing report↔ARA for material misleading — so a faithful 理解阅读 may carry numbers in natural prose.
 
-**Architecture:** A faithful report's numbers are verified deterministically against the source MD (reusing 数字门's value-match helpers); semantic faithfulness (misattribution/overclaim) is judged by a NEW 7th LLM seam routed through `config/llm.yaml`, defaulted to a model ≠ the writer's. The prose `<!--ref-->` requirement is dropped from BOTH the branch1 lint and the G3 auditor; the engine-mechanical 核心结论 block keeps its anchors and 最终门 still resolves them. Both layers are content gates that feed findings back to the writer (ADR-0006) and raise `AnchorGateError` on hard-block (name unchanged per ADR-0008).
+**Architecture:** A faithful report's numbers are verified deterministically against the source MD (reusing 数字门's value-match helpers); semantic faithfulness (misattribution/overclaim) is judged by a NEW 7th LLM seam routed through `config/llm.yaml`, defaulted to a model ≠ the writer's. The prose `<!--ref-->` requirement is dropped from BOTH the branch1 lint and the G3 auditor; the engine-mechanical 核心结论 block keeps its anchors and 最终门 still resolves them. On hard-block the gate raises `AnchorGateError` → `_failed/<key>/` scene (name unchanged per ADR-0008), exactly like the other pre-promotion gates (结构门/数字门); ADR-0006's content-gate feedback is realized by **revival** re-emitting branch1 with the scene's findings as `prior_failure` (ADR-0009) — NOT a new in-tick loop (see "branch1 忠实门 feedback is via REVIVAL").
 
 **Tech Stack:** Python 3.13, `uv run pytest`, `ruff`. No new dependencies.
 
@@ -193,6 +193,24 @@ def test_grounded_prose_numbers_pass() -> None:
     assert unconfirmed_report_numbers(report, md) == []
 
 
+def test_anchor_comment_payloads_are_not_parsed_as_numbers() -> None:
+    # Codex R1 finding 1: the 核心结论 block's <!--ref:quote:...%20...--> anchors
+    # must be stripped before extraction, else %20-encoded payloads become bogus
+    # ungrounded numbers (201 / 20 / 2028.4) and false-block a clean report.
+    md = "Table 1 reports 28.4 NDS."
+    report = "结论:本文达到 28.4 NDS。<!--ref:quote:Table%201%20reports%2028.4-->"
+    assert unconfirmed_report_numbers(report, md) == []
+
+
+def test_list_index_and_locators_are_not_data_numbers() -> None:
+    # Codex R3 finding 1: the engine's numbered 核心结论 ("1. …") and figure/section
+    # locators (图2 / §3 / Table 1) are structure, not data — must not be flagged
+    # just because their digit is absent from the source MD.
+    md = "Our model reaches 28.4 NDS."   # 28.4 present; index 1 / locators 2,3 absent
+    report = "1. 本文达到 28.4 NDS。\n见 图2 与 §3 的对比。"
+    assert unconfirmed_report_numbers(report, md) == []
+
+
 def test_invented_prose_number_is_flagged() -> None:
     md = "Our model reaches 28.4 NDS."
     report = "本文模型达到 99.9 NDS(凭空数字)。"
@@ -234,16 +252,31 @@ import re
 from scripts.audit.ara_tree import extract_numbers, number_present, source_value_set
 
 _FENCE = re.compile(r"^\s*```")
+# Strip HTML comments BEFORE number extraction. The engine 核心结论 block carries
+# anchors like `<!--ref:quote:Table%201%20reports%2028.4-->`; without stripping,
+# extract_numbers parses the URL-encoded payload into bogus tokens ('201', '20',
+# '2028.4') that would be flagged as ungrounded prose numbers (Codex R1 finding 1).
+_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+# Markdown ordered-list index ("1. ", "2. ") — the LLM assembler emits numbered
+# 核心结论 lines (branch1_llm.py:95); the index is structure, not a data number.
+_OL_PREFIX = re.compile(r"^\s*\d+\.\s")
+# Provenance LOCATORS (English Table 1 / §4 / Eq 3 AND Chinese 图1 / 表1 / 第4节 /
+# 公式1) — references, not metric values; strip so a faithful report is never blocked
+# on a locator digit absent from the source MD (mirrors g2_data_fidelity._LOCATOR;
+# Codex R3 finding 1).
+_LOCATOR = re.compile(
+    r"(?i)(?:\b(?:tables?|tab|sections?|sec|figures?|fig|equations?|eq|appendix|app)\.?\s*|§\s*)\d+"
+    r"|(?:图|表|公式|附录|第)\s*\d+"
+)
 
 
-def unconfirmed_report_numbers(report_text: str, source_md: str) -> list[str]:
-    """Prose numbers in `report_text` whose VALUE is NOT present in `source_md`.
-
-    Skips markdown table rows (the paper's own figures, gated by 数字门 on the ARA)
-    and fenced code blocks (illustrative). Order-preserving, de-duplicated.
-    """
-    source_values = source_value_set(source_md)
-    bad: list[str] = []
+def prose_numbers(report_text: str) -> list[str]:
+    """Distinct DATA numbers in report PROSE. Stripped/skipped before extraction:
+    HTML-comment anchor payloads, fenced code blocks, markdown table rows (the
+    paper's own figures, gated by 数字门 on the ARA), ordered-list indices, and
+    provenance locators (Table 1 / 图1 / §4). The SINGLE scope used by both the
+    grounding check and its ratio denominator, so they can never diverge."""
+    nums: list[str] = []
     in_fence = False
     for raw in report_text.splitlines():
         if _FENCE.match(raw):
@@ -251,10 +284,18 @@ def unconfirmed_report_numbers(report_text: str, source_md: str) -> list[str]:
             continue
         if in_fence or raw.lstrip().startswith("|"):
             continue
-        for n in extract_numbers(raw):
-            if n not in bad and not number_present(n, source_values):
-                bad.append(n)
-    return bad
+        line = _OL_PREFIX.sub("", _COMMENT.sub("", raw))  # drop anchors + list index
+        line = _LOCATOR.sub(" ", line)                     # drop Table 1 / 图1 / §4
+        for n in extract_numbers(line):
+            if n not in nums:
+                nums.append(n)
+    return nums
+
+
+def unconfirmed_report_numbers(report_text: str, source_md: str) -> list[str]:
+    """Prose numbers whose VALUE is NOT present in `source_md`. Order-preserving."""
+    source_values = source_value_set(source_md)
+    return [n for n in prose_numbers(report_text) if not number_present(n, source_values)]
 ```
 
 - [ ] **Step 4: Run the tests**
@@ -339,13 +380,29 @@ NEW:
 Run: `uv run pytest tests/output/test_anchor_lint.py tests/audit/test_anchor_resolution.py -q`
 Expected: PASS. (Any existing test asserting "unanchored prose fails" is now obsolete — update it to assert the new freed behavior, citing ADR-0012, rather than deleting coverage.)
 
+- [ ] **Step 5b: Relax the writer prompt (Codex R1 finding 5)** — the writer's `_CONSTRAINTS` rule 3 (`scripts/llm/writer.py:48-56`) still forbids precise numbers in prose; ADR-0012 frees them, and this rule is what the writer was *leaking verbatim* into reports. Read `writer.py:48-56` first, then rewrite rule 3.
+
+OLD (`writer.py`, the rule-3 lines beginning `"3. 接地安全(重要):不要在叙述句子里写精确性能数字...`):
+```python
+    "3. 接地安全(重要):不要在叙述句子里写精确性能数字(某指标的具体得分、与基线的差值、"
+    "百分比提升等都不要写进叙述句)。性能比较一律用定性语言(如“在整体质量上领先所有对比基线”),"
+```
+NEW (allow grounded numbers; the engine now verifies grounding, not anchoring — ADR-0012):
+```python
+    "3. 数字忠实(ADR-0012):叙述里可以自然地写性能数字,但每个数字都必须是 ARA/源文里真实"
+    "出现的值——绝不编造、绝不张冠李戴(把某系统的得分安到另一个系统头上)。不确定就用定性语言。"
+    "切勿把本条写作规则本身抄进报告正文。"
+```
+> Read the surrounding lines to land the boundary exactly (rule 3 may span 2-3 string fragments through the next numbered rule); replace only rule 3's fragments, leaving rules 1/2/4+ intact. Grep for any test asserting the old wording: `grep -rn "接地安全\|定性语言" tests/`.
+
 - [ ] **Step 6: Lint + commit**
 
 ```bash
 git add .claude/skills/paper-landscape/scripts/output/anchor_lint.py \
         .claude/skills/paper-landscape/scripts/audit/anchor_resolution.py \
+        .claude/skills/paper-landscape/scripts/llm/writer.py \
         tests/output/test_anchor_lint.py tests/audit/test_anchor_resolution.py
-git commit -m "feat(branch1,audit): free prose — drop <!--ref-->-per-line requirement (ADR-0012)"
+git commit -m "feat(branch1,audit,writer): free prose — drop <!--ref-->-per-line + relax writer rule (ADR-0012)"
 ```
 
 ---
@@ -526,12 +583,20 @@ def test_gate_blocks_systematic_invented_numbers(tmp_path) -> None:
     assert hard and all(f.is_hard_block for f in hard)
 
 
-def test_gate_tolerates_a_single_miss(tmp_path) -> None:
+def test_gate_tolerates_a_single_miss_when_tolerant(tmp_path) -> None:
     md = "Real numbers 28.4 and 24.6 here."
     report = "28.4 与 24.6 是真的,只有 99.9 手滑。"  # 1 miss within tolerance
     hard = check_report_faithfulness(report, md, tmp_path, judge=_ok_judge,
-                                     max_unconfirmed=5, max_unconfirmed_ratio=0.2)
+                                     tolerant=True, max_unconfirmed=5, max_unconfirmed_ratio=0.2)
     assert hard == []
+
+
+def test_gate_strict_blocks_a_single_miss(tmp_path) -> None:
+    # tolerant=False (the default) → ANY unconfirmed number hard-blocks, like 数字门.
+    md = "Real numbers 28.4 and 24.6 here."
+    report = "28.4 与 24.6 是真的,只有 99.9 手滑。"  # 1 miss
+    hard = check_report_faithfulness(report, md, tmp_path, judge=_ok_judge)
+    assert hard and all(f.is_hard_block for f in hard)
 
 
 def test_gate_blocks_on_judge_drift(tmp_path) -> None:
@@ -561,6 +626,7 @@ def check_report_faithfulness(
     ara_dir: "Path",
     *,
     judge: Callable[[str, "Path"], dict] | None = None,
+    tolerant: bool = False,
     max_unconfirmed: int = 5,
     max_unconfirmed_ratio: float = 0.2,
 ) -> list[Finding]:
@@ -579,10 +645,18 @@ def check_report_faithfulness(
             suggestion="Fix or remove the malformed anchor.",
         ))
 
-    # (b) tolerant mechanical grounding of prose numbers.
+    # (b) tolerant mechanical grounding of prose numbers. Numerator AND denominator
+    # share prose_numbers() — same stripped/skipped scope (Codex R1 finding 1).
     bad = unconfirmed_report_numbers(report_text, source_md)
-    total = len(extract_numbers(report_text)) or 1
-    grounding_hard = len(bad) > max_unconfirmed or len(bad) > max_unconfirmed_ratio * total
+    total = len(prose_numbers(report_text)) or 1
+    # Mirror 数字门 (g2_data_fidelity.py): STRICT (tolerant=False, the default) hard-
+    # blocks on ANY unconfirmed number; tolerant softens only within BOTH limits
+    # (Codex R2 finding 3 — the `tolerant` boolean must be threaded, not just the
+    # thresholds).
+    within_tolerance = (
+        tolerant and len(bad) <= max_unconfirmed and len(bad) <= max_unconfirmed_ratio * total
+    )
+    grounding_hard = bool(bad) and not within_tolerance
     for n in bad:
         findings.append(Finding(
             finding_id=f"AF{len(findings) + 1:02d}",
@@ -631,20 +705,30 @@ OLD (lines 241-246):
 ```
 NEW:
 ```python
-    hard = check_report_faithfulness(report, md_text, ara_dir, judge=None)
+    hard = check_report_faithfulness(
+        report, md_text, ara_dir, judge=None,
+        tolerant=report_tolerant,
+        max_unconfirmed=report_max_unconfirmed,
+        max_unconfirmed_ratio=report_max_unconfirmed_ratio,
+    )
     if hard:
         raise AnchorGateError(
             "branch1 report failed 忠实门 (ADR-0012): "
             + "; ".join(f.observation for f in hard[:5])
         )
 ```
-Update `branch1_report.py` imports: replace `from scripts.output.anchor_lint import lint_text` with `from scripts.output.branch1_gate import check_report_faithfulness` (confirm `lint_text` is not used elsewhere in the file first via `grep -n lint_text scripts/output/branch1_report.py`).
+Add `report_tolerant=False, report_max_unconfirmed=5, report_max_unconfirmed_ratio=0.2` as keyword params to `write_branch1`'s signature (defaults = strict; the deterministic report grounds by construction, but the same knobs thread in so config controls both paths — Codex R2 finding 3). Update `branch1_report.py` imports: replace `from scripts.output.anchor_lint import lint_text` with `from scripts.output.branch1_gate import check_report_faithfulness` (confirm `lint_text` is not used elsewhere in the file first via `grep -n lint_text scripts/output/branch1_report.py`).
 
 - [ ] **Step 6: Wire into the LLM path** (`branch1_llm.py`) — add a `judge` parameter and call the gate. Read `write_branch1_llm`'s signature + lint site first.
 
-At the signature (line ~212), add a keyword param `faithfulness_judge=None` (after `write_report`). At the lint site (the `lint_text(report)` block near the end), replace exactly as in Step 5 but pass the judge:
+At the signature (line ~212), add keyword params `faithfulness_judge=None, report_tolerant=False, report_max_unconfirmed=5, report_max_unconfirmed_ratio=0.2` (after `write_report`). At the lint site (the `lint_text(report)` block near the end), replace exactly as in Step 5 but pass the judge + tolerance:
 ```python
-    hard = check_report_faithfulness(report, md_text, ara_dir, judge=faithfulness_judge)
+    hard = check_report_faithfulness(
+        report, md_text, ara_dir, judge=faithfulness_judge,
+        tolerant=report_tolerant,
+        max_unconfirmed=report_max_unconfirmed,
+        max_unconfirmed_ratio=report_max_unconfirmed_ratio,
+    )
     if hard:
         raise AnchorGateError(
             "branch1 (LLM) report failed 忠实门 (ADR-0012): "
@@ -692,48 +776,81 @@ git commit -m "feat(branch1): assemble 忠实门 (kept-lint + (b) + (c)) into bo
 
 ---
 
-### Task 6: Route the seam + wire the spoke gate-retry feedback
+### Task 6: Route the seam + thread it END-TO-END (run_campaign → spoke → produce → revival)
 
 **Files:**
 - Modify: `config/llm.yaml` (route `faithfulness`)
-- Modify: `.claude/skills/paper-landscape/scripts/spoke.py` (pass `faithfulness_judge` into produce; map its failure to 锚点门 — already mapped via `AnchorGateError`)
-- Test: `tests/llm/test_llm_providers.py` (config loads with 7 seams), `tests/test_spoke.py`
+- Modify: `.claude/skills/paper-landscape/scripts/run_campaign.py:58-78` (new `faithfulness_judge` param)
+- Modify: `.claude/skills/paper-landscape/scripts/spoke.py` (`make_spoke`: new `faithfulness_judge` + reuse the g2 tolerance for the report)
+- Modify: `.claude/skills/paper-landscape/scripts/output/produce.py` (`produce_outputs`/`stage_branch1` thread the kwarg — Task 5 Step 7)
+- Modify: `.claude/skills/paper-landscape/scripts/revival.py:299,330` (pass the judge into the revival's `stage_branch1`)
+- Test: `tests/llm/test_llm_providers.py`, `tests/test_run_campaign.py`, `tests/test_spoke.py`
 
-- [ ] **Step 1: Write the failing test** — add to the config test:
+> **Codex R1 findings 2 & 4 — the threading my first draft missed.** `run_campaign` takes INDIVIDUAL seam callables, NOT a `seams` dict (`run_campaign.py:58-78`: `resolve_analysis, skeptic_votes, rigor_scores, entailment_judge, http, run_cli, …, write_report=None`). And `revival.py` calls `stage_branch1(...)` directly at lines 299 & 330 with `seams.get("write_report")`. So the judge must be a NEW optional param threaded through BOTH paths, else branch1 silently runs `judge=None` and the whole "revive false-quarantined papers" goal bypasses the (c) layer. Tolerance (finding 2): reuse the spoke's EXISTING g2 tolerance values for the report (ADR-0012: the report is uniformly tolerant) — no new config knobs.
 
+- [ ] **Step 1: Route + config test.** Add `faithfulness: opencode` to `_full_seam_yaml` (Task 4) and the test:
 ```python
 def test_config_routes_faithfulness_seam(tmp_path) -> None:
     from scripts.llm.config import load_llm_config
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "llm.yaml").write_text(_full_seam_yaml(), encoding="utf-8")
-    cfg = load_llm_config(tmp_path)
-    assert cfg.for_seam("faithfulness").name == "opencode"
+    assert load_llm_config(tmp_path).for_seam("faithfulness").name == "opencode"
 ```
-(Task 4 Step 5 already added `faithfulness: opencode` to `_full_seam_yaml`; if not, add it now.)
-
-- [ ] **Step 2: Run it to verify it passes or fails**
-
-Run: `uv run pytest tests/llm/test_llm_providers.py::test_config_routes_faithfulness_seam -v`
-Expected: PASS if `_full_seam_yaml` routes it (from Task 4), else FAIL → add the route.
-
-- [ ] **Step 3: Route the real seam** — at `config/llm.yaml`, in the `seams:` block (after `writer:`), add:
+Then route the real seam in `config/llm.yaml` (`seams:` block, after `writer:`):
 ```yaml
   faithfulness: hellorobotaxi   # branch1 忠实门 (c); judge runs tier=fast → qwen3.7-plus (≠ writer max), ADR-0012
 ```
 
-- [ ] **Step 4: Pass the seam into the spoke's produce call** — read `spoke.py` around where `produce_outputs` / branch1 is invoked (grep `grep -n "produce\|write_report\|faithfulness" scripts/spoke.py`). The spoke already receives `write_report` from `seams`; add `faithfulness_judge=seams.get("faithfulness_judge")` alongside it and forward through the produce chain threaded in Task 5 Step 7. (`spoke.py:431` already maps `AnchorGateError` → `锚点门`, so the failure surface is unchanged.)
+- [ ] **Step 2: Thread `faithfulness_judge` through `run_campaign`** — read `run_campaign.py:58-160` first. Add the param (after `write_report`):
 
-- [ ] **Step 5: Run the suite**
+OLD (`run_campaign.py`, the signature line):
+```python
+    write_report: Callable | None = None,
+    repo_resolver: Callable | None = None,
+```
+NEW:
+```python
+    write_report: Callable | None = None,
+    faithfulness_judge: Callable | None = None,
+    repo_resolver: Callable | None = None,
+```
+Then at its `make_spoke(...)` call inside `run_campaign` (grep `grep -n "make_spoke(" scripts/run_campaign.py`), pass `faithfulness_judge=faithfulness_judge`.
+
+- [ ] **Step 3: Thread through `make_spoke` + reuse g2 tolerance** — read `spoke.py:80-160`. Add `faithfulness_judge: Callable | None = None` to `make_spoke`'s signature. Where `make_spoke` builds the `produce_outputs` call (the same place `write_report=write_report` is passed — grep `grep -n "write_report=\|produce_outputs\|stage_branch1" scripts/spoke.py`), also pass `faithfulness_judge=faithfulness_judge` AND the report tolerance — **all three** g2 knobs (Codex R2 finding 3 — the `tolerant` boolean, not just the thresholds): `report_tolerant=g2_tolerant, report_max_unconfirmed=g2_max_unconfirmed, report_max_unconfirmed_ratio=g2_max_unconfirmed_ratio` (reusing the spoke's existing g2 tolerance params). These thread through `produce_outputs` → `stage_branch1` → BOTH `write_branch1_llm` AND the deterministic `write_branch1`, each of which passes them to `check_report_faithfulness(..., tolerant=report_tolerant, max_unconfirmed=report_max_unconfirmed, max_unconfirmed_ratio=report_max_unconfirmed_ratio)`. **Neither branch1 path may call the gate with bare defaults** (finding 3, spec:669).
+
+- [ ] **Step 4: Verify the produce chain carries it (Task 5 Step 7).** Confirm `produce_outputs` (`produce.py:242`) and `stage_branch1` (`produce.py:162`) accept `faithfulness_judge=None`, `report_max_unconfirmed=5`, `report_max_unconfirmed_ratio=0.2` and forward them to `write_branch1_llm` / `check_report_faithfulness`. (Threaded in Task 5; this step is the cross-check.)
+
+- [ ] **Step 5: Thread through `revival.py`** — read `revival.py:290-340`. Revival bypasses the spoke/produce path and calls `stage_branch1(...)` directly at lines ~299 and ~330, and it ALREADY loads `cfg = load_audit_config(workspace)` at line 263 (used for the G2 run at lines 324-326). At BOTH `stage_branch1(...)` calls, add the judge AND the report tolerance (Codex R3 finding 2 — not just the judge):
+```python
+                faithfulness_judge=seams.get("faithfulness_judge"),
+                report_tolerant=cfg.data_fidelity_tolerant,
+                report_max_unconfirmed=cfg.data_fidelity_max_unconfirmed,
+                report_max_unconfirmed_ratio=cfg.data_fidelity_max_unconfirmed_ratio,
+```
+Without all four, revival (the path that re-runs the false-quarantined papers) runs branch1 with `judge=None` and bare-default strict tolerance — diverging from the campaign path.
+
+- [ ] **Step 6: Driver note (non-engine).** The `/loop` runtime / any driver that calls `run_campaign` must pass `faithfulness_judge=build_seams()["faithfulness_judge"]`. Record this in the driver; it is outside the engine but required for the seam to fire in production.
+
+- [ ] **Step 7: Suite + commit**
 
 Run: `uv run pytest -q && uv run ruff check .claude/skills/paper-landscape/scripts/ tests/`
-Expected: all green, ruff clean.
-
-- [ ] **Step 6: Commit**
-
 ```bash
-git add config/llm.yaml .claude/skills/paper-landscape/scripts/spoke.py tests/
-git commit -m "feat(config,spoke): route faithfulness seam + wire 忠实门 judge into branch1 (ADR-0012)"
+git add config/llm.yaml .claude/skills/paper-landscape/scripts/run_campaign.py \
+        .claude/skills/paper-landscape/scripts/spoke.py \
+        .claude/skills/paper-landscape/scripts/output/produce.py \
+        .claude/skills/paper-landscape/scripts/revival.py tests/
+git commit -m "feat: thread faithfulness_judge end-to-end (run_campaign + spoke + produce + revival) (ADR-0012)"
 ```
+
+---
+
+### branch1 忠实门 feedback is via REVIVAL, not an in-tick loop (Codex R2 findings 1 & 2)
+
+> **Rejected: wiring the initial 忠实门 failure into a new in-tick re-emit loop.** Verified against `spoke.py:249-275`: the only loop around `_attempt()` is the **G2 blind-retry** `for g2_round in range(g2_blind_retry_rounds + 1)`. A `continue` in the `AnchorGateError` handler would consume the G2 budget (and with `g2_blind_retry_rounds=0` fall through to `assert produced is not None`). Worse, `_attempt()` only caches branch2's SSOT AFTER `produce_outputs()` returns successfully (`spoke.py:191`); a branch1 failure is raised mid-`produce_outputs`, so a re-emit has NO cached analysis and would re-sample the (expensive) analyzer — the opposite of a cheap branch1-only retry. Restructuring that delicate, documented loop for a feature the old code never had is bloat, not a fix.
+
+**The 忠实门 keeps the existing pre-promotion behavior**: hard-block → `AnchorGateError` → `_pre_promote_scene(failed_gate="锚点门")` → `_failed/<key>/`, exactly like 结构门 (`spoke.py:263`). ADR-0006's content-gate feedback is realized by **revival** — `revival.py` builds `fb` from the scene (`revival.py:261`, ADR-0009) and re-emits branch1 with `prior_failure=fb` (`stage_branch1(..., prior_failure=fb)`, lines 307/338). So the writer DOES get the findings back and re-writes — across a revival run, not in-tick. A genuinely faithful paper passes the gate on the first try, so the in-tick loop would only ever help borderline cases that revival already covers.
+
+> Action for the implementer: leave the `except AnchorGateError` immediate-scene at `spoke.py:283` UNCHANGED. (Reconcile the ADR-0012 sentence "feed the finding back … bounded rounds" to mean the revival path, consistent with 结构门/数字门 — not a new in-tick loop.)
 
 ---
 
@@ -795,3 +912,90 @@ git commit -m "test(spoke): branch1 忠实门 end-to-end — faithful prose pass
 
 - Separate looser tolerance knobs for the report vs the ARA — this plan reuses 数字门's tolerant values; add report-specific knobs only if the shared values prove wrong in practice.
 - A trained empirical-claim classifier (ROADMAP C4) — `unanchored_empirical_lines` stays defined but unused for a future plug-in.
+
+---
+
+## Review Log
+
+### Round 1 (Codex gpt-5.5 — Initial)
+
+**Findings**
+
+1. **Critical: mechanical number grounding will count anchor-comment payloads as prose numbers.**  
+   Proposed `unconfirmed_report_numbers()` runs `extract_numbers(raw)` on raw report lines. Current reports contain anchors built by `_anchor()` with URL-encoded spaces like `%20` ([branch1_report.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/output/branch1_report.py:43), [branch1_llm.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/output/branch1_llm.py:83)). `extract_numbers()` will parse those comments too ([ara_tree.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/audit/ara_tree.py:35)); locally, an anchored `28.4` line yields `('28.4', '20', '2028.4')`. The gate must strip HTML comments before number extraction, and the denominator must use the same skipped/stripped prose scope.
+
+2. **High: the plan claims reuse of `config/audit.yaml` tolerance, but does not wire it.**  
+   `run_campaign()` currently loads `data_fidelity_*` only for G2 ([run_campaign.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/run_campaign.py:131)), and `make_spoke()` only has `g2_*` knobs ([spoke.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/spoke.py:97)). The spec’s call sites use `check_report_faithfulness(... judge=...)` with defaults, so config changes would not affect branch1.
+
+3. **High: ADR-0006 feedback/retry is not implemented for initial branch1 failures.**  
+   The plan says branch1 content-gate findings feed back to the writer, but current pre-promotion `AnchorGateError` is immediately scened to `_failed` ([spoke.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/spoke.py:283)). The bounded retry loop exists only for post-promotion G3 ([spoke.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/spoke.py:397)). The spec must add an initial branch1 retry path, or explicitly revise the ADR claim.
+
+4. **High: production and revival wiring are incomplete.**  
+   `run_campaign()` accepts individual seam callables, not a `seams` dict ([run_campaign.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/run_campaign.py:58)), so adding only `spoke.py` wiring is insufficient. Also `revival.py` calls `stage_branch1()` directly twice ([revival.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/revival.py:299), [revival.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/revival.py:330)); without threading `faithfulness_judge` and tolerance there, the very “revive false-quarantined papers” path bypasses the new semantic layer.
+
+5. **Medium: the writer prompt still enforces the old rule.**  
+   ADR-0012 explicitly frees prose numbers, but `writer.py` still tells the writer not to put exact performance numbers in prose ([writer.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/llm/writer.py:48), [writer.py](/Users/shinewine/Coding/paper-rolling/.claude/skills/paper-landscape/scripts/llm/writer.py:101)). The plan should update this, otherwise the implementation removes the gate but keeps training the writer against the new desired behavior.
+
+Baseline verified: `uv run pytest -q` passes (`534 passed`), and `uv run ruff check .claude/skills/paper-landscape/scripts/ tests/` passes. Current repo `HEAD` is `a002daf`, so the spec’s `f64c9d4` baseline is stale.
+
+REVISIONS NEEDED
+
+
+### Response to Round 1 (Claude Code)
+
+All five findings verified against the codebase and **ACCEPTED** — they are real gaps (mostly call-chain threading my first draft under-specified, plus one genuine parse bug). Changes:
+
+1. **ACCEPTED (critical) — anchor payloads parsed as prose numbers.** Confirmed: `extract_numbers('… 28.4 … <!--ref:quote:Table%201%20reports%2028.4-->')` → `('28.4','201','20','2028.4')`. Fixed Task 2: added `_COMMENT` stripping + a `prose_numbers()` helper (strips HTML comments, skips fences + table rows); BOTH the grounding check and the ratio denominator (Task 5) now use `prose_numbers()` so they share one scope. Added regression test `test_anchor_comment_payloads_are_not_parsed_as_numbers`.
+
+2. **ACCEPTED — tolerance not wired.** Confirmed `make_spoke` has only `g2_*` knobs and the call sites used function defaults. Fix (no new config, per ADR-0012's "report is uniformly tolerant"): Task 6 Step 3 threads the spoke's EXISTING g2 tolerance values into the branch1 gate as `report_max_unconfirmed`/`report_max_unconfirmed_ratio` — true reuse of `config/audit.yaml`'s `data_fidelity_*`.
+
+3. **ACCEPTED — initial 锚点门 had no feedback retry.** Confirmed `spoke.py:283` immediately scenes; the `prior_failure_branch1` re-emit infra exists (`spoke.py:164-189`) but only G3 drives it. Added **Task 6.5**: wire the initial 忠实门 hard-block into the existing bounded re-emit (branch1-only, reuse cached branch2 SSOT), scene on `max_gate_rounds` exhaustion — with a flaky-judge test proving round-2 recovery.
+
+4. **ACCEPTED — production + revival wiring incomplete.** Confirmed `run_campaign` takes individual seam callables (not a dict) and `revival.py:299,330` calls `stage_branch1` directly. Rewrote Task 6 to thread `faithfulness_judge` end-to-end: `run_campaign` param → `make_spoke` → produce chain → `write_branch1_llm`, AND both revival call sites, plus a driver note.
+
+5. **ACCEPTED — writer prompt still enforces the old rule.** Confirmed `writer.py:48-56` rule 3 forbids prose numbers. Added Task 3 Step 5b: rewrite rule 3 to "numbers allowed but must be grounded / no misattribution / do not copy this rule into the report", committing `writer.py` with the free-prose change.
+
+Also updated the stale baseline `f64c9d4` → `a002daf`.
+
+No findings rejected — all five tightened the plan (threading completeness, the parse bug, and the feedback loop).
+
+### Round 2 (Codex gpt-5.5 — Focused)
+
+(Verdict: REVISIONS NEEDED — 3 new high findings on the R1 fixes; R1 findings 1/4/5 acknowledged adequate. Full text retained in the orchestration log.)
+
+### Response to Round 2 (Claude Code)
+
+All three verified; R2-F3 **ACCEPTED**, R2-F1 & R2-F2 **PARTIALLY ACCEPTED** (problem real, fix = remove the offending addition, not patch it).
+
+1. **R2-F1 (loop budget / staging cleanup) + R2-F2 (no cached SSOT on branch1 failure) → DROPPED Task 6.5.** Verified `spoke.py:258` — the only loop is the G2 blind-retry `for g2_round`; a `continue` would consume its budget and (with `g2_blind_retry_rounds=0`) fall through to `assert produced is not None`. Verified `spoke.py:191` — `cached_analysis` is set only after a successful `produce_outputs()`, so a branch1 failure has no cache and would re-sample the analyzer. **Per the anti-bloat principle, the right fix is to NOT add the in-tick re-emit** — it restructures a delicate, documented loop for a feature the old code never had. The 忠实门 keeps the existing pre-promotion behavior (immediate `_pre_promote_scene("锚点门")`, identical to 结构门 at `spoke.py:263`); ADR-0006 feedback is realized by **revival**, which already re-emits branch1 with `prior_failure=fb` (`revival.py:261,307,338`). Task 6.5 replaced with a note documenting this; the Architecture paragraph updated.
+
+2. **R2-F3 (tolerant boolean not threaded) → ACCEPTED.** Verified `g2_data_fidelity.py` only softens when `tolerant=True`. Added a `tolerant: bool = False` param to `check_report_faithfulness`; STRICT (default) hard-blocks ANY unconfirmed number, tolerant softens within both limits — mirroring 数字门. Task 6 now threads all THREE g2 knobs (`g2_tolerant`/`g2_max_unconfirmed`/`g2_max_unconfirmed_ratio`) → both `write_branch1_llm` AND `write_branch1`, each passing them to the gate (no bare defaults). Added `test_gate_strict_blocks_a_single_miss`; renamed the tolerant test and gave it `tolerant=True`.
+
+R1 findings 1/4/5 confirmed resolved by you. No open blockers remain on my side.
+
+### Round 3 (Codex gpt-5.5 — Focused)
+
+(Verdict: REVISIONS NEEDED — 2 new high findings; the in-tick-removal + spoke/produce tolerance fix acknowledged adequate.)
+
+### Response to Round 3 (Claude Code)
+
+Both verified and **ACCEPTED** — same class of issue 数字门 already solved upstream.
+
+1. **R3-F1 (list index / locator false-block) → ACCEPTED.** Confirmed `prose_numbers` returned `('1','28.4')` for a numbered 核心结论 line. Added `_OL_PREFIX` (strip `^\d+\.\s`) and `_LOCATOR` (English Table 1/§4/Eq 3 + Chinese 图1/表1/第4节/公式1, mirroring `g2_data_fidelity._LOCATOR`) stripping in `prose_numbers` before extraction. Added `test_list_index_and_locators_are_not_data_numbers`.
+
+2. **R3-F2 (revival missing tolerance) → ACCEPTED.** Confirmed `revival.py:263` already loads `cfg` and uses `cfg.data_fidelity_*` for G2. Task 6 Step 5 now passes `report_tolerant`/`report_max_unconfirmed`/`report_max_unconfirmed_ratio` (from `cfg.data_fidelity_*`) into BOTH revival `stage_branch1` calls, alongside `faithfulness_judge` — so revival matches the campaign path exactly.
+
+No open blockers on my side.
+
+### Round 4 (Codex gpt-5.5 — Focused) — APPROVED
+
+No blocking findings.
+
+R3-F1 is adequately addressed. The proposed `_OL_PREFIX` and `_LOCATOR` stripping happens before `extract_numbers()`, and the added regression covers the actual false-block class: numbered core conclusions plus `图2` / `§3` locators.
+
+R3-F2 is also adequately addressed. Task 6 Step 5 now threads `faithfulness_judge` plus all three `cfg.data_fidelity_*` tolerance values into both direct revival `stage_branch1(...)` calls, matching the campaign path.
+
+I also checked the surrounding `produce -> spoke -> run_campaign -> revival` call paths and did not find a remaining blocker. Minor implementation note: when landing Task 6, make sure the runtime wiring docs/driver snippets that call `run_campaign(...)` are updated to pass `faithfulness_judge`; the spec’s Step 6 already points at that requirement.
+
+Decision: APPROVED
+
