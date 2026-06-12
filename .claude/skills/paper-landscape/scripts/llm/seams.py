@@ -1,5 +1,5 @@
 # .claude/skills/paper-landscape/scripts/llm/seams.py
-"""Production construction of the SIX LLM seams (the runtime's seam factory).
+"""Production construction of the SEVEN LLM seams (the runtime's seam factory).
 
 `run_campaign(...)` injects LLM-backed seams; this module builds the REAL ones on
 top of the provider layer: resolve_analysis / skeptic_votes / rigor_scores /
