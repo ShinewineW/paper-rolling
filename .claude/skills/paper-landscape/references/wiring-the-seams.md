@@ -20,6 +20,7 @@ run_campaign(*, workspace, discover, resolve_analysis, skeptic_votes,
              rigor_scores, entailment_judge, http, run_cli,
              cross_model_votes=None, cross_model_sample=0.0,
              empirical_classifier=None, write_report=None,
+             faithfulness_judge=None,
              repo_resolver=None, requested_topic=None,
              requested_n=None, requested_auto_discover=None,
              max_concurrent=5) -> TickResult

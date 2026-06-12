@@ -14,7 +14,7 @@ communication** and **deliberately do NOT rename the code identifiers**.
 |---|---|---|---|---|
 | **结构门** | after branch2 | `Seal-1` / `validate_ara_tree` / 吸收-D8 | mechanical | SSOT exploration-tree is structurally valid (node types, required fields, `also_depends_on` points to a real node) |
 | **数字门** | branch2 → branch1 | `G2` / data-fidelity / audit-D1 | LLM (skeptic, N votes) | every evidence number appears in the source MD |
-| **锚点门** | inside branch1 | three-layer anchor / 吸收-D1 / `AnchorGateError` | mechanical + classifier | every empirical assertion in the human report carries a `<!--ref-->` anchor |
+| **锚点门** | inside branch1 | 忠实门 / 吸收-D1 + ADR-0012 / `AnchorGateError` | mechanical + LLM judge | ADR-0012 (name kept): prose numbers GROUNDED in the source MD ((b)) + report not materially misleading vs the ARA ((c)); engine 核心结论 block still carries `<!--ref-->` anchors |
 | **最终门** | after both chains | `G3` / seal / Seal Level 2 | mixed | composite of 4 sub-checks (below) |
 
 **最终门 (G3) sub-checks**: (a) anchor resolution — claims resolve to source MD;

@@ -66,8 +66,9 @@ for a complete, copy-pasteable instance.
   claim must be grounded in the MD text. Fabricated or paraphrased-into-existence
   numbers are caught downstream: G2 (`../../scripts/audit/g2_data_fidelity.py`)
   runs ground-truth-isolated skeptic votes over your numbers and **hard-blocks**
-  fabrication before branch1 promotion. Anchorless empirical claims later raise
-  `AnchorGateError` in branch1 (吸收-D1).
+  fabrication before branch1 promotion. A report number that isn't grounded in the
+  MD — or that misattributes a result — later raises `AnchorGateError` in branch1's
+  忠实门 (ADR-0012: (b) grounding + (c) judge; 吸收-D1).
 - **Independent invocation [MUST].** A single, isolated Agent-tool call per
   paper. No shared analyzer state across concurrent spokes — `resolve_analysis`
   is injected as a keyword arg precisely so concurrent spokes never share or

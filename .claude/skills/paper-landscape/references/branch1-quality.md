@@ -59,9 +59,13 @@ adds two faithfulness layers for free prose:
 
 ## Anti-patterns (reject these)
 
-- A number with a metric cue and **no** `<!--ref-->` → hard-block (anchor lint #3).
-- A **fabricated** number not in `{ID}.md` → this gate can't see it, but **G2's
-  skeptic catches it first** (runs before branch1); never invent figures.
+- A prose number whose value is **not present** in `{ID}.md` → hard-block (忠实门
+  (b) grounding). Numbers in natural prose are fine *if grounded* — ADR-0012 dropped
+  the per-line `<!--ref-->` requirement.
+- A number attributed to the **wrong system** / an overclaim vs the ARA → hard-block
+  (忠实门 (c) judge).
+- A **fabricated** number not in `{ID}.md` → **G2's skeptic catches it first** (runs
+  before branch1) and the (b) layer would also reject it here; never invent figures.
 - Anchoring with `kind: quote` but quoting > 25 words, or leaving a raw `--` inside.
 - Asserting a domain-specific mechanism the source does not state (use the neutral
   number-free fallback instead).

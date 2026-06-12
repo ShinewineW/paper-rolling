@@ -205,6 +205,7 @@ def _ask_json(prompt, *, seam, tier="strong", retries=2, ...) → dict | list
 | `entailment_judge` | (claim, experiment) | (bool, reason) | inline | 低 |
 | `expand_llm` | (topic) | [query, ...] | inline | 低 |
 | `write_report` | (ara_bundle, figures) | rich HTML str | inline | 中 |
+| `faithfulness_judge` | (report_text, ara_dir) | {faithful, findings} | inline | 低 |
 
 **Global state**:
 

@@ -136,6 +136,7 @@ def make_spoke(
     rigor_scores: Callable[[dict], dict],
     entailment_judge: Callable[[...], tuple[bool, str]],
     write_report: Callable[..., dict] | None = None,
+    faithfulness_judge: Callable[..., dict] | None = None,   # branch1 忠实门 (c), ADR-0012
     cancel: threading.Event | None = None,
 ) → SpokeFn:
     """Build the production spoke that runs the full gated pipeline per paper.
@@ -198,6 +199,7 @@ def make_spoke(
 - `skeptic_votes` — LLM seam（G2 multi-vote）
 - `rigor_scores` — LLM seam（G3 6-dim）
 - `entailment_judge` — LLM seam（G3 蕴含）
+- `faithfulness_judge` — LLM seam（branch1 忠实门 (c)，report↔ARA，ADR-0012）
 - `write_report` — LLM seam (可选，人链)；None = 使用 thin 确定性
 - `cancel` — threading.Event，如果设置 → abort spoke（stall timeout）
 
