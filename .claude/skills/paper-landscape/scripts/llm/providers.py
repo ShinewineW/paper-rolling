@@ -357,7 +357,16 @@ class OpenAICompatibleProvider:
         # Chinese report comes back as mojibake (e.g. 用户 → `ç¨æ·`). Pin UTF-8 so
         # the decode is correct regardless of the server's (missing) charset header.
         resp.encoding = "utf-8"
-        parts: list[str] = []
+        # Reasoning models (qwen3.x, deepseek-r1, …) stream their chain-of-thought
+        # in `delta.reasoning_content` and the ANSWER in `delta.content`. Capture
+        # ONLY content; falling back to reasoning_content per-frame (the old
+        # `content or reasoning_content`) concatenated the model's THINKING into the
+        # answer — e.g. the writer's report filled with "Wait, I should be careful…
+        # Previous Rejection: numbers '2026','72000.0'…" and the JSON judge returning
+        # "The user wants me to verify…". Fall back to reasoning ONLY if no content
+        # arrived at all (a model that emits reasoning but no separate answer).
+        content_parts: list[str] = []
+        reasoning_parts: list[str] = []
         for raw in resp.iter_lines(decode_unicode=True):
             if time.monotonic() > deadline:
                 raise _RetryableHTTP(f"{self.name} exceeded overall budget mid-stream")
@@ -373,10 +382,11 @@ class OpenAICompatibleProvider:
                 delta = json.loads(chunk)["choices"][0].get("delta", {})
             except (ValueError, KeyError, IndexError):
                 continue  # keep-alive / usage-only / comment frame
-            piece = delta.get("content") or delta.get("reasoning_content") or ""
-            if piece:
-                parts.append(piece)
-        content = "".join(parts)
+            if delta.get("content"):
+                content_parts.append(delta["content"])
+            elif delta.get("reasoning_content"):
+                reasoning_parts.append(delta["reasoning_content"])
+        content = "".join(content_parts) or "".join(reasoning_parts)
         if not content:
             raise _RetryableHTTP(f"{self.name} empty stream")
         return content

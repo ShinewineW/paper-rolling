@@ -162,6 +162,62 @@ def test_openai_sse_decodes_cjk_as_utf8_not_latin1(monkeypatch: pytest.MonkeyPat
     assert prov.complete("hi") == cjk  # real Chinese, NOT 'æ\x9c¬æ\x96\x87...' mojibake
 
 
+def test_openai_sse_excludes_reasoning_content_from_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Regression: reasoning models stream chain-of-thought in `reasoning_content`
+    # and the answer in `content`. The consumer must return ONLY content — the old
+    # `content or reasoning_content` concatenated the model's thinking into the
+    # report (ORION: "Wait, I should be careful… Previous Rejection: '2026'…").
+    monkeypatch.setenv("TEST_KEY_ENV", "sk-test")
+    monkeypatch.setattr(
+        P.requests,
+        "post",
+        lambda *a, **k: _StreamResp(
+            200,
+            [
+                'data: {"choices": [{"delta": {"reasoning_content": "Wait, be careful"}}]}',
+                'data: {"choices": [{"delta": {"content": "正式答案"}}]}',
+                'data: {"choices": [{"delta": {"reasoning_content": "double-check"}}]}',
+                "data: [DONE]",
+            ],
+        ),
+    )
+    prov = P.OpenAICompatibleProvider(
+        name="t",
+        base_url="https://x/v1",
+        strong_model="s",
+        fast_model="f",
+        api_key_env="TEST_KEY_ENV",
+    )
+    assert prov.complete("hi") == "正式答案"  # ONLY the answer, no chain-of-thought
+
+
+def test_openai_sse_falls_back_to_reasoning_when_no_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Degenerate model that emits only reasoning_content (no separate answer): we
+    # still return something rather than treating it as an empty stream.
+    monkeypatch.setenv("TEST_KEY_ENV", "sk-test")
+    monkeypatch.setattr(
+        P.requests,
+        "post",
+        lambda *a, **k: _StreamResp(
+            200,
+            [
+                'data: {"choices": [{"delta": {"reasoning_content": "only-reasoning"}}]}',
+                "data: [DONE]",
+            ],
+        ),
+    )
+    prov = P.OpenAICompatibleProvider(
+        name="t",
+        base_url="https://x/v1",
+        strong_model="s",
+        fast_model="f",
+        api_key_env="TEST_KEY_ENV",
+    )
+    assert prov.complete("hi") == "only-reasoning"
+
+
 def test_openai_complete_4xx_fails_fast(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TEST_KEY_ENV", "sk-test")
     monkeypatch.setattr(P.requests, "post", lambda *a, **k: _StreamResp(400, text="bad request"))
