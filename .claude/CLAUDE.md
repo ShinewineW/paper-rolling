@@ -134,6 +134,13 @@ codex, grounded) and the other 5 seams to `openai_compatible`, keys from `.env`.
   they are mutually exclusive (a second start fails fast with `LedgerLockError`) and
   never race. Idempotency keys come from `ledger/naming.py`; vault keys come from
   `output/naming.py` — different concerns.
+- **An ARA is never reflex-deleted** (ADR-0011, the one token-expensive product). On
+  any failure/abort the staged ARA is MOVED to a `_failed/<key>/` scene (gated by
+  `paths.ara_is_nonempty`), never `rm`'d; an `ai_package/` orphan holding a real ARA
+  goes to `_failed/_orphans/`, not pruned. Cheap dirs (person_vault, empty shells,
+  `.clones`, temp) are still hard-deleted. The `失败现场` is a one-way sink — a
+  gate-failed ARA flows in for debug, never back out (revival re-samples). Known
+  residual: the `SpokeCancelled` (stall) path still deletes the built ARA.
 - **Tracked = products, ignored = regenerable inputs** (基调-D2): converted
   `corpus/{ID}/{ID}.md` + `.md_contract.json` + `content_list.json`, `person_vault/`,
   `ai_package/`, `_ledger/`, `landscapes/`, engine + `config/` are tracked; original

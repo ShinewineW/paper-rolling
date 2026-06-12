@@ -48,6 +48,7 @@
 
 ### spec/ — 设计文档
 - [`spec/2026-06-09-code-ref-repo-resolution-impl.md`](spec/2026-06-09-code-ref-repo-resolution-impl.md) — code_ref 官方仓定位级联(T1 grep+T2a PwC离线+T2b HF-live+T4 websearch)+ clone 验证闸门 + 三态语义实施计划(P0)。
+- [`spec/2026-06-11-paper-list-input-mode-impl.md`](spec/2026-06-11-paper-list-input-mode-impl.md) — 指定列表输入模式(关闭自发查找、只跑操作者给的论文集),与自发查找二元切换实施计划(依据 ADR-0010)。
 - [`spec/2026-06-12-ara-delete-safety-impl.md`](spec/2026-06-12-ara-delete-safety-impl.md) — ARA 删除安全:失败/abort 一律移入 `_failed/`、绝不反射式 rm token-expensive 的 ARA,空壳/person/可再生临时物照删(依据 ADR-0011;已落地)。
 
 ### spec/archive/ — 设计文档(归档)

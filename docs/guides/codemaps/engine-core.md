@@ -1,8 +1,8 @@
 # Engine Core Pipeline 代码地图
 
 > **范围**: `scripts/{campaign,hub,spoke,run_campaign}.py` + `scripts/output/{produce,branch1_llm,branch1_report}.py`
-> **最后更新**: 2026-06-08
-> **关键特性**: Per-paper gated pipeline、双链原子产出、LLM writer 集成
+> **最后更新**: 2026-06-12
+> **关键特性**: Per-paper gated pipeline、双链原子产出、LLM writer 集成、失败不删 ARA（ADR-0011）
 
 <!-- Generated: 2026-06-08 | Files scanned: 8 | Token estimate: ~4000 -->
 
@@ -92,8 +92,9 @@ class Ledger:
         # 获得写锁，hold 整个 tick
 
     def consistency_check() → None:
-        # LS-4：启动时验证每个 done paper 有 person_vault/ 和 ai_package/
-        # 缺少 → 降级为 re-process（漂移自愈）
+        # LS-4：启动时 (a) done paper 缺 vault 半边 → 降级 re-process（漂移自愈）；
+        #       (b) 清无 done 行背书的孤儿 vault 目录——但含非空 ARA 的 ai_package
+        #           孤儿 MOVE 到 _failed/_orphans/（ADR-0011），不 rm
 
     def mark_done(key: str, person_path: str, ai_path: str) → None:
         # 原子附加 ledger 行：status:done, vault paths, timestamps
@@ -188,8 +189,8 @@ def make_spoke(
    └─ Failure → re-emit or quarantine
 
 6. promote both-or-neither (OT-5)
-   ├─ If both pass: move ai_package + person_vault to real vaults
-   ├─ Else: delete staging dirs (nothing reaches the vault)
+   ├─ 成功: move ai_package + person_vault → 真 vault
+   ├─ 门控失败/abort: staged ARA 保留为 _failed/<key>/ 现场 (ADR-0011, 不反射式 rm)
 ```
 
 **关键参数**：
@@ -284,59 +285,45 @@ def produce_outputs(
     write_report: Callable[..., dict] | None = None,
     cancel: threading.Event | None = None,
 ) → ProduceResult:
-    """Produce branch2 + branch1 atomically.
-    
-    Both branches are built in staging directories.
-    G2 runs on staged branch2 (before branch1).
-    G3 runs on both (after promotion? NO — runs on staged both).
-    
-    Success: promote both simultaneously.
-    Failure (G2 or G3): delete both staging dirs (atomic: nothing reaches vault).
+    """Produce branch2 + branch1 atomically (OT-5 both-or-neither).
+
+    Both branches build in ONE staging tempdir; promote moves both into the
+    vaults only on full success. G2 数字门 runs on staged branch2 (before
+    branch1); G3 最终门 runs AFTER promote, in the SPOKE's bounded gate-runner.
+    Failure (gate OR transport-abort): the staged ARA is PRESERVED as a
+    _failed/<key>/ scene, NOT deleted (ADR-0011). Only success + SpokeCancelled
+    clean staging.
     """
-    
-    key = derive_name(candidate, ledger)  # vault key
-    stage_ai = Path(f"_stage_{key}_ai/")
-    stage_person = Path(f"_stage_{key}_person/")
-    
+
+    key = vault_key(intake=ledger.intake_date(), title=…, arxiv_id=…, doi=…)
+    staging = Path(tempfile.mkdtemp())          # ONE temp dir
+    stage_ai = staging / "ai" / "ara"           # branch2 ARA;  stage_person = staging/"person"
+    handed_off = False
     try:
-        # Call analyzer → branch2
-        analysis = resolve_analysis(md_path, candidate)
-        write_branch2(stage_ai, analysis, candidate, key=key)
-        
-        # G2 gate (hard block before branch1)
-        if g2_gate:
-            verdict = g2_gate(stage_ai)
-            if verdict.is_hard_block:
-                raise GateFailure("G2 hard block")
-        
-        # branch1: LLM-written OR thin deterministic
-        if write_report is not None:
-            write_branch1_llm(
-                stage_person, candidate, stage_ai, md_path,
-                write_report, key=key
-            )
-        else:
-            write_branch1(stage_person, candidate, stage_ai, md_path, analysis, key=key)
-        
-        # G3 gate (hard block, may re-emit via bounded_gate_runner)
-        # [gate_runner handles retry logic]
-        
-        # Both pass → promote
-        promote_staging(stage_person, stage_ai, key)
-        return ProduceResult(person_path=..., ai_path=...)
-        
+        stage_ai, analysis = stage_branch2(staging, candidate, md_path, resolve_analysis=…)  # → Seal-1 结构门
+        if g2_gate and g2_gate(staging / "ai").blocked:          # G2 数字门 (before branch1)
+            raise ProduceGateBlocked(verdict, staged_dir=staging)
+        stage_branch1(staging, candidate, stage_ai, md_path, write_report, analysis, key)  # 锚点门 self-gate
+        if cancel and cancel.is_set():           # stall 砍单 last safe point
+            raise SpokeCancelled(…)
+        return promote(staging, key, …)          # move BOTH → vaults, atomic
+    except (StructuralSealFailed, ProduceGateBlocked, AnchorGateError):
+        handed_off = True; raise                 # spoke scenes staging → _failed/<key>/
+    except EngineAbort as exc:                   # ADR-0011: transport abort
+        if ara_is_nonempty(staging / "ai" / "ara"):
+            exc.staged_dir = staging; handed_off = True   # preserve the paid-for ARA
+        raise
     finally:
-        # Cleanup staging even on failure
-        shutil.rmtree(stage_ai, ignore_errors=True)
-        shutil.rmtree(stage_person, ignore_errors=True)
+        if not handed_off:                       # only success + SpokeCancelled clean staging
+            shutil.rmtree(staging, ignore_errors=True)
+    # G3 最终门 runs AFTER this, in the SPOKE (run_with_budget) on the PROMOTED products.
 ```
 
 **关键不变式**：
-- 两个分支都在 staging 目录构建（_stage_{key}_ai, _stage_{key}_person）
-- G2 运行在 staged branch2 上（branch1 还未构建）
-- G3 运行在 staged 两个分支上（或 hub 的 after-promotion copy？TBD）
-- 任何硬门失败 → 删除两个 staging 目录（Nothing reaches vault）
-- Hub 从 ProduceResult 而不是重新派生 key
+- 单个 staging tempdir（`staging/ai/ara` + `staging/person`）；promote 时整体 move 进两个 vault（OT-5 both-or-neither）。
+- G2 数字门 在 staged branch2、branch1 之前；**G3 最终门 在 promote 之后**、由 spoke 的 bounded gate-runner 跑（含 branch 级重发）。
+- **失败不删 ARA（ADR-0011）**：门控失败 / EngineAbort 都把 staged ARA 交给 spoke 保留成 `_failed/<key>/` 现场；只有成功 + SpokeCancelled（stall 砍单）清 staging —— 后者是 ADR-0011 尚未覆盖的残留（stall 仍删刚建好的 ARA）。
+- Hub 从 ProduceResult 读路径，不重新派生 key。
 
 ---
 
