@@ -16,7 +16,7 @@ communication** and **deliberately do NOT rename the code identifiers**.
 | **数字门** | branch2 → branch1 | `G2` / data-fidelity / audit-D1 | LLM (skeptic, N votes) | every evidence number appears in the source MD |
 | **最终门** | after both chains | `G3` / seal / Seal Level 2 | mixed | composite sub-checks (below) |
 
-> **ADR-0012 修订(2026-06-13,实现待落地)**:**锚点门不再是一道门**。branch1 人链报告改为不设
+> **ADR-0012 修订(2026-06-13,已落地)**:**锚点门不再是一道门**。branch1 人链报告改为不设
 > 任何硬门——原 (b) 数字落源 + (c) 判官不再硬拦,转为生成报告**开篇的「评价」**(对照 ARA 的忠实性
 > 自述,judge 写、永不拦)。**「评价」是 branch1 的内容产物,不是 checkpoint。** 因此**规范门只剩
 > 三道,全在 ARA 上:结构门 → 数字门 → 最终门**;最终门的"锚点解析"子检查也随之移除。下表保留旧的
