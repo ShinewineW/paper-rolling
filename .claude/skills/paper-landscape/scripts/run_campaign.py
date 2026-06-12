@@ -6,7 +6,7 @@ composed them and SKILL.md only described the wiring in prose. Prose wiring is
 unenforceable: a lazy runtime could pass always-pass seams and silently neuter
 the adversarial guarantees (G2 number-fabrication hard-block + G3 6-dim seal).
 This module turns the composition into a single executable entry point so the
-ONLY thing left to the runtime agent is constructing the four LLM-backed seams.
+ONLY thing left to the runtime agent is constructing the five LLM-backed seams.
 
 The `/loop` tick drives `run_campaign(...)`:
 
@@ -16,7 +16,7 @@ The `/loop` tick drives `run_campaign(...)`:
              run_campaign_tick(discover, spoke)  # gate-check -> LS-4 self-heal
                                                  #   -> batch -> landscape
 
-The four model seams are provider-agnostic injected callables (NO LLM call is
+The five model seams are provider-agnostic injected callables (NO LLM call is
 hard-coded here). In production EACH seam MUST be backed by an INDEPENDENT
 Agent-tool invocation (a fresh sub-agent per call), so the audit votes are not
 correlated with the generator that produced the numbers:
@@ -37,10 +37,14 @@ correlated with the generator that produced the numbers:
                         appears in any generator prompt.
   - entailment_judge  — the G3 type-aware entailment check (claim + linked
                         experiment text -> (entailed, reason)).
+  - faithfulness_judge — the branch1 忠实门 (c) judge (ADR-0012): compares the
+                        human report against the verified ARA (report ↔ ARA), fails
+                        CLOSED. Ground-truth-isolated from the write_report writer
+                        (routed at tier=fast → a model ≠ the writer's).
 
 The composition is deterministic and fully testable with fake seams (see
 tests/test_run_campaign.py and tests/test_spoke.py); production swaps in the
-four Agent-tool-backed seams without touching this file.
+five Agent-tool-backed seams without touching this file.
 """
 
 from __future__ import annotations
@@ -79,7 +83,7 @@ def run_campaign(
     """Run one /loop campaign tick end-to-end (gates included).
 
     Builds the single-writer ledger, composes the per-paper gated spoke with the
-    four injected model seams, and dispatches one `run_campaign_tick` — returning
+    five injected model seams, and dispatches one `run_campaign_tick` — returning
     its `TickResult` (hub counts + the regenerated landscape). The wiring is CODE
     so the adversarial guarantees cannot be bypassed by prose drift: every run
     goes through G2 (number-fabrication hard-block) and G3 (6-dim seal).
@@ -189,10 +193,11 @@ blindly from the shell:
   skeptic_votes      — model seam #2: the G2 ground-truth-isolated skeptic
   rigor_scores       — model seam #3: the G3 6-dim rigor reviewer
   entailment_judge   — model seam #4: the G3 type-aware entailment judge
+  faithfulness_judge — model seam #5: the branch1 忠实门 (c) report<->ARA judge
   http               — HTTP fetch seam used by ingest (Tier-1 arXiv-HTML)
   run_cli            — CLI runner seam used by ingest (Tier-2 MinerU / pandoc)
 
-The FOUR model seams MUST each be backed by an INDEPENDENT Agent-tool invocation
+The FIVE model seams MUST each be backed by an INDEPENDENT Agent-tool invocation
 (a fresh sub-agent per call) so the audit votes are uncorrelated with the
 generator. See SKILL.md "Wiring the model seams" for the exact contract of each.
 

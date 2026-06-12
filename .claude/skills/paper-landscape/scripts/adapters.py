@@ -1,7 +1,9 @@
 # .claude/skills/paper-landscape/scripts/adapters.py
 """Default deterministic infra adapters — the "just works" wiring (READY).
 
-`run_campaign(...)` takes SEVEN injected callables. Four are LLM seams that MUST
+`run_campaign(...)` takes the LLM seams plus three infra adapters. The five LLM
+analysis/audit seams (resolve_analysis, skeptic_votes, rigor_scores,
+entailment_judge, faithfulness_judge — plus the optional write_report writer) MUST
 be independent Agent-tool invocations and therefore can only be supplied by the
 runtime agent (see ``references/wiring-the-seams.md``). The other THREE are pure
 deterministic I/O:
@@ -12,7 +14,7 @@ deterministic I/O:
 
 There is no reason to re-improvise deterministic plumbing per run, so this module
 ships tested defaults. With them, invoking /paper-landscape reduces to: construct
-the four LLM seams, then call ``run_campaign(..., http=build_http(),
+the LLM seams, then call ``run_campaign(..., http=build_http(),
 run_cli=build_run_cli(), discover=build_discover(llm=...), ...)``. Pass your own
 callable to override any adapter.
 """

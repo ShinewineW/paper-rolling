@@ -23,7 +23,7 @@ The agent-facing knowledge lives in `references/` (load the doc you need),
 - `references/discovery-and-authority.md` · `ingest-fidelity.md` · `naming-and-ledger.md` · `landscapes.md` — per-subsystem depth.
 - `references/branch1-quality.md` — quality bar + anchor discipline for the human report.
 - `references/glossary.md` — domain terms.
-- `sub-skills/{analyze-paper,g2-skeptic,g3-rigor-reviewer,entailment-judge}/` — the four independent LLM-seam roles.
+- `sub-skills/{analyze-paper,g2-skeptic,g3-rigor-reviewer,entailment-judge}/` — the four sub-skill LLM-seam role docs (the 忠实门 `faithfulness_judge` seam is routed via config without a role dir).
 - `examples/worked-example.md` + `examples/sample-ara-bundle.json` — one paper end-to-end; the literal `resolve_analysis` output target.
 - `templates/{ara-paper,branch1-report,landscape}.md` — the output skeletons branch2 / branch1 / landscapes write.
 

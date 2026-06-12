@@ -157,6 +157,7 @@ seams:
   entailment: opencode
   expand: opencode
   writer: opencode
+  faithfulness: opencode   # branch1 忠实门 (c) judge — ADR-0012 (every seam MUST be routed)
 ```
 
 **特性**：

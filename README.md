@@ -27,8 +27,9 @@ If you are taking this over with no prior context:
 - The runtime injects the **seams** — everything LLM-backed or I/O-backed lives
   outside the pure core. These are: three **infrastructure adapters** the driver
   supplies (`discover`, `http`, `run_cli`), and the **LLM-backed seams** — the
-  four analysis/audit callables (`resolve_analysis`, `skeptic_votes`,
-  `rigor_scores`, `entailment_judge`) **plus** the query-expansion `llm` used
+  five analysis/audit callables (`resolve_analysis`, `skeptic_votes`,
+  `rigor_scores`, `entailment_judge`, `faithfulness_judge`), the optional
+  human-chain `write_report` writer, **plus** the query-expansion `llm` used
   inside the `discover` callable. Their exact contracts are in `SKILL.md` →
   "Wiring the model seams".
 - Tests are the executable spec. Start at `tests/test_spoke.py` (full per-paper

@@ -121,7 +121,7 @@ data_fidelity:
                     ┌─────────▼─────────┐
                     │  scripts/llm/     │
                     │  seams.py:        │
-                    │  build_seams()    │ ← 6 个 provider 路由 seam
+                    │  build_seams()    │ ← 7 个 provider 路由 seam
                     └─────────┬─────────┘
                               │
           ┌───────────────────┼───────────────────┐
@@ -152,7 +152,7 @@ data_fidelity:
 
 - **SKILL.md** — `/paper-landscape` 技能合约 + 硬门 + 每日 /loop 运行约定
 - **ADR-0004** — LLM seam = 同步注入 callable；默认传输锁死 `claude -p`
-- **`references/wiring-the-seams.md`** — 引擎组成合约（7 个 seam，其中 6 个 LLM）
+- **`references/wiring-the-seams.md`** — 引擎组成合约（7 个 LLM seam，含 faithfulness）
 - **`references/human-report-writing.md`** — 人链写入器的语言风格 + anchor 规范
 - **`references/ara-schema.md`** — 分析束输出格式
 

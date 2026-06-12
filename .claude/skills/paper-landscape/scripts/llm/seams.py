@@ -391,6 +391,11 @@ def write_report(
     return {"sections": sections, "figures": figures}
 
 
+# --------------------------------------------------------------------------- #
+# Seam 7: faithfulness_judge — branch1 忠实门 (c) report<->ARA judge (ADR-0012)  #
+# --------------------------------------------------------------------------- #
+
+
 def faithfulness_judge(report_text: str, ara_dir: Path) -> dict:
     """branch1 忠实门 (c): is the 理解阅读 FAITHFUL to its verified ARA? (ADR-0012)
 
