@@ -48,6 +48,7 @@
 
 ### spec/ — 设计文档
 - [`spec/2026-06-09-code-ref-repo-resolution-impl.md`](spec/2026-06-09-code-ref-repo-resolution-impl.md) — code_ref 官方仓定位级联(T1 grep+T2a PwC离线+T2b HF-live+T4 websearch)+ clone 验证闸门 + 三态语义实施计划(P0)。
+- [`spec/2026-06-12-ara-delete-safety-impl.md`](spec/2026-06-12-ara-delete-safety-impl.md) — ARA 删除安全:失败/abort 一律移入 `_failed/`、绝不反射式 rm token-expensive 的 ARA,空壳/person/可再生临时物照删(依据 ADR-0011;已落地)。
 
 ### spec/archive/ — 设计文档(归档)
 - [`spec/archive/2026-06-09-失败现场与复活赛-impl.md`](spec/archive/2026-06-09-失败现场与复活赛-impl.md) — 失败现场保全 + branch 级重试 + 批次复活赛实施计划(依据 ADR-0006~0009;已落地归档)。
