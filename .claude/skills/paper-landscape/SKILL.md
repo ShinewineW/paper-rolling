@@ -136,8 +136,9 @@ ordinal sequence is discover → ingest → ledger → branch2 → **G2** → br
    branch2's staged ARA evidence. A hard block aborts before branch1 and any
    promotion (OT-5: nothing reaches the real vault).
 6. **branch1** — illustration author: `person_vault/{date}_{Name}_{idbase}/`
-   (Chinese report; Mermaid redraw + derivation + loss explainer; every
-   empirical claim anchored to the MD via `<!--ref-->` markers, 吸收-D1).
+   (Chinese report; Mermaid redraw + derivation + loss explainer; 忠实门 (ADR-0012):
+   prose MAY carry numbers grounded in the MD ((b)) + an LLM faithfulness judge
+   ((c)), while the engine 核心结论 block keeps its `<!--ref-->` anchors, 吸收-D1).
 7. **G3** — seal gate (branch1↔MD consistency + equation fidelity + 6-dim rigor
    seal): runs **after both branches**. Hard failures block + re-emit (max N
    rounds → escalate / flag for human).

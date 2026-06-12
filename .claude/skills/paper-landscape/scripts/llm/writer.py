@@ -8,11 +8,12 @@ produces flowing, illustrative Chinese prose. It is provider-agnostic: the calle
 passes an ``LLMProvider`` (explicitly routed per config/llm.yaml — no default), so
 the human chain can run on, e.g., deepseek/qwen while the analyzer stays on Claude.
 
-Grounding discipline (so the report passes the three-layer anchor lint, 吸收-D1):
-sections keep EXACT performance numbers OUT of prose sentences (they live in the
-rendered evidence tables + a mechanically-anchored 核心结论 block, added by the
-assembler), and keep numbers/equations/proper-nouns verbatim. The assembler runs
-the real anchor lint afterward.
+Grounding discipline (so the report passes the branch1 忠实门, ADR-0012 / 吸收-D1):
+sections MAY write performance numbers in natural prose, but every number must be a
+real value from the ARA/source (the 忠实门 verifies grounding mechanically + an LLM
+judge); numbers/equations/proper-nouns stay verbatim. The assembler runs the real
+忠实门 (kept anchor-form lint + (b) grounding + (c) judge) afterward; the engine
+核心结论 block is still mechanically anchored.
 """
 
 from __future__ import annotations

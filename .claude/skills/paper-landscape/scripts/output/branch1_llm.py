@@ -13,8 +13,9 @@ thin deterministic write_branch1. This module then GROUNDS it deterministically:
     grounding + optional LLM faithfulness judge, checked by branch1_gate before
     promotion.
 
-So the rich LLM prose keeps loose performance numbers OUT of sentences (they live
-in tables / anchored conclusions), staying faithful + gate-passing.
+So the rich LLM prose MAY carry performance numbers in natural sentences (ADR-0012)
+as long as each value is grounded in the MD; the 忠实门 ((b) grounding + (c) judge)
+verifies faithfulness, and the engine 核心结论 block stays anchored.
 """
 
 from __future__ import annotations
