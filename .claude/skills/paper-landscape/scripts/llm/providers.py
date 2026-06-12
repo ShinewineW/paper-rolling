@@ -351,6 +351,12 @@ class OpenAICompatibleProvider:
         """Assemble streamed `data: {delta}` chunks into the full content. An
         overall-budget guard caps a slow trickle; per-chunk silence is bounded by
         the socket read timeout (raises RequestException, handled by the caller)."""
+        # SSE frames are UTF-8, but `text/event-stream` rarely carries an explicit
+        # charset, so requests defaults `resp.encoding` to ISO-8859-1 (RFC 2616) →
+        # `iter_lines(decode_unicode=True)` then decodes CJK as latin-1 and the whole
+        # Chinese report comes back as mojibake (e.g. 用户 → `ç¨æ·`). Pin UTF-8 so
+        # the decode is correct regardless of the server's (missing) charset header.
+        resp.encoding = "utf-8"
         parts: list[str] = []
         for raw in resp.iter_lines(decode_unicode=True):
             if time.monotonic() > deadline:

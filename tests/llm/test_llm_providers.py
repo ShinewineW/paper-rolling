@@ -116,6 +116,52 @@ def test_openai_complete_parses_content(monkeypatch: pytest.MonkeyPatch) -> None
     assert captured["auth"] == "Bearer sk-test"
 
 
+class _EncStreamResp:
+    """Fake SSE response whose `iter_lines(decode_unicode=True)` decodes its raw
+    UTF-8 frames via `self.encoding` — mirroring requests, which defaults a
+    charset-less `text/event-stream` to ISO-8859-1. Lets us prove the provider
+    pins UTF-8 (else CJK comes back as mojibake)."""
+
+    def __init__(self, frames_utf8: list[str]) -> None:
+        self.status_code = 200
+        self.encoding = "ISO-8859-1"  # requests' charset-less default
+        self._raw = [f.encode("utf-8") for f in frames_utf8]
+        self.text = ""
+
+    def __enter__(self) -> _EncStreamResp:
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        return False
+
+    def iter_lines(self, decode_unicode: bool = False):  # noqa: FBT002 - mirror requests API
+        for b in self._raw:
+            yield b.decode(self.encoding) if decode_unicode else b
+
+
+def test_openai_sse_decodes_cjk_as_utf8_not_latin1(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Regression: a charset-less SSE stream made requests decode CJK as latin-1,
+    # turning a Chinese report into mojibake (ORION revival demo). _consume_sse must
+    # pin resp.encoding='utf-8' so the assembled content is the real Chinese.
+    monkeypatch.setenv("TEST_KEY_ENV", "sk-test")
+    cjk = "本文模型达到 28.4 NDS,仅用 10% 数据"
+    monkeypatch.setattr(
+        P.requests,
+        "post",
+        lambda *a, **k: _EncStreamResp(
+            [f'data: {{"choices": [{{"delta": {{"content": "{cjk}"}}}}]}}', "data: [DONE]"]
+        ),
+    )
+    prov = P.OpenAICompatibleProvider(
+        name="t",
+        base_url="https://x/v1",
+        strong_model="s",
+        fast_model="f",
+        api_key_env="TEST_KEY_ENV",
+    )
+    assert prov.complete("hi") == cjk  # real Chinese, NOT 'æ\x9c¬æ\x96\x87...' mojibake
+
+
 def test_openai_complete_4xx_fails_fast(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TEST_KEY_ENV", "sk-test")
     monkeypatch.setattr(P.requests, "post", lambda *a, **k: _StreamResp(400, text="bad request"))
