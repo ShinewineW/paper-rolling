@@ -251,14 +251,25 @@ class Ledger:
         slate. Done rows are never touched.
         """
         removed: list[str] = []
+        orphans_dir = self.topic_dir / FAILED_REL / "_orphans"
         for _key, row in self._latest_by_key().items():
             if row["status"] == _DONE or row.get("rescinded_at"):
                 continue
             for path_key in ("person_vault_path", "ai_package_path"):
                 p = row.get(path_key)
-                if p and Path(p).exists():
+                if not (p and Path(p).exists()):
+                    continue
+                # ADR-0011: preserve a non-empty ai_package ARA (token-expensive);
+                # person_vault + empty ARA dirs are still removed.
+                if path_key == "ai_package_path" and paths.ara_is_nonempty(Path(p) / "ara"):
+                    orphans_dir.mkdir(parents=True, exist_ok=True)
+                    dest = orphans_dir / Path(p).name
+                    if dest.exists():
+                        shutil.rmtree(dest, ignore_errors=True)
+                    shutil.move(p, str(dest))
+                else:
                     shutil.rmtree(p)
-                    removed.append(p)
+                removed.append(p)
         clones = self.topic_dir / ".clones"
         if clones.exists():
             shutil.rmtree(clones)
