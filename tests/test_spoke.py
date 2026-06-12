@@ -1005,6 +1005,11 @@ def test_spoke_unanchored_prose_claim_now_passes(tmp_path, fake_http, fake_cli):
         rigor_scores=_good_rigor,
         entailment_judge=_entailed,
         ledger=_ledger(tmp_path),
+        # Production default from AuditConfig.data_fidelity_tolerant=True; the report
+        # gate reuses g2_tolerant so we must match the production value here (ADR-0012).
+        g2_tolerant=True,
+        g2_max_unconfirmed=5,
+        g2_max_unconfirmed_ratio=0.2,
     )
 
     result = spoke(dict(_CANDIDATE))

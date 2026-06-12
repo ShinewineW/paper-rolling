@@ -68,6 +68,7 @@ def run_campaign(
     cross_model_votes: SkepticVoteFn | None = None,
     cross_model_sample: float = 0.0,
     write_report: Callable | None = None,
+    faithfulness_judge: Callable | None = None,
     repo_resolver: Callable | None = None,
     audit_config: AuditConfig | None = None,
     requested_topic: str | None = None,
@@ -148,6 +149,7 @@ def run_campaign(
         g2_max_unconfirmed=cfg.data_fidelity_max_unconfirmed,
         g2_max_unconfirmed_ratio=cfg.data_fidelity_max_unconfirmed_ratio,
         write_report=write_report,
+        faithfulness_judge=faithfulness_judge,
         repo_resolver=repo_resolver,
     )
     # LS-1 single-writer lock: hold _ledger/.lock for the whole tick so a second

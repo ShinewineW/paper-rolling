@@ -305,6 +305,10 @@ def _revive_one(
                 manifest.get("analysis"),
                 key,
                 prior_failure=fb,
+                faithfulness_judge=seams.get("faithfulness_judge"),
+                report_tolerant=cfg.data_fidelity_tolerant,
+                report_max_unconfirmed=cfg.data_fidelity_max_unconfirmed,
+                report_max_unconfirmed_ratio=cfg.data_fidelity_max_unconfirmed_ratio,
             )
         else:
             # branch2 整条重跑:重调 analyzer(带反馈)+ G2 复核 + branch1(R10:透传 repo_resolver)。
@@ -336,6 +340,10 @@ def _revive_one(
                 _analysis,
                 key,
                 prior_failure=fb,
+                faithfulness_judge=seams.get("faithfulness_judge"),
+                report_tolerant=cfg.data_fidelity_tolerant,
+                report_max_unconfirmed=cfg.data_fidelity_max_unconfirmed,
+                report_max_unconfirmed_ratio=cfg.data_fidelity_max_unconfirmed_ratio,
             )
 
         # 复核一律对 staging 跑、promote 只在通过后(审计 R2 Finding 3:严禁先 promote 再复核)。

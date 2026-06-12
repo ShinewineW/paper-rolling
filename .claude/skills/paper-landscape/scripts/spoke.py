@@ -97,6 +97,7 @@ def make_spoke(
     g2_max_unconfirmed: int = 0,
     g2_max_unconfirmed_ratio: float = 0.0,
     write_report: Callable | None = None,
+    faithfulness_judge: Callable | None = None,
     repo_resolver: Callable | None = None,
 ) -> SpokeFn:
     """Build the production SpokeFn that runs the full gated pipeline per paper.
@@ -181,6 +182,10 @@ def make_spoke(
                 resolve_analysis=resolve_analysis,
                 g2_gate=_g2,
                 write_report=write_report,
+                faithfulness_judge=faithfulness_judge,
+                report_tolerant=g2_tolerant,
+                report_max_unconfirmed=g2_max_unconfirmed,
+                report_max_unconfirmed_ratio=g2_max_unconfirmed_ratio,
                 cancel=cancel,
                 repo_resolver=repo_resolver,
                 reuse_analysis=reuse,
