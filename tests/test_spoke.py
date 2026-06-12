@@ -969,18 +969,15 @@ def test_g3_branch1_root_reuses_branch2(tmp_path, fake_http, fake_cli, monkeypat
 # --- branch1 ANCHOR GATE (failure isolation) ------------------------------
 
 
-def test_spoke_unanchorable_claim_quarantines_not_crash(tmp_path, fake_http, fake_cli):
-    # Codex Round-8 regression: a branch1 empirical claim that cannot be grounded
-    # in the MD raises AnchorGateError in staging (pre-promotion). The spoke MUST
-    # quarantine + return failed — NOT let the exception escape and crash the
-    # unattended /loop tick.
+def test_spoke_unanchored_prose_claim_now_passes(tmp_path, fake_http, fake_cli):
+    # ADR-0012: prose-anchor requirement dropped — a branch1 empirical claim
+    # that cannot be grounded in the MD no longer raises AnchorGateError.
+    # The spoke MUST succeed (status=done), not quarantine. Faithfulness is
+    # branch1_gate's job, not the anchor lint's.
     _tier2_http(fake_http, dict(_CANDIDATE))
     bad = copy.deepcopy(_ANALYSIS)
-    # The ONLY claim cites "99 NDS", which never appears in _SOURCE_MD, so branch1
-    # cannot anchor it. (The anchor lint is line-based, so the claim must stand
-    # alone — an anchored sibling claim on the same paragraph line would mask it.)
-    # The single unanchored number + metric cue makes the three-layer lint
-    # hard-fail -> AnchorGateError inside write_branch1 (staging, pre-promotion).
+    # The ONLY claim cites "99 NDS", which never appears in _SOURCE_MD. Under the
+    # old contract this caused AnchorGateError; after ADR-0012 it is allowed.
     bad["claims"] = [
         {
             "id": "C99",
@@ -1010,21 +1007,9 @@ def test_spoke_unanchorable_claim_quarantines_not_crash(tmp_path, fake_http, fak
         ledger=_ledger(tmp_path),
     )
 
-    result = spoke(dict(_CANDIDATE))  # must NOT raise AnchorGateError
-
-    assert result.status == "failed"
-    assert result.failure_class == FAILURE_AUDIT_BLOCK
-    assert "anchor" in result.failure_reason.lower()
-    # Pre-promotion: nothing reached the vaults (OT-5 holds for the anchor gate too).
-    assert not (tmp_path / "ai_package").exists() or not any(
-        p for p in (tmp_path / "ai_package").iterdir() if p.name != ".gitkeep"
-    )
-    # audit F: anchor failure preserves the staged scene (ai/ + partial person/).
-    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
-    assert scenes, "expected a _failed/<key>/scene.json"
-    m = json.loads(scenes[0].read_text(encoding="utf-8"))
-    assert m["failed_gate"] == "锚点门"
-    assert (scenes[0].parent / "ai").is_dir()
+    result = spoke(dict(_CANDIDATE))
+    # ADR-0012: prose number no longer blocked by anchor lint → spoke succeeds.
+    assert result.status == "done"
 
 
 # --- INGEST FAIL -----------------------------------------------------------

@@ -62,16 +62,16 @@ def test_check_hard_blocks_unresolvable_anchor(tmp_path: Path) -> None:
     assert hard.is_hard_block is True
 
 
-def test_check_hard_blocks_empirical_sentence_with_no_anchor(tmp_path: Path) -> None:
-    """吸收-D1 lint = hard gate: an empirical sentence (carries a number) with
-    NO ref/anchor marker is a block — forces full anchoring."""
+def test_check_does_not_block_empirical_sentence_with_no_anchor(tmp_path: Path) -> None:
+    """ADR-0012: prose-anchor requirement dropped. An empirical sentence with NO
+    ref/anchor marker must NOT be blocked by check_branch1_md_anchors — only
+    present anchors that fail to resolve are blocked."""
     md = tmp_path / "src.md"
     md.write_text(_MD, encoding="utf-8")
     report = tmp_path / "report.md"
     report.write_text("本模型取得了 28.4 的 BLEU 分数，但没有任何锚点。\n", encoding="utf-8")
     verdict = check_branch1_md_anchors(report, md)
-    assert verdict.blocked is True
-    assert any("no anchor" in f.observation.lower() for f in verdict.hard_findings)
+    assert verdict.blocked is False
 
 
 def test_check_ignores_non_empirical_prose(tmp_path: Path) -> None:
@@ -83,29 +83,20 @@ def test_check_ignores_non_empirical_prose(tmp_path: Path) -> None:
     assert verdict.blocked is False
 
 
-def test_anchor_check_accepts_injected_empirical_classifier(tmp_path):
-    """ROADMAP C4: the empirical-sentence detector is injectable — a custom
-    classifier (stand-in for an NLI / factual-consistency model) overrides the
-    metric-cue heuristic for deciding which sentences must anchor."""
+def test_anchor_check_ignores_numbers_in_prose_no_anchors(tmp_path):
+    """ADR-0012: prose-anchor requirement dropped. A number-bearing sentence
+    with no ref/anchor markers must not be blocked by check_branch1_md_anchors,
+    regardless of whether numbers look empirical."""
     from scripts.audit.anchor_resolution import check_branch1_md_anchors
 
     report = tmp_path / "report.md"
-    # A number-bearing sentence with NO metric cue: the heuristic does not flag it.
+    # A number-bearing sentence with no anchor markers at all.
     report.write_text("The system processed 42 documents overnight.\n", encoding="utf-8")
     md = tmp_path / "src.md"
     md.write_text("Unrelated source text.\n", encoding="utf-8")
 
-    # Default heuristic -> not empirical -> not gated.
+    # No anchors present -> nothing to resolve -> gate passes.
     assert check_branch1_md_anchors(report, md).blocked is False
-
-    # Injected classifier treats any number-bearing sentence as empirical -> the
-    # unanchored sentence is now hard-blocked.
-    def nli_stub(sentence: str) -> bool:
-        return any(c.isdigit() for c in sentence)
-
-    verdict = check_branch1_md_anchors(report, md, is_empirical=nli_stub)
-    assert verdict.blocked is True
-    assert any("no anchor" in f.observation for f in verdict.hard_findings)
 
 
 def test_g3_skips_table_rows_regression(tmp_path: Path) -> None:
@@ -123,11 +114,16 @@ def test_g3_skips_table_rows_regression(tmp_path: Path) -> None:
     assert not verdict.findings  # table row not flagged (was the G3 false-positive)
 
 
-def test_g3_and_branch1_agree_on_unanchored_lines() -> None:
-    """G3 and branch1 use the SAME shared detector, so they flag the same lines."""
+def test_unanchored_empirical_lines_still_detects_but_lint_text_does_not_block() -> None:
+    """ADR-0012: unanchored_empirical_lines still detects performance lines (it
+    remains defined as a future classifier hook / C4 roadmap entry), but lint_text
+    no longer uses it — prose numbers are not blocked by the anchor lint gate."""
     from scripts.output.anchor_lint import lint_text, unanchored_empirical_lines
 
     text = "本节小结。\n模型在 mAP 上达到 0.99，大幅超过基线。\n"  # 2nd line empirical, no ref
-    g3 = {ln for ln, _ in unanchored_empirical_lines(text)}
-    b1 = {v.line for v in lint_text(text) if "unanchored empirical" in v.message}
-    assert g3 == b1 and g3  # agree + actually caught the empirical line
+    # The detector still correctly identifies the empirical line.
+    detected = {ln for ln, _ in unanchored_empirical_lines(text)}
+    assert detected == {2}
+    # But lint_text (check 4 removed per ADR-0012) does NOT flag it.
+    empirical_violations = [v for v in lint_text(text) if "unanchored empirical" in v.message]
+    assert empirical_violations == []

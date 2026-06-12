@@ -35,9 +35,8 @@ def test_run_g2_signature_is_stable_for_hub() -> None:
 
 def test_run_g3_signature_is_stable_for_hub() -> None:
     sig = inspect.signature(g3_seal.run_g3)
-    # + the optional `empirical_classifier` seam (ROADMAP C4): a keyword-only,
-    # None-default classifier for the anchor empirical-sentence detection, so the
-    # hub's existing calls stay back-compatible.
+    # ADR-0012: empirical_classifier seam (ROADMAP C4) removed — prose-anchor
+    # requirement dropped; check_branch1_md_anchors no longer uses a classifier.
     assert list(sig.parameters) == [
         "person_vault_entry",
         "ai_package_entry",
@@ -45,7 +44,6 @@ def test_run_g3_signature_is_stable_for_hub() -> None:
         "content_list_path",
         "rigor_scores",
         "entailment_judge",
-        "empirical_classifier",
     ]
 
 

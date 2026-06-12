@@ -162,17 +162,21 @@ def test_write_branch1_llm_requires_architecture_figure(tmp_path: Path) -> None:
         write_branch1_llm(person, {"title": "P"}, ara, md, fake_write_report, key="k")
 
 
-def test_write_branch1_llm_blocks_unanchored_perf_claim(tmp_path: Path) -> None:
+def test_write_branch1_llm_prose_perf_number_no_longer_blocked(tmp_path: Path) -> None:
+    # ADR-0012: prose-anchor requirement dropped. An LLM section with a prose
+    # performance number not present in the source MD must NOT raise AnchorGateError
+    # — lint_text check 4 was removed; faithfulness is branch1_gate's job.
     ara = _ara(tmp_path)
     md = tmp_path / "src.md"
     md.write_text("Our model reaches a BLEU of 28.4.\n", encoding="utf-8")  # 0.99 NOT here
     person = tmp_path / "person_vault" / "k"
 
-    def bad_write_report(ara_dir, *, md_path=None, outdir=None):  # noqa: ARG001
+    def prose_write_report(ara_dir, *, md_path=None, outdir=None):  # noqa: ARG001
         return {
             "sections": {"06_实验": "## 实验\n我们在 mAP 上达到 0.99,大幅超过基线。"},
             "figures": [],
         }
 
-    with pytest.raises(AnchorGateError):
-        write_branch1_llm(person, {"title": "X"}, ara, md, bad_write_report, key="k")
+    # Should succeed without raising.
+    write_branch1_llm(person, {"title": "X"}, ara, md, prose_write_report, key="k")
+    assert (person / "report.md").exists()

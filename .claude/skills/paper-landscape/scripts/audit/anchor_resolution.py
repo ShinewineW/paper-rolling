@@ -12,10 +12,8 @@ at an MD span, and G3 checks branch1<->MD. This module:
      marker shape — pure regex, zero dependency),
   2. resolves each anchor against the source MD (quote substring / page-or-
      section presence),
-  3. HARD-BLOCKS (a) any anchor that does not resolve and (b) any empirical
-     sentence that carries a number but no anchor at all (lint = hard gate,
-     吸收-D1 option a — forces full anchoring, same disposition as G2's
-     fabrication block).
+  3. HARD-BLOCKS any anchor that does not resolve — prose faithfulness
+     (ADR-0012) is branch1_gate's job; this gate only validates anchors present.
 
 Marker shape and quote-word conventions follow
 `references/academic-research-skills/scripts/check_v3_7_3_three_layer_citation.py`
@@ -25,13 +23,11 @@ Marker shape and quote-word conventions follow
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote
 
 from scripts.audit.types import Finding, GateVerdict, Severity
-from scripts.output.anchor_lint import unanchored_empirical_lines
 
 _VALID_KINDS = frozenset({"quote", "page", "section", "paragraph", "none"})
 
@@ -40,11 +36,6 @@ _REF_ANCHOR = re.compile(
     r"<!--ref:[A-Za-z][A-Za-z0-9_:-]*(?:\s+[\w-]+){0,2}\s*-->"
     r"\s*<!--anchor:([a-z]+):([^>]*?)-->"
 )
-
-# "Which lines must be anchored" is decided by the SHARED detector in anchor_lint
-# (`unanchored_empirical_lines`), so the G3 auditor and the branch1 author agree
-# exactly — line-based, skips fences / ref-lines / table rows. (Previously G3 used
-# its own sentence-based scan that disagreed and rejected reports branch1 passed.)
 
 
 @dataclass(frozen=True)
@@ -87,15 +78,12 @@ def resolves_in_md(kind: str, value: str, md_text: str) -> bool:
 def check_branch1_md_anchors(
     report_path: Path,
     md_path: Path,
-    *,
-    is_empirical: Callable[[str], bool] | None = None,
 ) -> GateVerdict:
-    """Hard-block unresolvable anchors and anchorless empirical sentences.
+    """Hard-block anchors that do not resolve to a real span in the source MD.
 
-    `is_empirical` (ROADMAP C4 / deferred B9): an OPTIONAL injected classifier
-    `(sentence) -> bool` deciding which sentences are empirical-performance claims
-    that MUST anchor. Defaults to the metric-cue heuristic; production may plug a
-    trained NLI / factual-consistency model that generalizes beyond keyword cues.
+    ADR-0012: prose no longer requires <!--ref--> markers; faithfulness is
+    branch1_gate's responsibility. This gate only validates that every anchor
+    present in the report resolves to an actual span in the source MD.
     """
     report = report_path.read_text(encoding="utf-8")
     md_text = md_path.read_text(encoding="utf-8")
@@ -123,31 +111,6 @@ def check_branch1_md_anchors(
                 )
             )
 
-    # 2. Every empirical PERFORMANCE LINE must carry an anchor — via the SHARED
-    #    line-based detector (anchor_lint.unanchored_empirical_lines). Identical to
-    #    branch1's own authoring gate (skips fences / ref-lines / table rows), so a
-    #    report that passes branch1 is never rejected here on a divergent scan.
-    #    `is_empirical` (ROADMAP C4) still injects a custom classifier if provided.
-    for fault, (lineno, prose) in enumerate(
-        unanchored_empirical_lines(report, is_empirical=is_empirical), start=1
-    ):
-        findings.append(
-            Finding(
-                finding_id=f"NA{fault:02d}",
-                severity=Severity.CRITICAL,
-                target=str(report_path.name),
-                observation=(
-                    f"empirical line carries a number but has no anchor "
-                    f"(吸收-D1 hard gate) [L{lineno}]: {prose[:80]!r}"
-                ),
-                is_hard_block=True,
-                reasoning=(
-                    "An un-anchored empirical statement cannot be traced to "
-                    "the MD and is treated as ungrounded."
-                ),
-                suggestion=(
-                    "Add a <!--ref:slug--><!--anchor:quote:...--> pointing at the MD span."
-                ),
-            )
-        )
+    # ADR-0012: prose-anchor requirement dropped — 最终门 only RESOLVES the anchors
+    # present (the engine 核心结论 block); prose faithfulness is branch1_gate's job.
     return GateVerdict(gate="G3-anchor", findings=tuple(findings))

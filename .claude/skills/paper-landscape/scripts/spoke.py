@@ -93,7 +93,6 @@ def make_spoke(
     g2_blind_retry_rounds: int = 1,
     cross_model_votes: SkepticVoteFn | None = None,
     cross_model_sample: float = 0.0,
-    empirical_classifier: Callable | None = None,
     g2_tolerant: bool = False,
     g2_max_unconfirmed: int = 0,
     g2_max_unconfirmed_ratio: float = 0.0,
@@ -305,7 +304,6 @@ def make_spoke(
                 content_list_path,
                 rigor_scores=rigor_scores,
                 entailment_judge=entailment_judge,
-                empirical_classifier=empirical_classifier,
             )
 
         def _g3_to_scene(verdict) -> SpokeResult:

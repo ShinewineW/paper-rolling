@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
 from scripts.output.anchor_lint import lint_text
-from scripts.output.branch1_report import AnchorGateError, write_branch1
+from scripts.output.branch1_report import write_branch1
 from scripts.output.branch2_ara import write_branch2
 
 
@@ -62,14 +61,18 @@ def test_evidence_pointer_targets_ai_package(tmp_path, candidate, analysis, md_p
     assert "../ai_package/" in report or "../../ai_package/" in report
 
 
-def test_unanchored_claim_raises_gate_error(tmp_path, candidate, analysis, md_path):
+def test_unanchored_prose_number_no_longer_raises_gate_error(
+    tmp_path, candidate, analysis, md_path
+):
+    # ADR-0012: prose-anchor requirement dropped. write_branch1 with
+    # _force_unanchored=True (injects an unanchored prose performance sentence)
+    # must NO LONGER raise AnchorGateError — lint_text check 4 was removed.
     ara = tmp_path / "ara"
     write_branch2(ara, candidate, analysis)
     person = tmp_path / "person"
-    # Force the producer to emit a performance number with no MD anchor -> the
-    # producer must raise rather than silently ship an unanchored claim.
-    with pytest.raises(AnchorGateError):
-        write_branch1(person, candidate, ara, md_path, analysis, _force_unanchored=True)
+    # Should succeed without raising.
+    write_branch1(person, candidate, ara, md_path, analysis, _force_unanchored=True)
+    assert (person / "report.md").exists()
 
 
 def test_branch1_prose_is_domain_agnostic_no_hardcoded_diffusion(

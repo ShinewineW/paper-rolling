@@ -47,13 +47,12 @@ def test_none_kind_may_be_empty() -> None:
     assert lint_text(text) == []
 
 
-def test_unanchored_empirical_number_hard_blocks() -> None:
-    # An empirical performance number with NO ref marker at all — the
-    # paper-rolling addition over the base grammar lint: every branch1 performance
-    # number must be anchored.
+def test_unanchored_empirical_number_no_longer_hard_blocks() -> None:
+    # ADR-0012: prose-anchor requirement dropped. An empirical performance number
+    # with NO ref marker must NOT be flagged by lint_text — faithfulness is
+    # branch1_gate's job, not the anchor lint's.
     text = "我们的方法在 KITTI 上提升了 5.4 个百分点。"
-    v = lint_text(text)
-    assert any("unanchored empirical assertion" in x.message for x in v)
+    assert lint_text(text) == []
 
 
 def test_section_reference_number_is_not_an_assertion() -> None:
@@ -79,16 +78,27 @@ def test_markdown_table_row_is_not_an_assertion() -> None:
     # G2, not the anchor lint). Metric-name headers ("mAP↑", the `3` in `3D-Bbox`)
     # and data rows must NOT be flagged as unanchored performance assertions, so a
     # report can faithfully inline the evidence tables.
-    text = (
-        "| Method | 3D-Bbox mAP↑ | Lane mIoU↑ |\n"
-        "|---|---|---|\n"
-        "| HDMap+LiDAR | 0.42 | 0.71 |\n"
-    )
+    text = "| Method | 3D-Bbox mAP↑ | Lane mIoU↑ |\n|---|---|---|\n| HDMap+LiDAR | 0.42 | 0.71 |\n"
     assert lint_text(text) == []
 
 
-def test_prose_performance_claim_still_blocks_outside_tables() -> None:
-    # The table skip must NOT weaken prose policing: a real unanchored prose
-    # performance sentence still hard-blocks.
+def test_prose_performance_claim_no_longer_blocks_outside_tables() -> None:
+    # ADR-0012: prose-anchor requirement dropped — lint_text must NOT flag an
+    # unanchored performance number in prose (faithfulness is branch1_gate's job).
     text = "融合模型在 mAP 上达到 0.42,显著高于基线。"
-    assert any("unanchored empirical assertion" in v.message for v in lint_text(text))
+    assert lint_text(text) == []
+
+
+def test_unanchored_prose_number_no_longer_fails_lint() -> None:
+    # ADR-0012: prose may carry numbers; lint_text must NOT flag them.
+    from scripts.output.anchor_lint import lint_text
+
+    report = "本文模型在 KITTI 上提升了 9.9 个百分点。"  # prose %, no <!--ref-->
+    assert lint_text(report) == []
+
+
+def test_malformed_core_block_anchor_still_fails() -> None:
+    # The KEPT checks still guard the engine 核心结论 block's anchors.
+    from scripts.output.anchor_lint import lint_text
+
+    assert lint_text("结论 <!--ref:boguskind:x--> 收尾。") != []

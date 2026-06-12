@@ -194,17 +194,9 @@ def lint_text(text: str) -> list[AnchorViolation]:
                 AnchorViolation(_line_of(scan, m.start()), f"orphan anchor marker: {m.group(0)!r}")
             )
 
-    # 4. paper-rolling addition — unanchored empirical PERFORMANCE assertions
-    #    hard-block, via the SHARED line-based scan (skips fences / ref-lines /
-    #    table rows). Same function the G3 auditor uses, so branch1 and G3 agree.
-    for lineno, prose in unanchored_empirical_lines(text):
-        violations.append(
-            AnchorViolation(
-                lineno,
-                f"unanchored empirical assertion (no <!--ref--> marker): {prose[:60]!r}",
-            )
-        )
-
+    # ADR-0012: prose no longer needs <!--ref--> — the 理解阅读 may carry numbers in
+    # natural prose; faithfulness is checked by branch1_gate ((b) grounding + (c)
+    # judge). Checks 1-3 above still validate the engine 核心结论 block's anchors.
     return violations
 
 

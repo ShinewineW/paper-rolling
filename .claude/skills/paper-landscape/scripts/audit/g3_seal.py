@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable
 from pathlib import Path
 
 from scripts.audit.anchor_resolution import check_branch1_md_anchors
@@ -90,14 +89,8 @@ def run_g3(
     *,
     rigor_scores: RigorScoreFn,
     entailment_judge: EntailmentJudgeFn,
-    empirical_classifier: Callable[[str], bool] | None = None,
 ) -> GateVerdict:
-    """Run the four-part G3 seal for one paper; write level2_report.json.
-
-    `empirical_classifier` (ROADMAP C4): optional injected classifier for the
-    branch1 anchor check's empirical-sentence detection; defaults to the metric-
-    cue heuristic. Production may plug a trained NLI / factual-consistency model.
-    """
+    """Run the four-part G3 seal for one paper; write level2_report.json."""
     ara_dir = find_ara_dir(ai_package_entry)
     findings: list[Finding] = []
 
@@ -111,9 +104,7 @@ def run_g3(
     # paper seal on an empty human branch (the audit found this silent pass).
     report_md = person_vault_entry / "report.md"
     if report_md.exists():
-        findings.extend(
-            check_branch1_md_anchors(report_md, md_path, is_empirical=empirical_classifier).findings
-        )
+        findings.extend(check_branch1_md_anchors(report_md, md_path).findings)
     else:
         findings.append(
             Finding(
