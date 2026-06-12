@@ -171,7 +171,7 @@ seams:
 
 ```python
 def build_seams() → dict[str, Callable]
-    # 单次调用，返回所有 6 个 seam（已路由 + StrictProvider 包裹,无回退）
+    # 单次调用，返回所有 7 个 seam（已路由 + StrictProvider 包裹,无回退）
     # 返回 {
     #   "resolve_analysis": seam_fn,
     #   "skeptic_votes": seam_fn,
@@ -179,6 +179,7 @@ def build_seams() → dict[str, Callable]
     #   "entailment_judge": seam_fn,
     #   "expand_llm": seam_fn,
     #   "write_report": seam_fn,
+    #   "faithfulness_judge": seam_fn,   # branch1 忠实门 (c), ADR-0012
     # }
 
 def _provider_for(seam: str) → StrictProvider
@@ -355,7 +356,7 @@ LLMConfig(providers={...}, routing={...}, modes={...})
   ↓
 _ask_json for each seam → StrictProvider(provider)（无 fallback）
   ↓
-return dict[str, Callable] of all 6 seams
+return dict[str, Callable] of all 7 seams
   ↓
 run_campaign(..., resolve_analysis=seams["resolve_analysis"], ...)
 ```
@@ -374,7 +375,7 @@ run_campaign(..., resolve_analysis=seams["resolve_analysis"], ...)
 
 ## 相关文档
 
-- `SKILL.md` — Wiring contract（6 个 seam，how to inject）
+- `SKILL.md` — Wiring contract（7 个 seam，how to inject）
 - `references/wiring-the-seams.md` — Provider-agnostic seam composition
 - `references/human-report-writing.md` — Writer seam 的语言风格
 - ADR-0004 — LLM seam = callable injection；默认 claude -p

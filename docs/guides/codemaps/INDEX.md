@@ -29,7 +29,7 @@ scripts/llm/
 │                       + OpenAICompatibleProvider（API 令牌）
 │                       + StrictProvider（无兜底,失败 → EngineAbort）
 ├── config.py         # LLMConfig 从 config/llm.yaml 加载
-├── seams.py          # build_seams() — 6 个 provider 路由的 seam 实例
+├── seams.py          # build_seams() — 7 个 provider 路由的 seam 实例（含 faithfulness_judge, ADR-0012）
 ├── analyzer.py       # 分块平行接地分析器（formula-fidelity 纪律）
 ├── writer.py         # 人链 LLM 写入器（vivid 中文段落 + curate_figures）
 └── jsonparse.py      # 宽容 JSON 提取 + LaTeX 转义修复
@@ -105,7 +105,7 @@ data_fidelity:
 | `scripts/paths.py` | 新增 `class EngineAbort` | 两层回退都失败 → LLM 无关核心中止（不导入 LLM 层） |
 | `scripts/spoke.py` | `write_report: Callable \| None` 参数 | 分支1 可选 LLM 写入；默认 None = thin 确定性 |
 | `scripts/output/produce.py` | `if write_report is not None: write_branch1_llm(...) else: write_branch1(...)` | 条件路由到 LLM 或确定性分支1 |
-| `scripts/run_campaign.py` | `write_report=seams["write_report"]` | 从 `build_seams()` 注入第 6 个 seam |
+| `scripts/run_campaign.py` | `write_report=seams["write_report"]` + `faithfulness_judge=seams["faithfulness_judge"]` | 从 `build_seams()` 注入 write_report + faithfulness（7 seam 中的两个；ADR-0012） |
 | `scripts/output/figures.py` | SELECTIVE 图形策展（强制 arch + 部分结果） | 替代全嵌入方式 |
 
 ---

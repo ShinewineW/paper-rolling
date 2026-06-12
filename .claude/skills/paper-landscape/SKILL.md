@@ -158,15 +158,17 @@ never a re-derived key.
 
 ## Wiring the model seams [MUST]
 
-`make_spoke(...)` (and the `run_campaign(...)` driver that composes it) take four
-**injected analysis/audit model seams**. The composition is CODE; the runtime
-injects everything LLM-backed or I/O-backed. Besides these four, the runtime also
-supplies the infrastructure adapters `discover` / `http` / `run_cli`, and the
-`discover` callable is itself built over a **fifth** LLM-backed seam — the
-query-expansion `llm` (`discovery.query_expand.expand_queries(topic, llm=...)`).
-Each of the four below **MUST** be backed by an **independent Agent-tool
-invocation** (a fresh sub-agent per call) so the audit votes are uncorrelated with
-the generator that produced the numbers. The entry point the `/loop` tick drives,
+`make_spoke(...)` (and the `run_campaign(...)` driver that composes it) take five
+**injected analysis/audit model seams** (the four analysis/G2/G3 seams below plus
+the branch1 忠实门 (c) `faithfulness_judge`, item 5 — ADR-0012). The composition is
+CODE; the runtime injects everything LLM-backed or I/O-backed. Besides these, the
+runtime also supplies the infrastructure adapters `discover` / `http` / `run_cli`,
+and the `discover` callable is itself built over a further LLM-backed seam — the
+query-expansion `llm` (`discovery.query_expand.expand_queries(topic, llm=...)`) —
+and the optional human-chain `write_report` writer. Each analysis/audit seam below
+**MUST** be backed by an **independent Agent-tool invocation** (a fresh sub-agent
+per call) so the audit votes are uncorrelated with the generator that produced the
+numbers. The entry point the `/loop` tick drives,
 once the seams are constructed, is **`scripts/run_campaign.py`** →
 `run_campaign(workspace, discover, resolve_analysis, skeptic_votes, rigor_scores,
 entailment_judge, http, run_cli, ...)`; it builds the ledger, wires the seams into
@@ -223,6 +225,14 @@ contract: `references/wiring-the-seams.md`; per-role: `sub-skills/<role>/SKILL.m
    - **Output**: `(entailed: bool, reason: str)`.
    - **MUST**: an independent Agent-tool invocation.
 
+5. **`faithfulness_judge(report_text, ara_dir) -> dict`** — the branch1 忠实门 (c)
+   judge (ADR-0012). Compares the human report against the verified ARA.
+   - **Input**: the composed Chinese `report_text` + the staged `ara/` dir.
+   - **Output**: `{"faithful": bool, "findings": [{"claim": str, "issue": str}, ...]}`.
+     Fails CLOSED (malformed/empty/errored → `faithful=False`).
+   - **MUST**: an independent Agent-tool invocation, ground-truth-isolated from the
+     `write_report` writer (routed at tier=fast → a model ≠ the writer's).
+
 ## Invoke the engine (quickstart)
 
 Run the **Preflight** gate first (above) and only proceed if it is all-green. The
@@ -242,12 +252,14 @@ from scripts.adapters import build_http, build_run_cli, build_discover
 # setup gate. is_ad_domain defaults to True (AD whitelists) when not yet locked.
 campaign = load_campaign(Path("."))
 
-# The SIX LLM seams are provider-routed + StrictProvider-wrapped (NO fallback — a
+# The SEVEN LLM seams are provider-routed + StrictProvider-wrapped (NO fallback — a
 # failing provider raises EngineAbort, never silently uses the Claude Code sub); build them
 # from config/llm.yaml via build_seams() (see references/wiring-the-seams.md). Each
 # is an independent provider call (ground-truth isolation preserved). write_report
 # is the human-chain writer — pass it so branch1 produces the RICH LLM report
 # (figures + sections); omit it and branch1 falls back to the thin renderer.
+# faithfulness_judge is the branch1 忠实门 (c) seam (report ↔ ARA, ADR-0012) — pass it
+# or the (c) layer is disabled (it defaults to None).
 from scripts.llm.seams import build_seams
 from scripts.output.repo_resolve import make_repo_resolver
 
@@ -259,6 +271,7 @@ result = run_campaign(
     rigor_scores=seams["rigor_scores"],
     entailment_judge=seams["entailment_judge"],
     write_report=seams["write_report"],  # DEFAULT: rich LLM human chain
+    faithfulness_judge=seams["faithfulness_judge"],  # branch1 忠实门 (c), ADR-0012
     discover=build_discover(
         llm=seams["expand_llm"],
         is_ad_domain=campaign.is_ad_domain if campaign else True,
@@ -277,9 +290,9 @@ result = run_campaign(
 
 `run_campaign` raises `GateRequired` until `config/campaign.yaml` is locked (the
 campaign Hard Gate above) — establish the campaign once, then a `/loop` tick just
-runs this. `build_seams()` constructs all six provider-routed LLM seams (analysis,
-skeptic, rigor, entailment, expand, writer); the agent only loads the campaign and
-calls `run_campaign(...)`.
+runs this. `build_seams()` constructs all seven provider-routed LLM seams (analysis,
+skeptic, rigor, entailment, expand, writer, faithfulness); the agent only loads the
+campaign and calls `run_campaign(...)`.
 
 ## Failure handling (中枢-D2)
 

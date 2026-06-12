@@ -268,13 +268,12 @@ def write_branch1(
 {analysis.get('related_work', '')}
 """
     
-    # Three-layer anchor-lint (same gate as LLM version)
-    try:
-        lint_result = lint_text(report, md_path)
-        if lint_result.has_unanchored:
-            raise AnchorGateError(f"Unanchored: {lint_result.findings}")
-    except AnchorGateError:
-        raise  # Re-raise for spoke to handle
+    # branch1 忠实门 (ADR-0012): kept anchor-form lint (engine 核心结论 block) +
+    # (b) mechanical prose-number grounding vs source MD + (c) optional judge.
+    # Prose may carry numbers; only an UNGROUNDED number (or judge drift) blocks.
+    hard = check_report_faithfulness(report, md_text, ara_dir, judge=faithfulness_judge)
+    if hard:
+        raise AnchorGateError(f"忠实门: {[f.observation for f in hard]}")
     
     # Write
     (stage_person / "report.md").write_text(report)
@@ -342,13 +341,11 @@ def write_branch1_llm(
     report = _strip_emoji(report)  # 铁律：无 emoji
     report = _quote_mermaid_labels(report)
     
-    # 7. Three-layer anchor-lint (hard gate)
-    try:
-        lint_result = lint_text(report, md_path)
-        if lint_result.has_unanchored:
-            raise AnchorGateError(...)
-    except AnchorGateError:
-        raise  # Re-raise for spoke
+    # 7. branch1 忠实门 (ADR-0012): kept anchor-form lint + (b) prose-number
+    #    grounding + (c) judge. Prose numbers allowed if grounded in the MD.
+    hard = check_report_faithfulness(report, md_text, ara_dir, judge=faithfulness_judge)
+    if hard:
+        raise AnchorGateError(...)
     
     # 8. Convert to self-contained HTML
     html = _to_html_self_contained(report, figures=curated_figs)

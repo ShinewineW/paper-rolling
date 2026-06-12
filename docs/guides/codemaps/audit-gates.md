@@ -246,11 +246,14 @@ def g3_gate(
     
     findings = []
     
-    # 1. Anchor-lint: three-layer consistency
+    # 1. Anchor RESOLUTION (ADR-0012): 最终门 only resolves the anchors PRESENT
+    #    (the engine 核心结论 block) to real MD spans; the dropped check 2 no longer
+    #    demands a <!--ref--> on every empirical prose line (prose faithfulness is
+    #    branch1_gate's job now, via check_branch1_md_anchors).
     branch1_text = (stage_person / "report.html").read_text()  # or .md
-    lint_result = lint_text(branch1_text, md_path)
-    if lint_result.has_unanchored:
-        findings.extend(lint_result.findings)
+    anchor_verdict = check_branch1_md_anchors(branch1_text, md_path)
+    if not anchor_verdict.is_pass:
+        findings.extend(anchor_verdict.findings)
         return GateVerdict(
             is_pass=False,
             is_hard_block=True,
@@ -340,9 +343,13 @@ Layer 3: Evidence table (from ARA)
 ```python
 def lint_text(text: str, md_path: Path) -> LintResult:
     """Three-layer anchor check on branch1 text against source MD.
-    
-    Every empirical number in branch1 must be anchored:
-      number → (claim) → (evidence table) → (MD equation/section)
+
+    NOTE (ADR-0012): this illustrates the PRE-忠实门 model where every empirical
+    PROSE number had to be anchored. That per-prose-line requirement was DROPPED —
+    the real `check_branch1_md_anchors` now only RESOLVES the anchors present (the
+    engine 核心结论 block) to MD spans; prose-number faithfulness moved to
+    `branch1_gate.check_report_faithfulness` ((b) grounding + (c) judge). The
+    per-number trace below is retained only as historical illustration.
     """
     
     md = md_path.read_text()

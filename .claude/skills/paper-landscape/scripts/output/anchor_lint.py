@@ -14,14 +14,18 @@ Contract (per branch1 report):
   * Non-`none` kinds require a non-empty decoded value.
   * Orphan anchors (anchor without a preceding ref) are violations.
 
-paper-rolling ADDITION over the base anchor-grammar lint (吸收-D1, per the
-documented v3.7.3 grammar; ARS
+paper-rolling history (吸收-D1, per the documented v3.7.3 grammar; ARS
 `uncited_assertion_detector.py`): an empirical PERFORMANCE assertion — a line
 carrying a number adjacent to a metric/comparison cue (NDS/mAP/accuracy/提升/
-outperform/...), or a `%`/`个百分点`, or an English empirical verb — with NO
-`<!--ref-->` marker hard-blocks. Illustrative numbers without a performance cue
-(toy examples, k-steps, list numbering, math constants) do NOT require an
-anchor, so the report can pass its own gate.
+outperform/...), or a `%`/`个百分点`, or an English empirical verb — without a
+`<!--ref-->` marker USED to hard-block here (check 4 + the G3 mirror). **ADR-0012
+DROPPED that per-prose-line requirement from both gates**: the 理解阅读 may now
+carry numbers in natural prose, and faithfulness is checked instead by
+`branch1_gate` ((b) mechanical number-grounding + (c) LLM judge). `lint_text`
+keeps only checks 1-3 (well-formed / non-orphan anchors for the engine 核心结论
+block). `unanchored_empirical_lines` / `_is_empirical_assertion` remain defined
+(still unit-tested; `_is_empirical_assertion` is reused by `branch1_llm._ground_line`)
+but no gate calls `unanchored_empirical_lines` any more.
 
 Detection is line-based and strips HTML-comment markers before the number
 scan, so decimals (`0.61`) and `-->` terminators never shred a sentence or

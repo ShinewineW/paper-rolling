@@ -98,7 +98,7 @@ scripts/          the engine code (packages below)
 |--------|---------|
 | `providers.py` | `LLMProvider` protocol + 4 provider types: `ClaudeCodeProvider` (claude -p) & `CodexCliProvider` (codex exec, no-sandbox) — **local agents** (`grounded_capable`); `OpenAICompatibleProvider` (any OpenAI-compat API); `RoundRobinProvider` (composite — alternates calls across member providers, e.g. claude+codex → 10-wide). Each leaf owns a **per-instance `max_concurrent` semaphore** (per-provider cap, not global). `StrictProvider` wraps every routed provider → on failure raises `EngineAbort`, **no fallback** (a bad key/endpoint fails loud, never silently drains the Claude Code subscription). |
 | `config.py` | `LLMConfig` from `config/llm.yaml` (**required**; every seam must be explicitly routed — no default provider): loads per-seam provider routing + execution modes (inline / grounded / agent_team). |
-| `seams.py` | `build_seams()` factory: constructs the 6 LLM seams (analyzer, skeptic, rigor, entailment, expand, writer) with provider routing + `StrictProvider` (no-fallback) wrapping. |
+| `seams.py` | `build_seams()` factory: constructs the 7 LLM seams (analyzer, skeptic, rigor, entailment, expand, writer, faithfulness) with provider routing + `StrictProvider` (no-fallback) wrapping. |
 | `analyzer.py` | `analyze_chunked(...)` — grounded analyzer (chunks large MD, parallel analyst calls, formula-fidelity discipline). |
 | `writer.py` | `write_human_sections(...)` + `curate_figures(...)` — human-chain LLM writer (vivid Chinese prose + selective figure curation: mandatory arch + top-N results). |
 | `jsonparse.py` | `extract_json(...)` — tolerant JSON extraction (handles code fences, LaTeX escapes, leading prose). |
@@ -119,6 +119,7 @@ scripts/          the engine code (packages below)
 | `branch2_ara.py` | branch2 ARA producer (runs first). |
 | `branch1_llm.py` | branch1 LLM-written human chain (vivid Chinese sections + grounded assembly + figure curation + self-contained HTML). Wired via optional `write_report` seam. |
 | `branch1_report.py` | branch1 thin deterministic renderer (fallback when no `write_report` seam; from analysis → markdown template). |
+| `branch1_gate.py` | branch1 忠实门 (ADR-0012): kept anchor-form lint + (b) mechanical prose-number grounding vs source MD + (c) optional LLM judge (report ↔ ARA). Returns hard-block `Finding`s; used by both branch1 paths. |
 | `naming.py` | **The single live vault-key authority**: `vault_key`, `derive_name`, `identity_base`, `find_existing_entries`. |
 | `ara_schema.py` | ARA Seal Level 1 structural validator. |
 | `anchor_lint.py` | Three-layer citation anchor lint (HARD gate) + the anchor-lint CLI. |
@@ -204,8 +205,9 @@ ruff" is the validation gate.
 3. **`run_campaign()` — the composition driver** (`scripts/run_campaign.py`). This is
    what the `/loop` tick actually drives. It composes
    `Ledger → make_spoke(seams) → (LS-1 lock) run_campaign_tick`. It is a function, not
-   a CLI: the runtime agent must supply `discover`, `http`, `run_cli`, and the **four
-   model seams**. See `SKILL.md` → "Wiring the model seams" for the exact contract.
+   a CLI: the runtime agent must supply `discover`, `http`, `run_cli`, and the **five
+   analysis/audit model seams** (incl. the branch1 忠实门 `faithfulness_judge`, ADR-0012).
+   See `SKILL.md` → "Wiring the model seams" for the exact contract.
    Invoking the module directly prints a usage message and exits (it is intentionally
    not a silent no-op):
 
@@ -241,7 +243,7 @@ ruff" is the validation gate.
 The composition is CODE; the runtime injects the seams. Three infrastructure
 adapters are supplied to `run_campaign(...)` — **`discover`** (the discovery
 callable, built over the query-expansion `llm` + the source clients), **`http`**,
-and **`run_cli`** — plus the **six LLM-backed seams** (all routed via
+and **`run_cli`** — plus the **seven LLM-backed seams** (all routed via
 `config/llm.yaml` from `scripts/llm.seams.build_seams()`). Each LLM seam
 **MUST** be an **independent Agent-tool invocation** (a fresh sub-agent per call)
 so audit votes stay uncorrelated with the generator. `SKILL.md` → "Wiring the
@@ -262,6 +264,10 @@ model seams" documents the exact input/output shape of each:
 - **`write_report(ara_bundle, figures) -> dict`** — the human-chain LLM writer
   (optional; if provided, generates vivid Chinese prose + grounded assembly;
   if omitted, branch1 falls back to thin deterministic renderer).
+- **`faithfulness_judge(report_text, ara_dir) -> dict`** — the branch1 忠实门 (c)
+  judge (ADR-0012): compares the human report against the verified ARA, returning
+  `{"faithful": bool, "findings": [...]}` (fails CLOSED). Ground-truth-isolated from
+  `write_report` (tier=fast → a model ≠ the writer's).
 
 ## Key dependencies / external services / env
 

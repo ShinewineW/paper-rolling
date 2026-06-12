@@ -395,14 +395,12 @@ def write_branch1_llm(
     report = _strip_emoji(report)
     report = _quote_mermaid_labels(report)
     
-    # Three-layer anchor-lint (hard gate)
-    try:
-        lint_result = lint_text(report, md_path)
-        if lint_result.has_unanchored:
-            raise AnchorGateError(f"Unanchored claims: {lint_result.details}")
-    except AnchorGateError as e:
-        # Re-raise for spoke to handle via bounded_gate_runner
-        raise
+    # branch1 忠实门 (ADR-0012): kept anchor-form lint + (b) prose-number grounding
+    # + (c) faithfulness judge (report ↔ ARA). Prose may carry numbers; an
+    # ungrounded prose number or a materially-misleading report hard-blocks.
+    hard = check_report_faithfulness(report, md_text, ara_dir, judge=faithfulness_judge)
+    if hard:
+        raise AnchorGateError(f"忠实门: {[f.observation for f in hard]}")
     
     # Convert to self-contained HTML (MathJax + mermaid 11)
     html = _to_html_self_contained(report, figures=curated_figs)
@@ -456,10 +454,10 @@ def write_branch1(
         ...
     }
     
-    # Same three-layer anchor-lint gate
+    # Same branch1 忠实门 (ADR-0012): (b) prose-number grounding + (c) judge
     report = _format_report(sections, analysis)
-    lint_result = lint_text(report, md_path)
-    if lint_result.has_unanchored:
+    hard = check_report_faithfulness(report, md_text, ara_dir, judge=faithfulness_judge)
+    if hard:
         raise AnchorGateError(...)
     
     # Write
