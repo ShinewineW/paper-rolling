@@ -1,14 +1,16 @@
-"""G3 — branch1<->MD + type-aware entailment + 6-dim rigor seal (audit-D1, single pass).
+"""G3 — equation fidelity + branch1 presence + type-aware entailment + 6-dim rigor
+seal (audit-D1, single pass).
 
-Runs AFTER the dual-output branches. Three parts, all run; the verdict is the
-union of their findings (which blocks iff any hard finding fires):
-  (a) anchor resolution  — every <!--ref--> anchor PRESENT in person_vault/report.md
-      (the engine 核心结论 block) resolves to a real MD span (吸收-D1 K4 fix; ADR-0012
-      dropped the per-prose-line requirement — prose faithfulness is branch1_gate's);
+Runs AFTER the dual-output branches. Parts all run; the verdict is the union of
+their findings (which blocks iff any hard finding fires):
+  (a) branch1 presence — a MISSING person_vault/report.md hard-blocks (G3R0). ADR-0012
+      rev RETIRED the old branch1<->MD anchor-resolution sub-check: the report no
+      longer carries <!--ref--> anchors and faithfulness is now the 评价's job, not G3's;
   (b) type-aware entailment — every claim's experiment design matches its claim
       type (吸收-D8);
   (c) 6-dim rigor seal — Seal Level 2; level2_report.json is written into the
-      ai_package; grade < Weak Accept is a hard block (吸收-D7).
+      ai_package; grade < Weak Accept is a hard block (吸收-D7);
+  (d) mechanical equation fidelity — content_list.json formula blocks vs the MD.
 
 On a hard verdict the HUB re-emits the offending branch (gate_runner owns the
 bounded retry). The level2_report.json is always written — even on a low-grade
@@ -21,7 +23,6 @@ import json
 import re
 from pathlib import Path
 
-from scripts.audit.anchor_resolution import check_branch1_md_anchors
 from scripts.audit.ara_tree import extract_claim_registry, find_ara_dir
 from scripts.audit.entailment import check_entailment
 from scripts.audit.equation_fidelity import check_equation_fidelity
@@ -100,13 +101,13 @@ def run_g3(
     # Hard-blocks a count mismatch (garbled-equation ingest).
     findings.extend(check_equation_fidelity(md_path, content_list_path).findings)
 
-    # (a) branch1 <-> MD anchor resolution. A MISSING branch1 report.md is a HARD
-    # block: with no report there is nothing to seal, so passing it would let the
-    # paper seal on an empty human branch (the audit found this silent pass).
+    # (a) branch1 presence. ADR-0012 rev: the branch1 <-> MD anchor-resolution
+    # sub-check is RETIRED (the report no longer carries <!--ref--> anchors;
+    # faithfulness is the 评价's job, not G3's). A MISSING branch1 report.md is
+    # still a HARD block (G3R0): with no report there is nothing to seal, so
+    # passing it would let the paper seal on an empty human branch.
     report_md = person_vault_entry / "report.md"
-    if report_md.exists():
-        findings.extend(check_branch1_md_anchors(report_md, md_path).findings)
-    else:
+    if not report_md.exists():
         findings.append(
             Finding(
                 finding_id="G3R0",
@@ -114,8 +115,8 @@ def run_g3(
                 target=str(report_md),
                 observation="missing branch1 report.md — cannot seal",
                 is_hard_block=True,
-                reasoning="G3 seals the branch1 human report against the MD; with no "
-                "report.md there is no branch1 to anchor-check, so the paper must NOT seal.",
+                reasoning="G3 seals the paper only when both branches exist; with no "
+                "report.md there is no branch1 at all, so the paper must NOT seal.",
                 suggestion="Re-emit branch1 so person_vault/{key}/report.md exists, then re-run.",
             )
         )

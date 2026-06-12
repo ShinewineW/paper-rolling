@@ -7,7 +7,7 @@ from scripts.audit.g3_seal import run_g3
 from scripts.audit.rigor_rubric import DIMENSION_KEYS
 
 
-def _build_paper(tmp_path: Path, *, good: bool = True):
+def _build_paper(tmp_path: Path, *, report_body: str = "取得 28.4 BLEU。\n"):
     md = tmp_path / "src.md"
     md.write_text(
         "# T\n\nThe model achieves a BLEU score of 28.4 on WMT14.\n",
@@ -18,11 +18,8 @@ def _build_paper(tmp_path: Path, *, good: bool = True):
 
     person = tmp_path / "person_vault" / "2026-06-05_T_170603762"
     person.mkdir(parents=True)
-    quote = "BLEU%20score%20of%2028.4" if good else "BLEU%20score%20of%2099.9"
-    (person / "report.md").write_text(
-        f"取得 28.4 BLEU<!--ref:bleu--><!--anchor:quote:{quote}-->。\n",
-        encoding="utf-8",
-    )
+    # ADR-0012 rev: the report carries plain prose (no <!--ref--> anchors).
+    (person / "report.md").write_text(report_body, encoding="utf-8")
 
     ai = tmp_path / "ai_package" / "2026-06-05_T_170603762"
     ara = ai / "ara"
@@ -55,7 +52,7 @@ def _entailed(claim, exp_text):
 
 
 def test_run_g3_passes_and_writes_level2_report(tmp_path: Path) -> None:
-    md, cl, person, ai = _build_paper(tmp_path, good=True)
+    md, cl, person, ai = _build_paper(tmp_path)
     verdict = run_g3(person, ai, md, cl, rigor_scores=_good_rigor, entailment_judge=_entailed)
     assert verdict.blocked is False
     report_path = ai / "ara" / "level2_report.json"
@@ -64,15 +61,20 @@ def test_run_g3_passes_and_writes_level2_report(tmp_path: Path) -> None:
     assert data["overall"]["grade"] == "Accept"
 
 
-def test_run_g3_blocks_on_unresolvable_branch1_anchor(tmp_path: Path) -> None:
-    md, cl, person, ai = _build_paper(tmp_path, good=False)
+def test_g3_no_longer_blocks_on_unresolvable_branch1_anchor(tmp_path: Path) -> None:
+    # ADR-0012 rev: G3 retired branch1 anchor-resolution. A report carrying an anchor
+    # whose quote is absent from the source MD used to be (a)-hard-blocked; now it must
+    # NOT block (entailment/rigor/equation still pass on this good fixture).
+    md, cl, person, ai = _build_paper(
+        tmp_path,
+        report_body="取得 28.4 BLEU<!--ref:x--><!--anchor:quote:NONEXISTENT%20IN%20MD-->。\n",
+    )
     verdict = run_g3(person, ai, md, cl, rigor_scores=_good_rigor, entailment_judge=_entailed)
-    assert verdict.blocked is True
-    assert any("does not resolve" in f.observation for f in verdict.hard_findings)
+    assert verdict.blocked is False
 
 
 def test_run_g3_blocks_on_low_rigor_grade(tmp_path: Path) -> None:
-    md, cl, person, ai = _build_paper(tmp_path, good=True)
+    md, cl, person, ai = _build_paper(tmp_path)
 
     def low_rigor(ara_bundle):
         return {
@@ -91,7 +93,7 @@ def test_run_g3_blocks_on_low_rigor_grade(tmp_path: Path) -> None:
 
 
 def test_run_g3_blocks_on_entailment_failure(tmp_path: Path) -> None:
-    md, cl, person, ai = _build_paper(tmp_path, good=True)
+    md, cl, person, ai = _build_paper(tmp_path)
 
     def not_entailed(claim, exp_text):
         return (False, "no baseline numbers shown")
@@ -106,7 +108,7 @@ def test_run_g3_feeds_evidence_tables_to_rigor_reviewer(tmp_path: Path) -> None:
     # numbers). The rigor reviewer must also receive the actual evidence/tables/
     # files so it can verify numerical support instead of reporting "only an index
     # is present". Without this the D1 (evidence_relevance) dimension is blind.
-    md, cl, person, ai = _build_paper(tmp_path, good=True)
+    md, cl, person, ai = _build_paper(tmp_path)
     evidence = ai / "ara" / "evidence"
     (evidence / "tables").mkdir(parents=True)
     (evidence / "README.md").write_text(
@@ -136,7 +138,7 @@ def test_run_g3_feeds_evidence_tables_to_rigor_reviewer(tmp_path: Path) -> None:
 def test_run_g3_hard_blocks_when_branch1_report_missing(tmp_path: Path) -> None:
     # A person_vault entry with NO report.md must HARD-block (cannot seal an empty
     # human branch); previously the anchor check was skipped silently and passed.
-    md, cl, person, ai = _build_paper(tmp_path, good=True)
+    md, cl, person, ai = _build_paper(tmp_path)
     (person / "report.md").unlink()  # remove branch1 report
 
     verdict = run_g3(person, ai, md, cl, rigor_scores=_good_rigor, entailment_judge=_entailed)
