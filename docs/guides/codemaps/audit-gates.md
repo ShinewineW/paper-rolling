@@ -1,8 +1,8 @@
 # Adversarial Audit Gates (G2 + G3) 代码地图
 
 > **范围**: `scripts/audit/` — types, g2_data_fidelity, g3_seal, entailment, rigor_rubric, gate_runner
-> **最后更新**: 2026-06-08
-> **关键特性**: Multi-vote skeptic (G2) 硬门、6-维严谨性评分 (G3)、LLM 回退集成
+> **最后更新**: 2026-06-12
+> **关键特性**: Multi-vote skeptic (G2) 硬门、6-维严谨性评分 (G3)、LLM 回退集成、失败保留现场不删 ARA (ADR-0011)
 
 <!-- Generated: 2026-06-08 | Files scanned: 10 | Token estimate: ~3500 -->
 
@@ -34,7 +34,7 @@ Per-paper spoke:
                 ↓
     bounded_gate_runner:
     ├─ Re-emit (branch2 → G2) up to max_gate_rounds
-    ├─ If still fail → quarantine to _failed/{key}.md
+    ├─ If still fail → 保留 _failed/<key>/ 现场 (staged ARA 不删, ADR-0007/0011)
     └─ (pass → continue)
                 ↓
   branch1 built (person_vault/{key}/)
@@ -544,8 +544,8 @@ verdict_g2 = bounded_gate_runner(
 )
 
 if verdict_g2 is None:
-    # Quarantine: write to _failed/{key}.md
-    write_failure_record(key, "G2 hard-block after 2 rounds")
+    # 数字门 hard-block → spoke 把 staged ARA 保留成 _failed/<key>/ 现场 (不删, ADR-0011)
+    preserve_scene(key, staged_dir, failed_gate="数字门")
     return
 elif verdict_g2.is_hard_block:
     # Re-emit not exhausted yet (internal retry happened)
