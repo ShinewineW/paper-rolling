@@ -2,7 +2,7 @@
 
 > **范围**: `scripts/audit/` — types, g2_data_fidelity, g3_seal, entailment, rigor_rubric, gate_runner
 > **最后更新**: 2026-06-13
-> **关键特性**: G2 两层数字门（Layer-1 代码核对存在性 → Layer-2 multi-vote skeptic 判语义变换）硬门、G3 3 部分检查（G3R0 + anchor-resolution + equation + entailment + rigor）、失败保留现场不删 ARA (ADR-0011)
+> **关键特性**: G2 两层数字门（Layer-1 代码核对存在性 → Layer-2 multi-vote skeptic 判语义变换）硬门、G3 检查（G3R0 branch1 存在性 + entailment + 6 维 rigor + equation;ADR-0012 rev 退役 branch1 锚点解析）、失败保留现场不删 ARA (ADR-0011)
 
 <!-- Generated: 2026-06-08 | Files scanned: 10 | Token estimate: ~3500 -->
 

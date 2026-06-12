@@ -26,7 +26,7 @@
 │        ├─ branch2 (ARA compiler)                      │
 │        ├─ G2 gate (数据保真, skeptic multi-vote)      │
 │        ├─ branch1 (人链 + 接地) OR thin (确定性)      │
-│        ├─ G3 gate (anchor lint + 6-dim seal)         │
+│        ├─ G3 gate (G3R0 presence + entail + 6-dim + eq) │
 │        └─ promote both-or-neither (OT-5)             │
 │     e. landscape sync (跨论文指标表)                 │
 │                                                       │

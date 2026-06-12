@@ -1,7 +1,8 @@
 # 理解阅读忠实门(branch1)实现计划 — ADR-0012
 
 > **日期**: 2026-06-12
-> **状态**: 草稿(已通过 Codex 交叉审计,4 轮)
+> **状态**: 已归档(superseded by `spec/2026-06-13-human-chain-assessment-no-gate-impl.md` / ADR-0012 rev —
+> 这版「忠实门硬门」会误杀人稿,已被「不设硬门 + 开篇评价」取代。留作历史记录;其「忠实门/锚点门」术语为当时设计。)
 > **作者**: Claude (Opus 4.8) + ShinewineW
 > **基准版本**: `paper-rolling@a002daf`
 > **目的**: 把 branch1 锚点门从"逼 LLM 给每条经验正文自贴 `<!--ref-->`"重构为"机械落源(b)+ 语义判官(c)"两层忠实验收,终结 DiffusionForcing/Genie 那类内容满分却被形式门误杀的论文。

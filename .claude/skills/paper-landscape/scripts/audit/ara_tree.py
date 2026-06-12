@@ -46,7 +46,7 @@ def source_value_set(text: str) -> set[float]:
     """The distinct numeric VALUES present in `text` (parsed from its number
     tokens). Lets a candidate number be confirmed BY VALUE — cosmetic forms match
     (28.40 == 28.4, 1.0 == 1) — without an LLM. Shared by 数字门 (G2) and the
-    branch1 忠实门."""
+    branch1 「评价」 number-grounding ((b), ADR-0012 rev)."""
     values: set[float] = set()
     for tok in extract_numbers(text):
         try:

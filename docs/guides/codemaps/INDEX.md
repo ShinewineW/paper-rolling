@@ -51,7 +51,7 @@ write_branch1_llm(stage_person, candidate, stage_ai, md_path, write_report, key=
 1. LLM writer 生成富文本中文段落（来自 `write_report` seam）
 2. **核心结论块** 采用机械 `build_assessment()` + `_prepend_assessment()` 组装：前置非阻塞 `## 评价` section，含 (b) 数字落源检验结果 + (c) 诊断判官意见 + ARA 的 AUDIT_FLAGS.md 体
 3. **评价 (ADR-0012, 非阻塞)**：(b) 数字落源（报告内数字与已验证 ARA 值集对照）+ (c) 诊断判官（独立 LLM 按规范评析）；**分支1 NEVER blocks** —— gate 已退役，改为进展笔记
-4. **核心结论块** 采用平铺 markdown（无 `<!--ref-->` anchor 语法）；引擎仍保有锚点形态的结论块需要 G3 anchor-resolution，但不要求外部分支1 anchor
+4. **核心结论块** 采用平铺 markdown（无 `<!--ref-->` anchor 语法）；ADR-0012 rev 退役整套锚点机制——G3 不再对 branch1 做 anchor-resolution（仅 G3R0 校验 report.md 存在）
 5. **图形策展**：强制架构图 + 几个结果图（base64 内联到自包含 HTML）
 6. **NO emoji 铁律**：确定性剥离表情符号 + mermaid 标签引用
 7. **MathJax** 数学 + **parse-safe mermaid 11** 引用

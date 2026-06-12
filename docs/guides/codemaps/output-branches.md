@@ -40,7 +40,7 @@ branch1 (human report)
        ├─ prepend 评价 section (ADR-0012, fail-soft): (b) number grounding check + (c) judge note (if supplied)
        └─ output: person_vault/{key}/report.md
     ↓
-G3 gate (seal: anchor + eq fidelity + rigor + entailment)
+G3 gate (seal: G3R0 branch1 presence + eq fidelity + rigor + entailment)
     ↓ (pass)
 promote both (OT-5 atomic)
     ├─ move ai_package/{key}/ from staging to real vault

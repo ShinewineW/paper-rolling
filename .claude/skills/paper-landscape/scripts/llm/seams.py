@@ -392,7 +392,7 @@ def write_report(
 
 
 # --------------------------------------------------------------------------- #
-# Seam 7: faithfulness_judge — branch1 忠实门 (c) report<->ARA judge (ADR-0012)  #
+# Seam 7: faithfulness_judge — branch1 「评价」 (c) report<->ARA note-writer (ADR-0012 rev) #
 # --------------------------------------------------------------------------- #
 
 

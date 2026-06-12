@@ -41,7 +41,8 @@ fabricated numbers), and "不能毒化历史" is the governing constraint.
 
 ## Boundary (explicitly untouched)
 
-- **ADR-0007's branch1-only reuse stays.** When only the `锚点门` (branch1) fails,
+- **ADR-0007's branch1-only reuse stays.** When only the branch1 G3R0 root fails
+  (`最终门`: branch1 `report.md` missing; `锚点门` itself retired per ADR-0012 rev),
   the branch2 SSOT it reuses **passed `数字门`+`结构门`** — it is a *good* ARA, not a
   failed one, so reusing it is not "failed-ARA reuse" and is not poisoning. The
   one-way-sink rule applies **only to gate-failed ARAs** (`数字门`/`结构门`, or

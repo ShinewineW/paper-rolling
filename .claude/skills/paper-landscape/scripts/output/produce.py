@@ -2,7 +2,8 @@
 
 `produce_outputs(md_path, candidate, ledger)` builds branch2 (ai_package) FIRST,
 then branch1 (person_vault) DERIVED from it, in a STAGING directory; runs the
-ARA Seal-1 validator + the branch1 忠实门 (锚点门, ADR-0012); and only on full success
+ARA Seal-1 validator (branch1 has no hard gate — it opens with a 「评价」 note, ADR-0012 rev);
+and only on full success
 moves BOTH into their vaults under one shared key (OT-5: both or neither).
 Re-processing the same paper-identity deletes any prior same-identity entries
 first (OT-2). Naming is deterministic (OT-3).

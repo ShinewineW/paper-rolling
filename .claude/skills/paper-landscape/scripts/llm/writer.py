@@ -8,12 +8,13 @@ produces flowing, illustrative Chinese prose. It is provider-agnostic: the calle
 passes an ``LLMProvider`` (explicitly routed per config/llm.yaml — no default), so
 the human chain can run on, e.g., deepseek/qwen while the analyzer stays on Claude.
 
-Grounding discipline (so the report passes the branch1 忠实门, ADR-0012 / 吸收-D1):
-sections MAY write performance numbers in natural prose, but every number must be a
-real value from the ARA/source (the 忠实门 verifies grounding mechanically + an LLM
-judge); numbers/equations/proper-nouns stay verbatim. The assembler runs the real
-忠实门 (kept anchor-form lint + (b) grounding + (c) judge) afterward; the engine
-核心结论 block is still mechanically anchored.
+Grounding discipline (ADR-0012 rev): sections MAY write performance numbers in
+natural prose, but every number should be a real value from the ARA/source, and
+numbers/equations/proper-nouns stay verbatim. branch1 has NO hard gate — faithfulness
+is not enforced by blocking; instead the assembler prepends an opening 「评价」 note
+(``branch1_gate.build_assessment``) that surfaces, for the reader, any report number
+not found in the verified ARA plus an advisory judge note. So write faithfully because
+the 评价 will expose drift to the reader, not because a gate will reject the report.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ def _injection() -> str:
 
 
 _CONSTRAINTS = (
-    "硬约束(违反会让报告失真或被接地门拦下):\n"
+    "硬约束(违反会让报告失真,并被开篇「评价」如实点出给读者):\n"
     "1. 中文,流畅、生动,像一篇优秀的中文技术博客/深度科普;可用恰当比喻"
     "(标注“直觉,非严格对应”)。务必把“为什么这么做、解决了什么痛点、机制如何”讲透,杜绝空话套话。\n"
     "2. 忠实:只用下面给出的 ARA 事实内容,绝不编造。专有名词(模型名、指标名、数据集名、"

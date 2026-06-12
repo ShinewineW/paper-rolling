@@ -58,7 +58,7 @@ _DEFAULT_MODES = {
     "entailment": "inline",
     "expand": "inline",
     "writer": "inline",
-    "faithfulness": "inline",  # ADR-0012: branch1 忠实门 judge (report ↔ ARA)
+    "faithfulness": "inline",  # ADR-0012 rev: branch1 「评价」 (c) note-writer (advisory)
 }
 
 
