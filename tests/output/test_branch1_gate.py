@@ -147,6 +147,9 @@ def test_assessment_never_raises_on_unreadable_ara(tmp_path, monkeypatch) -> Non
     monkeypatch.setattr(bg, "ungrounded_report_numbers", _boom)
     note = build_assessment("本文达到 28.4 NDS。", tmp_path / "ara", judge=None)
     assert note.startswith("## 评价")
+    # Must NOT falsely claim all numbers grounded when the ARA could not be read.
+    assert "均可在已验证知识包" not in note
+    assert "未能读取已验证知识包" in note
 
 
 def test_assessment_includes_ara_audit_flags_when_present(tmp_path) -> None:

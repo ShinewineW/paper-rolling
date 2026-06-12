@@ -108,8 +108,9 @@ def build_assessment(report_text: str, ara_dir: Path, *, judge=None) -> str:
     guarded: a corrupt/unreadable ARA degrades the note, it can never fail the report."""
     try:
         ungrounded = ungrounded_report_numbers(report_text, ara_dir)
+        checked = True
     except Exception:  # noqa: BLE001 — 评价 never blocks; an unreadable ARA drops the fact list
-        ungrounded = []
+        ungrounded, checked = [], False
     note = ""
     if judge is not None:
         try:
@@ -120,7 +121,10 @@ def build_assessment(report_text: str, ara_dir: Path, *, judge=None) -> str:
     lines = ["## 评价", ""]
     if note:
         lines += [note, ""]
-    if ungrounded:
+    if not checked:
+        # ARA unreadable — must NOT claim all-grounded (false reassurance). Say so.
+        lines.append("> 机器核对:未能读取已验证知识包(ARA),本次未核对正文数字。")
+    elif ungrounded:
         lines.append(
             "> 机器核对:以下正文数字未在已验证知识包(ARA)中找到,读者请留意——"
             + "、".join(ungrounded)

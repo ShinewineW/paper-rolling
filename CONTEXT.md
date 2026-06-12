@@ -91,12 +91,14 @@ _Avoid_: treating 锚点门 as a live checkpoint (it is retired); 把 branch1 �
 
 **评价 (faithfulness assessment)**:
 (ADR-0012 rev, landed) replaces 锚点门: the branch1 report has **NO hard gate** and
-opens with a faithfulness 「评价」 as its **first section**. The machine deterministically
-lists "report numbers not in the ARA" (facts only, never blocks); the judge takes
-[report + ARA + that fact list + 数字门 `AUDIT_FLAGS` body] and writes a reader-facing
-semantic note (misattribution / overclaim / overall trust), **never blocks** and is
-fail-soft (any seam/ARA error degrades to a neutral note). The sole truth reference is
-the verified **ARA** (never the raw MD). branch1 is never false-quarantined — the reader
+opens with a faithfulness 「评价」 as its **first section**, assembled deterministically by
+`build_assessment` from three machine-written parts: (1) the "report numbers not in the
+ARA" fact list (via `ungrounded_report_numbers`; if the ARA is unreadable it says so —
+never a false all-clear), (2) the (c) judge's prose note ([report + ARA + that fact list]
+→ a reader-facing semantic read: misattribution / overclaim / overall trust), and (3) the
+数字门 `AUDIT_FLAGS` body quoted inline. The judge is ADVISORY and fail-soft (any seam/ARA
+error degrades to a neutral note); the whole 评价 **never blocks**. The sole truth reference
+is the verified **ARA** (never the raw MD). branch1 is never false-quarantined — the reader
 judges from the 评价. Code: `branch1_gate.build_assessment`.
 _Avoid_: 结语(it opens, not closes); 把它当一道会拦截的门(it never blocks)
 

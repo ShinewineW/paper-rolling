@@ -37,10 +37,12 @@ correlated with the generator that produced the numbers:
                         appears in any generator prompt.
   - entailment_judge  — the G3 type-aware entailment check (claim + linked
                         experiment text -> (entailed, reason)).
-  - faithfulness_judge — the branch1 忠实门 (c) judge (ADR-0012): compares the
-                        human report against the verified ARA (report ↔ ARA), fails
-                        CLOSED. Ground-truth-isolated from the write_report writer
-                        (routed at tier=fast → a model ≠ the writer's).
+  - faithfulness_judge — the branch1 「评价」 (c) note-writer (ADR-0012 rev): writes a
+                        reader-facing Chinese faithfulness note comparing the human
+                        report against the verified ARA (report ↔ ARA). ADVISORY and
+                        fail-SOFT — it NEVER blocks; branch1 always publishes.
+                        Ground-truth-isolated from the write_report writer (routed at
+                        tier=fast → a model ≠ the writer's).
 
 The composition is deterministic and fully testable with fake seams (see
 tests/test_run_campaign.py and tests/test_spoke.py); production swaps in the
@@ -193,11 +195,11 @@ blindly from the shell:
   skeptic_votes      — model seam #2: the G2 ground-truth-isolated skeptic
   rigor_scores       — model seam #3: the G3 6-dim rigor reviewer
   entailment_judge   — model seam #4: the G3 type-aware entailment judge
-  faithfulness_judge — model seam #5: the branch1 忠实门 (c) report<->ARA judge.
-                       MANDATORY whenever write_report (the LLM writer) is wired —
-                       i.e. every production path; omitting it there aborts loudly
-                       (no silent (c) no-op). Optional only on the no-LLM
-                       deterministic path (write_report=None).
+  faithfulness_judge — model seam #5: the branch1 「评价」 (c) report<->ARA note-writer
+                       (ADR-0012 rev). ADVISORY + fail-soft — it writes the opening
+                       评价's prose note and NEVER blocks. OPTIONAL on every path: when
+                       omitted (or on seam error) the 评价 still publishes with its
+                       machine number-facts, just without the prose note.
   http               — HTTP fetch seam used by ingest (Tier-1 arXiv-HTML)
   run_cli            — CLI runner seam used by ingest (Tier-2 MinerU / pandoc)
 
