@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.output.branch1_gate import unconfirmed_report_numbers
+from scripts.output.branch1_gate import check_report_faithfulness, unconfirmed_report_numbers
 
 
 def test_grounded_prose_numbers_pass() -> None:
@@ -44,3 +44,68 @@ def test_table_rows_and_code_fences_are_skipped() -> None:
         ]
     )
     assert unconfirmed_report_numbers(report, md) == []
+
+
+def _ok_judge(report_text, ara_dir):
+    return {"faithful": True, "findings": []}
+
+
+def _drift_judge(report_text, ara_dir):
+    return {"faithful": False, "findings": [{"claim": "88.1 是我们的", "issue": "实为 baseline"}]}
+
+
+def test_gate_passes_faithful_report(tmp_path) -> None:
+    md = "Our model reaches 28.4 NDS using 10% data."
+    report = "本文达到 28.4 NDS,仅用 10% 数据。"
+    hard = check_report_faithfulness(
+        report, md, tmp_path, judge=_ok_judge, max_unconfirmed=5, max_unconfirmed_ratio=0.2
+    )
+    assert hard == []
+
+
+def test_gate_blocks_systematic_invented_numbers(tmp_path) -> None:
+    md = "Only 28.4 appears."
+    report = "凭空: 11.1, 22.2, 33.3, 44.4, 55.5, 66.6 全是编的。"  # 6 ungrounded
+    hard = check_report_faithfulness(
+        report,
+        md,
+        tmp_path,
+        judge=_ok_judge,
+        tolerant=True,
+        max_unconfirmed=5,
+        max_unconfirmed_ratio=1.0,
+    )
+    assert hard and all(f.is_hard_block for f in hard)
+
+
+def test_gate_tolerates_a_single_miss_when_tolerant(tmp_path) -> None:
+    md = "Real numbers 28.4 and 24.6 here."
+    report = "28.4 与 24.6 是真的,只有 99.9 手滑。"
+    hard = check_report_faithfulness(
+        report,
+        md,
+        tmp_path,
+        judge=_ok_judge,
+        tolerant=True,
+        max_unconfirmed=5,
+        max_unconfirmed_ratio=0.2,
+    )
+    assert hard == []
+
+
+def test_gate_strict_blocks_a_single_miss(tmp_path) -> None:
+    md = "Real numbers 28.4 and 24.6 here."
+    report = "28.4 与 24.6 是真的,只有 99.9 手滑。"
+    hard = check_report_faithfulness(
+        report, md, tmp_path, judge=_ok_judge
+    )  # tolerant=False default
+    assert hard and all(f.is_hard_block for f in hard)
+
+
+def test_gate_blocks_on_judge_drift(tmp_path) -> None:
+    md = "Our model reaches 28.4 NDS."
+    report = "本文达到 28.4 NDS。"
+    hard = check_report_faithfulness(
+        report, md, tmp_path, judge=_drift_judge, max_unconfirmed=5, max_unconfirmed_ratio=0.2
+    )
+    assert hard and any("baseline" in f.observation for f in hard)

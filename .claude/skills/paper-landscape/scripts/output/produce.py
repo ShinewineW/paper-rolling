@@ -169,9 +169,13 @@ def stage_branch1(
     key: str,
     *,
     prior_failure: str | None = None,
+    faithfulness_judge: Any = None,
+    report_tolerant: bool = True,
+    report_max_unconfirmed: int = 5,
+    report_max_unconfirmed_ratio: float = 0.2,
 ) -> None:
     """Stage branch1 (human report) into ``staging/person``, self-gating on the
-    three-layer anchor lint.
+    忠实门 (ADR-0012).
 
     The deterministic ``write_branch1`` fallback (write_report=None) is preserved
     (audit R4 Finding 2 — test_produce monkeypatches it). AnchorGateError carries
@@ -179,7 +183,7 @@ def stage_branch1(
     still get a self-contained scene (audit R4 Finding 1).
 
     Raises:
-        AnchorGateError: the report failed the three-layer anchor gate.
+        AnchorGateError: the report failed the 忠実门.
     """
     stage_person = staging / "person"
     try:
@@ -187,10 +191,30 @@ def stage_branch1(
             # audit R5 Finding 1: conditional kwarg keeps older write_report fakes working.
             extra = {"prior_failure": prior_failure} if prior_failure is not None else {}
             write_branch1_llm(
-                stage_person, candidate, stage_ai, md_path, write_report, key=key, **extra
+                stage_person,
+                candidate,
+                stage_ai,
+                md_path,
+                write_report,
+                key=key,
+                faithfulness_judge=faithfulness_judge,
+                report_tolerant=report_tolerant,
+                report_max_unconfirmed=report_max_unconfirmed,
+                report_max_unconfirmed_ratio=report_max_unconfirmed_ratio,
+                **extra,
             )
         else:
-            write_branch1(stage_person, candidate, stage_ai, md_path, analysis, key=key)
+            write_branch1(
+                stage_person,
+                candidate,
+                stage_ai,
+                md_path,
+                analysis,
+                key=key,
+                report_tolerant=report_tolerant,
+                report_max_unconfirmed=report_max_unconfirmed,
+                report_max_unconfirmed_ratio=report_max_unconfirmed_ratio,
+            )
     except AnchorGateError as exc:
         exc.staged_dir = staging
         raise
@@ -253,6 +277,10 @@ def produce_outputs(
     reuse_analysis: dict | None = None,
     prior_failure_analyzer: str | None = None,
     prior_failure_branch1: str | None = None,
+    faithfulness_judge: Any = None,
+    report_tolerant: bool = True,
+    report_max_unconfirmed: int = 5,
+    report_max_unconfirmed_ratio: float = 0.2,
 ) -> ProduceResult:
     """Produce branch2 + branch1 atomically into the two top-level vaults.
 
@@ -331,6 +359,10 @@ def produce_outputs(
             analysis,
             key,
             prior_failure=prior_failure_branch1,
+            faithfulness_judge=faithfulness_judge,
+            report_tolerant=report_tolerant,
+            report_max_unconfirmed=report_max_unconfirmed,
+            report_max_unconfirmed_ratio=report_max_unconfirmed_ratio,
         )
 
         # Last safe point before any real-vault write (Codex R17): if the guard

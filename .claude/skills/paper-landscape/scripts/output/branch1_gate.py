@@ -1,15 +1,19 @@
 """branch1 忠实门 (ADR-0012) — verify the 理解阅读 is FAITHFUL to its verified ARA,
 not that prose carries `<!--ref-->` anchors. Two layers assembled here:
 (b) mechanical number-grounding of the report against the source MD (this module),
-(c) a config-routed LLM judge (report ↔ ARA), wired in a later task. The report MAY
-carry numbers in natural prose; only an UNGROUNDED prose number is suspect.
+(c) a config-routed LLM judge (report ↔ ARA), assembled in check_report_faithfulness.
+The report MAY carry numbers in natural prose; only an UNGROUNDED prose number is suspect.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
+from pathlib import Path
 
 from scripts.audit.ara_tree import extract_numbers, number_present, source_value_set
+from scripts.audit.types import Finding, Severity
+from scripts.output.anchor_lint import lint_text
 
 _FENCE = re.compile(r"^\s*```")
 # Strip HTML comments BEFORE number extraction. The engine 核心结论 block carries
@@ -27,14 +31,20 @@ _LOCATOR = re.compile(
     r"(?i)(?:\b(?:tables?|tab|sections?|sec|figures?|fig|equations?|eq|appendix|app)\.?\s*|§\s*)\d+"
     r"|(?:图|表|公式|附录|第)\s*\d+"
 )
+# Markdown link targets `](...)` — strip the URL/path payload so vault-key paths
+# like `../../ai_package/2026-06-05.../ara/evidence/` and arXiv IDs in hrefs are
+# not parsed as ungrounded data numbers (they are infrastructure references, not
+# scientific claims).
+_MD_LINK_TARGET = re.compile(r"\]\([^)]*\)")
 
 
 def prose_numbers(report_text: str) -> list[str]:
     """Distinct DATA numbers in report PROSE. Stripped/skipped before extraction:
     HTML-comment anchor payloads, fenced code blocks, markdown table rows (the
-    paper's own figures, gated by 数字门 on the ARA), ordered-list indices, and
-    provenance locators (Table 1 / 图1 / §4). The SINGLE scope used by both the
-    grounding check and its ratio denominator, so they can never diverge."""
+    paper's own figures, gated by 数字门 on the ARA), ordered-list indices,
+    markdown link targets (vault-key paths / hrefs), and provenance locators
+    (Table 1 / 图1 / §4). The SINGLE scope used by both the grounding check and
+    its ratio denominator, so they can never diverge."""
     nums: list[str] = []
     in_fence = False
     for raw in report_text.splitlines():
@@ -44,6 +54,7 @@ def prose_numbers(report_text: str) -> list[str]:
         if in_fence or raw.lstrip().startswith("|"):
             continue
         line = _OL_PREFIX.sub("", _COMMENT.sub("", raw))  # drop anchors + list index
+        line = _MD_LINK_TARGET.sub(" ", line)  # drop link targets (vault-key paths, hrefs)
         line = _LOCATOR.sub(" ", line)  # drop Table 1 / 图1 / §4
         for n in extract_numbers(line):
             if n not in nums:
@@ -55,3 +66,89 @@ def unconfirmed_report_numbers(report_text: str, source_md: str) -> list[str]:
     """Prose numbers whose VALUE is NOT present in `source_md`. Order-preserving."""
     source_values = source_value_set(source_md)
     return [n for n in prose_numbers(report_text) if not number_present(n, source_values)]
+
+
+def check_report_faithfulness(
+    report_text: str,
+    source_md: str,
+    ara_dir: Path,
+    *,
+    judge: Callable[[str, Path], dict] | None = None,
+    tolerant: bool = False,
+    max_unconfirmed: int = 5,
+    max_unconfirmed_ratio: float = 0.2,
+) -> list[Finding]:
+    """The branch1 忠实门 (ADR-0012): kept anchor-form lint + (b) tolerant number
+    grounding + (c) optional LLM judge. Returns the HARD-BLOCK findings (empty =
+    pass). `judge` is the (c) seam; None (deterministic fallback path) skips it."""
+    findings: list[Finding] = []
+
+    # Kept anchor-form checks (well-formed engine 核心结论 block anchors).
+    for v in lint_text(report_text):
+        findings.append(
+            Finding(
+                finding_id=f"AF{len(findings) + 1:02d}",
+                severity=Severity.CRITICAL,
+                target="report.md",
+                observation=v.message,
+                is_hard_block=True,
+                reasoning="A malformed/orphan <!--ref--> anchor breaks the core-block truth chain.",
+                suggestion="Fix or remove the malformed anchor.",
+            )
+        )
+
+    # (b) tolerant mechanical grounding of prose numbers. Numerator AND denominator
+    # share prose_numbers() — same stripped/skipped scope. STRICT (tolerant=False)
+    # hard-blocks ANY unconfirmed number, mirroring 数字门.
+    bad = unconfirmed_report_numbers(report_text, source_md)
+    total = len(prose_numbers(report_text)) or 1
+    # Count-primary: tolerate if bad count is within the absolute ceiling.
+    # Ratio is a secondary tighten-up: only applied when total is large enough that
+    # the ratio gate is meaningful (total > max_unconfirmed / max_unconfirmed_ratio).
+    # This avoids blocking small reports (e.g. 1 bad / 3 total with ratio=0.2=5/25)
+    # when the count ceiling alone says "fine".
+    ratio_limit = total * max_unconfirmed_ratio
+    within_tolerance = (
+        tolerant and len(bad) <= max_unconfirmed and len(bad) <= max(ratio_limit, max_unconfirmed)
+    )
+    grounding_hard = bool(bad) and not within_tolerance
+    for n in bad:
+        findings.append(
+            Finding(
+                finding_id=f"AF{len(findings) + 1:02d}",
+                severity=Severity.CRITICAL if grounding_hard else Severity.MAJOR,
+                target="report.md",
+                observation=f"prose number {n!r} not grounded in the source MD"
+                + ("" if grounding_hard else " [TOLERATED]"),
+                is_hard_block=grounding_hard,
+                reasoning="A report number absent from the source MD is narration drift.",
+                suggestion="Re-state the number from the ARA, or cut the claim.",
+            )
+        )
+
+    # (c) semantic faithfulness judge (LLM path only).
+    if judge is not None:
+        verdict = judge(report_text, ara_dir)
+        if not verdict.get("faithful", False):
+            for jf in verdict.get("findings", []) or [
+                {"claim": "", "issue": "report materially misleads vs ARA"}
+            ]:
+                findings.append(
+                    Finding(
+                        finding_id=f"AF{len(findings) + 1:02d}",
+                        severity=Severity.CRITICAL,
+                        target="report.md",
+                        observation=(
+                            f"materially misleading vs ARA: {jf.get('claim', '')}"
+                            f" — {jf.get('issue', '')}"
+                        ),
+                        is_hard_block=True,
+                        reasoning=(
+                            "The human report misrepresents the verified ARA"
+                            " (misattribution/overclaim)."
+                        ),
+                        suggestion="Correct the claim to match the ARA.",
+                    )
+                )
+
+    return [f for f in findings if f.is_hard_block]

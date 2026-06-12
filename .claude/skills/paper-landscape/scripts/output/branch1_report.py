@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from scripts.output.anchor_lint import lint_text
+from scripts.output.branch1_gate import check_report_faithfulness
 
 # Cherry-picked unified Mermaid classDef palette (双输出-D1). Source:
 # scientific-agent-skills markdown-mermaid-writing/references/mermaid_style_guide.md
@@ -193,8 +193,11 @@ def write_branch1(
     *,
     key: str | None = None,
     _force_unanchored: bool = False,
+    report_tolerant: bool = True,
+    report_max_unconfirmed: int = 5,
+    report_max_unconfirmed_ratio: float = 0.2,
 ) -> None:
-    """Write the branch1 report; RAISE if any empirical claim is unanchored.
+    """Write the branch1 report; RAISE if the 忠实门 (ADR-0012) hard-blocks.
 
     Args:
         person_dir: Target person_vault entry directory.
@@ -206,9 +209,13 @@ def write_branch1(
             (produce_outputs passes the real key; when omitted, falls back to
             the person_dir name).
         _force_unanchored: Test hook to inject an unanchored performance claim.
+        report_tolerant: If True, apply count/ratio tolerance to prose-number
+            grounding (ADR-0012 tolerant mode).
+        report_max_unconfirmed: Absolute ceiling for tolerated unconfirmed numbers.
+        report_max_unconfirmed_ratio: Ratio ceiling for tolerated unconfirmed numbers.
 
     Raises:
-        AnchorGateError: If the composed report fails the three-layer lint.
+        AnchorGateError: If the composed report fails the 忠实门.
     """
     person_dir.mkdir(parents=True, exist_ok=True)
     key = key or person_dir.name
@@ -234,15 +241,24 @@ def write_branch1(
         or "该工作在其研究方向上推进了当前方法的能力边界(综述见配对 ai_package 分析)。",
     ]
     if _force_unanchored:
-        sections.append("我们的方法在 KITTI 上提升了 9.9 个百分点。")  # no anchor → must fail gate
+        sections.append(
+            "我们的方法在 KITTI 上提升了 9.9 个百分点。"
+        )  # ADR-0012: no longer fails lint (prose numbers freed)
 
     report = "\n".join(sections) + "\n"
 
-    violations = lint_text(report)
-    if violations:
+    hard = check_report_faithfulness(
+        report,
+        md_text,
+        ara_dir,
+        judge=None,
+        tolerant=report_tolerant,
+        max_unconfirmed=report_max_unconfirmed,
+        max_unconfirmed_ratio=report_max_unconfirmed_ratio,
+    )
+    if hard:
         raise AnchorGateError(
-            "branch1 report failed three-layer citation gate (吸收-D1): "
-            + "; ".join(v.message for v in violations[:5])
+            "branch1 report failed 忠实门 (ADR-0012): " + "; ".join(f.observation for f in hard[:5])
         )
 
     (person_dir / "report.md").write_text(report, encoding="utf-8")

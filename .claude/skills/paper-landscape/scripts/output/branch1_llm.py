@@ -9,8 +9,9 @@ thin deterministic write_branch1. This module then GROUNDS it deterministically:
     MD-present number three-layer-anchored),
   - the REAL evidence tables rendered verbatim (exact numbers live here),
   - a whole-report grounding pass (anchor any stray empirical number to the MD),
-  - the SAME three-layer anchor hard-gate as write_branch1 (吸收-D1) — an
-    unanchored empirical claim raises AnchorGateError before promotion.
+  - the branch1 忠实门 (ADR-0012): anchor-form lint + tolerant prose-number
+    grounding + optional LLM faithfulness judge, checked by branch1_gate before
+    promotion.
 
 So the rich LLM prose keeps loose performance numbers OUT of sentences (they live
 in tables / anchored conclusions), staying faithful + gate-passing.
@@ -24,7 +25,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from scripts.output.anchor_lint import _is_empirical_assertion, lint_text
+from scripts.output.anchor_lint import _is_empirical_assertion
+from scripts.output.branch1_gate import check_report_faithfulness
 from scripts.output.branch1_report import AnchorGateError, _anchor, _find_in_md
 from scripts.output.figures import Figure, copy_figures, is_architecture_caption
 
@@ -218,15 +220,19 @@ def write_branch1_llm(
     *,
     key: str | None = None,
     prior_failure: str | None = None,
+    faithfulness_judge: Any = None,
+    report_tolerant: bool = True,
+    report_max_unconfirmed: int = 5,
+    report_max_unconfirmed_ratio: float = 0.2,
 ) -> None:
     """Write the LLM human report into ``person_dir`` (report.md + report.html).
 
     Calls the ``write_report`` seam (gated ARA -> vivid Chinese sections), stitches
     a mechanically-anchored 核心结论 + the real evidence tables + the sections,
-    grounds the whole thing, and HARD-GATES on the three-layer anchor lint.
+    grounds the whole thing, and HARD-GATES on the 忠实门 (ADR-0012).
 
     Raises:
-        AnchorGateError: the composed report failed the three-layer citation gate.
+        AnchorGateError: the composed report failed the 忠实門.
     """
     title = candidate["title"]
     key = key or person_dir.name
@@ -295,11 +301,19 @@ def write_branch1_llm(
     assembled = _strip_emoji("\n".join(parts) + "\n")  # no-emoji iron rule
     assembled = _quote_mermaid_labels(assembled)  # make LLM mermaid parse-safe
     report = _ground_report(assembled, md_text)
-    violations = lint_text(report)
-    if violations:
+    hard = check_report_faithfulness(
+        report,
+        md_text,
+        ara_dir,
+        judge=faithfulness_judge,
+        tolerant=report_tolerant,
+        max_unconfirmed=report_max_unconfirmed,
+        max_unconfirmed_ratio=report_max_unconfirmed_ratio,
+    )
+    if hard:
         raise AnchorGateError(
-            "branch1 (LLM) failed three-layer citation gate (吸收-D1): "
-            + "; ".join(v.message for v in violations[:5])
+            "branch1 (LLM) report failed 忠实门 (ADR-0012): "
+            + "; ".join(f.observation for f in hard[:5])
         )
     # Every SELECTED figure must be embedded...
     missing = [f.ref for f in copied if f"({f.ref})" not in report]
