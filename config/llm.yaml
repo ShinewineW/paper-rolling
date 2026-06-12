@@ -116,4 +116,4 @@ seams:
   entailment: hellorobotaxi    # G3 entailment — tiny in/out (tier=fast → qwen3.7-plus)
   expand: hellorobotaxi        # discovery query expansion (tier=fast → qwen3.7-plus)
   writer: hellorobotaxi-writer # human chain (tier=strong → qwen3.6-plus;2026-06-13 从 qwen3.7-max 换)
-  faithfulness: hellorobotaxi  # ADR-0012: branch1 忠实门 judge (tier=fast → qwen3.7-plus)
+  faithfulness: claude-code    # ADR-0012 忠实门 judge → 本地 claude-code (tier=fast → claude-haiku-4-5);2026-06-13 从 qwen3.7-plus 换:qwen 判官假阳性(把 ARA 里确有的细节误判成"不在 ARA")
