@@ -547,7 +547,7 @@ def validate_ara(ara_dir: Path) -> bool:
 1. **Single vault-key authority** — `naming.py` 中的 `vault_key()` 是唯一来源
 2. **Atomic dual-output** — Branch2 + Branch1 同时成功或同时失败（OT-5）
 3. **Deterministic naming** — Key = `{intake_date}_{Name}_{arxiv_base}`（可重现）
-4. **Three-layer anchoring** — 每个实证数字都被三层追溯到源 MD
+4. **忠实门 (ADR-0012)** — 正文数字允许自然书写，但必须机械落源到 MD（(b)）+ 不得相对 ARA 实质误导（(c) 判官）；引擎 `核心结论` 块仍保留 `<!--ref-->` 三层锚点
 5. **Mandatory architecture** — Branch1 中强制包含架构图
 6. **NO emoji** — 所有报告确定性剥离表情符号（项目铁律）
 7. **Self-contained HTML** — Branch1 HTML 报告中的图片 base64 inline（不外链）
