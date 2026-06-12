@@ -396,44 +396,47 @@ def write_report(
 # --------------------------------------------------------------------------- #
 
 
-def faithfulness_judge(report_text: str, ara_dir: Path) -> dict:
-    """branch1 忠实门 (c): is the 理解阅读 FAITHFUL to its verified ARA? (ADR-0012)
+def _ask_text(
+    prompt: str, *, seam: str, tier: str = "fast", timeout: float = 600.0, effort: str = "medium"
+) -> str:
+    """Call the seam's routed provider and return the RAW text (for prose seams like
+    the branch1 「评价」). Mirrors _ask_json but with no JSON parsing/retry."""
+    return _provider_for(seam).complete(prompt, tier=tier, effort=effort, timeout=timeout)
 
-    Ground-truth-isolated from the writer: routed to the `faithfulness` provider
-    and run at tier=fast, so it is a DIFFERENT model than the writer (writer=strong).
-    Bar = "would a reader be MATERIALLY MISLED" (clear misattribution / overclaim),
-    NOT prose-precision nitpicks — rigor lives in the ARA; this is a light backstop.
 
-    Returns {"faithful": bool, "findings": [{"claim": str, "issue": str}, ...]}.
-    Fails CLOSED: a malformed/empty judge response => faithful=False.
+def faithfulness_judge(
+    report_text: str, ara_dir: Path, *, ungrounded: list[str] | None = None
+) -> str:
+    """branch1 「评价」 (c) 语义层 (ADR-0012 rev): write a reader-facing Chinese
+    faithfulness note comparing the report against the verified ARA. It does NOT
+    adjudicate or block — the deterministic number facts are supplied by (b); this
+    only adds the semantic read (misattribution / overclaim / overall trust). The
+    `ungrounded` list (report numbers not found in the ARA) is passed as context.
+    Ground-truth-isolated from the writer (routed `faithfulness` provider, tier=fast,
+    a model ≠ the writer's). Fail-soft: any seam error returns a neutral note,
+    never raises.
     """
     bundle = load_ara_bundle(ara_dir)  # reuse g3_seal's reader (claims + evidence)
     ara_text = "\n\n".join(f"=== {name} ===\n{text}" for name, text in bundle.items())
     if len(ara_text) > _MD_CHAR_CAP:
         ara_text = ara_text[:_MD_CHAR_CAP] + "\n[...TRUNCATED...]"
-    _log("faithfulness: judging report ↔ ARA")
+    nums = "、".join(ungrounded or []) or "(无)"
+    _log("faithfulness: writing 评价 (report ↔ ARA)")
     prompt = (
-        "You verify a Chinese human-facing REPORT against a VERIFIED knowledge pack "
-        "(the ARA: claims + evidence tables). The ARA is ground truth. Flag ONLY "
-        "places where the REPORT would MATERIALLY MISLEAD a reader: a metric/number "
-        "attributed to the wrong system, a result overstated beyond what the ARA "
-        "supports, or a claim the ARA contradicts. Do NOT flag wording, style, "
-        "rounding, or general qualitative phrasing.\n\n"
-        'Return JSON: {"faithful": true|false, "findings": '
-        '[{"claim": "<short quote from the report>", "issue": "<<=1 line>"}]}. '
-        "faithful=true with an empty findings list means no material misleading.\n\n"
-        "=== VERIFIED ARA ===\n" + ara_text + "\n=== END ARA ===\n\n"
-        "=== REPORT ===\n" + report_text + "\n=== END REPORT ==="
+        "你在为一篇中文科普报告写一段简短「忠实性评价」(给读者看)。已验证知识包(ARA)是真值。"
+        "只点出会让读者实质误导的地方:把某系统的指标安到别的系统、夸大到 ARA 不支持、"
+        "或与 ARA 矛盾。不要挑措辞/取整/定性表达。机器已另行核出「报告里不在 ARA 的数字」:"
+        f"{nums}——你不必复述这串,只在它们确实造成误导时点评。\n"
+        "用 2-4 句中文,客观、给读者拿捏。若整体忠实,就说整体与知识包一致。\n\n"
+        "=== 已验证 ARA ===\n" + ara_text + "\n=== END ARA ===\n\n"
+        "=== 报告 ===\n" + report_text + "\n=== END 报告 ==="
     )
     try:
-        obj = _ask_json(prompt, seam="faithfulness", tier="fast", timeout=600.0, effort="medium")
-    except RuntimeError as exc:
-        _log(f"faithfulness: seam error, failing closed: {exc}")
-        return {"faithful": False, "findings": [{"claim": "", "issue": f"seam error: {exc}"}]}
-    if not isinstance(obj, dict) or "faithful" not in obj:
-        return {"faithful": False, "findings": [{"claim": "", "issue": "malformed judge response"}]}
-    findings = obj.get("findings") if isinstance(obj.get("findings"), list) else []
-    return {"faithful": bool(obj["faithful"]), "findings": findings}
+        note = _ask_text(prompt, seam="faithfulness", tier="fast", timeout=600.0, effort="medium")
+    except Exception as exc:  # noqa: BLE001 — 永不拦:任何 seam 故障都降级为中性句
+        _log(f"faithfulness: seam error, neutral note: {exc}")
+        return "(判官暂不可用,本节仅含机器核对结果。)"
+    return note.strip() or "整体与已验证知识包一致。"
 
 
 def build_seams() -> dict:
