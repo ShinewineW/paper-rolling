@@ -107,9 +107,17 @@ def build_assessment(report_text: str, ara_dir: Path, *, judge=None) -> str:
     `judge` is the (c) prose seam (None => facts-only). Every ARA-touching step is
     guarded: a corrupt/unreadable ARA degrades the note, it can never fail the report."""
     try:
-        ungrounded = ungrounded_report_numbers(report_text, ara_dir)
-        checked = True
-    except Exception:  # noqa: BLE001 — 评价 never blocks; an unreadable ARA drops the fact list
+        bundle = load_ara_bundle(ara_dir)
+        # A MISSING/empty ARA bundle is NOT a clean "all grounded" — load_ara_bundle
+        # returns {} (no exception) for an absent/empty ARA, so we must treat that as
+        # "未核对" too, never a false all-clear (Codex Final-gate HIGH).
+        checked = bool(bundle)
+        if checked:
+            vals = source_value_set("\n".join(bundle.values()))
+            ungrounded = [n for n in prose_numbers(report_text) if not number_present(n, vals)]
+        else:
+            ungrounded = []
+    except Exception:  # noqa: BLE001 — 评价 never blocks; an unreadable ARA degrades to 未核对
         ungrounded, checked = [], False
     note = ""
     if judge is not None:

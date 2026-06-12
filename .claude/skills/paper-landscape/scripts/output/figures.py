@@ -13,8 +13,9 @@ This module extracts that ordered figure list (path + caption), flags the
 architecture/method figure(s) via ``is_architecture_caption``, and copies the
 selected images into the report's vault dir so report.md / report.html resolve
 them. The writer (curate_figures) decides role + inclusion; branch1_llm embeds the
-selected figures (deterministic paths — no LLM hash reproduction) and hard-gates
-on the mandatory architecture figure being present.
+selected figures (deterministic paths — no LLM hash reproduction). ADR-0012 rev: a
+missing selected / mandatory architecture figure is NOT a hard gate — branch1 always
+publishes and the gap is surfaced as a 配图提示 note in the opening 「评价」.
 """
 
 from __future__ import annotations

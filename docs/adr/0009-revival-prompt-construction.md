@@ -1,10 +1,12 @@
 # 0009 — Revival prompt construction: branch-level re-gen with whole-report feedback
 
 > **Status**: accepted
-> **ADR-0012 修订(2026-06-13)**: branch1 不再会失败(锚点门退役为开篇「评价」,永不拦),故**"branch1
-> 根 → 重跑 branch1 带反馈"这条复活路径作废**;下文涉及 branch1 反馈注入(`prior_failure` 透传到
-> writer)的部分随之失效。余下有效:**branch2 根(rigor/entailment)重跑 + 数字门盲重试 + ingest 根人工
-> 回 ingest**——不变。
+> **ADR-0012 修订(2026-06-13)**: branch1 不再因忠实性失败(锚点门退役为开篇「评价」,永不拦),故下文
+> 涉及 branch1 **反馈注入**(把忠实门 findings 作为 `prior_failure` 透传给 writer 重写)的部分失效。
+> **但 branch1 复活路径本身保留,仅服务 G3R0(最终门下 report.md 缺失)**:此时复用已验证 branch2 SSOT
+> 重发 branch1 以重建 report.md(spoke `_classify`:report.md→branch1;revival `use_branch1`:最终门 +
+> branch1 根),与 ADR-0012 后果一致。余下有效:**branch2 根(rigor/entailment)重跑 + 数字门盲重试 +
+> ingest 根人工回 ingest**——不变。
 > **修订**: 2026-06-09 — 多 agent 审计推翻了初稿的 "section 级外科手术"。`Finding.target`
 > 从不携带 writer 章节标识(给的是文件路径 / ARA 节点 id / `level2_report.json`),
 > 且 `write_branch1_llm` 用 `sorted(sections)` 全量拼装、无章节 merge-back 机制 —— "只重跑

@@ -138,16 +138,27 @@ def test_assessment_fails_soft_when_judge_raises(tmp_path) -> None:
 
 def test_assessment_never_raises_on_unreadable_ara(tmp_path, monkeypatch) -> None:
     # ADR-0012 rev: build_assessment NEVER raises — even a corrupt/unreadable ARA
-    # (the (b) reader throwing) must degrade to a valid 评价, not fail the report.
+    # (the bundle reader THROWING) must degrade to a valid 评价, not fail the report.
     import scripts.output.branch1_gate as bg
 
     def _boom(*_a, **_k):
         raise RuntimeError("corrupt ARA")
 
-    monkeypatch.setattr(bg, "ungrounded_report_numbers", _boom)
+    monkeypatch.setattr(bg, "load_ara_bundle", _boom)
     note = build_assessment("本文达到 28.4 NDS。", tmp_path / "ara", judge=None)
     assert note.startswith("## 评价")
     # Must NOT falsely claim all numbers grounded when the ARA could not be read.
+    assert "均可在已验证知识包" not in note
+    assert "未能读取已验证知识包" in note
+
+
+def test_assessment_missing_or_empty_ara_is_not_a_false_all_clear(tmp_path) -> None:
+    # Codex Final-gate HIGH: a MISSING/empty ARA makes load_ara_bundle return {} with
+    # NO exception. build_assessment must still say "未核对", never "均可对应" — a report
+    # with no numbers over an absent ARA is NOT a verified all-clear.
+    missing = tmp_path / "nonexistent_ara"
+    note = build_assessment("本文不含任何性能数字,纯定性叙述。", missing, judge=None)
+    assert note.startswith("## 评价")
     assert "均可在已验证知识包" not in note
     assert "未能读取已验证知识包" in note
 
