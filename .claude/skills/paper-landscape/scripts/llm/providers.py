@@ -74,6 +74,13 @@ class ProviderError(RuntimeError):
     """A provider call failed after exhausting its retry budget."""
 
 
+class _RetryableHTTP(Exception):
+    """Internal signal: a transient HTTP outcome (429 / 5xx / empty-or-malformed
+    stream / over-budget) that the retry loop should back off and retry — as
+    opposed to a non-429 4xx (bad key/model/request), which raises ProviderError
+    and fails fast."""
+
+
 @runtime_checkable
 class LLMProvider(Protocol):
     """Transport behind one or more seams. Implementations must be stateless and
@@ -227,6 +234,13 @@ class OpenAICompatibleProvider:
     # API can be throttled narrow (e.g. 3); a generous one run wide — per provider,
     # from config/llm.yaml (Goal 3).
     max_concurrent: int = _DEFAULT_API_CONCURRENCY
+    # Idle-gap read timeout (seconds): the max SILENCE between streamed SSE chunks
+    # before the call is treated as a dead/stalled connection and fails LOUDLY for
+    # retry. Responses STREAM, so a slow-but-progressing generation (writer/rigor,
+    # minutes long) keeps resetting this gap and is NEVER false-killed by total
+    # length — while a hung connection (no bytes, e.g. proxy/endpoint dropped)
+    # aborts in ~idle_timeout s instead of stalling for the full `timeout` budget.
+    idle_timeout: float = 90.0
     _sem: threading.Semaphore = field(init=False, compare=False, repr=False, default=None)
     grounded_capable: ClassVar[bool] = False  # HTTP API: no local file access → no grounded
 
@@ -285,36 +299,81 @@ class OpenAICompatibleProvider:
                 time.sleep(min(cap, base * (2 ** (attempt - 1))))
             attempt += 1
             try:
-                with self._sem:  # this instance's own in-flight cap (config max_concurrent)
-                    if self.no_proxy:
-                        # Ignore env proxies so this host is reached DIRECT (then the OS
-                        # routing / Clash DIRECT rule takes it straight to the server).
-                        with requests.Session() as sess:
-                            sess.trust_env = False
-                            resp = sess.post(url, json=payload, headers=headers, timeout=timeout)
-                    else:
-                        resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+                return self._stream_completion(url, payload, headers, timeout)
             except requests.RequestException as exc:
+                # Transport-level: connect drop, OR an idle-gap read timeout (no SSE
+                # chunk for idle_timeout s = a stalled/dead connection). Retry.
                 last = ProviderError(f"{self.name} request error: {exc}")
                 conn_fail = True
                 continue
-            conn_fail = False
-            if resp.status_code == 429 or resp.status_code >= 500:
-                last = ProviderError(f"{self.name} HTTP {resp.status_code}: {resp.text[:200]}")
+            except _RetryableHTTP as exc:
+                # 429 / 5xx / malformed-or-empty stream: transient, retry.
+                last = ProviderError(str(exc))
+                conn_fail = False
                 continue
-            if resp.status_code != 200:
-                # 4xx other than 429 = non-transient (bad key/model/request); fail fast.
-                raise ProviderError(f"{self.name} HTTP {resp.status_code}: {resp.text[:300]}")
-            try:
-                data = resp.json()
-                msg = data["choices"][0]["message"]
-                # Some reasoning backends split content/reasoning; prefer content.
-                content = msg.get("content") or msg.get("reasoning_content") or ""
-            except (ValueError, KeyError, IndexError) as exc:
-                last = ProviderError(f"{self.name} malformed response: {exc}: {resp.text[:200]}")
-                continue
-            return str(content)
+            # A 4xx other than 429 (bad key/model/request) raises ProviderError from
+            # _stream_completion and propagates here — non-transient, fail fast.
         raise ProviderError(f"{self.name} failed after {attempt} attempt(s): {last}")
+
+    def _stream_completion(self, url: str, payload: dict, headers: dict, timeout: float) -> str:
+        """One streaming attempt. The response is consumed as an SSE stream so the
+        ``(connect, idle)`` read timeout bounds SILENCE BETWEEN CHUNKS, not total
+        time: a dead connection aborts in ~idle_timeout s while a long-but-flowing
+        generation is never false-killed. `timeout` is an overall wall-clock cap.
+
+        Returns the assembled content. Raises ``requests.RequestException`` on
+        transport failure (incl. idle-gap timeout), ``_RetryableHTTP`` on
+        429/5xx/empty-or-malformed stream, and ``ProviderError`` (fail-fast) on a
+        non-429 4xx.
+        """
+        body = {**payload, "stream": True}
+        read_to = (min(30.0, timeout), self.idle_timeout)  # (connect, idle-gap)
+        deadline = time.monotonic() + timeout
+
+        def _go(poster) -> str:
+            with poster(url, json=body, headers=headers, stream=True, timeout=read_to) as resp:
+                if resp.status_code == 429 or resp.status_code >= 500:
+                    raise _RetryableHTTP(f"{self.name} HTTP {resp.status_code}: {resp.text[:200]}")
+                if resp.status_code != 200:
+                    raise ProviderError(f"{self.name} HTTP {resp.status_code}: {resp.text[:300]}")
+                return self._consume_sse(resp, deadline)
+
+        with self._sem:  # this instance's own in-flight cap (config max_concurrent)
+            if self.no_proxy:
+                # Ignore env proxies so this host is reached DIRECT (then the OS
+                # routing / Clash DIRECT rule takes it straight to the server).
+                with requests.Session() as sess:
+                    sess.trust_env = False
+                    return _go(sess.post)
+            return _go(requests.post)
+
+    def _consume_sse(self, resp: requests.Response, deadline: float) -> str:
+        """Assemble streamed `data: {delta}` chunks into the full content. An
+        overall-budget guard caps a slow trickle; per-chunk silence is bounded by
+        the socket read timeout (raises RequestException, handled by the caller)."""
+        parts: list[str] = []
+        for raw in resp.iter_lines(decode_unicode=True):
+            if time.monotonic() > deadline:
+                raise _RetryableHTTP(f"{self.name} exceeded overall budget mid-stream")
+            if not raw:
+                continue
+            line = raw.strip()
+            if not line.startswith("data:"):
+                continue
+            chunk = line[len("data:") :].strip()
+            if chunk == "[DONE]":
+                break
+            try:
+                delta = json.loads(chunk)["choices"][0].get("delta", {})
+            except (ValueError, KeyError, IndexError):
+                continue  # keep-alive / usage-only / comment frame
+            piece = delta.get("content") or delta.get("reasoning_content") or ""
+            if piece:
+                parts.append(piece)
+        content = "".join(parts)
+        if not content:
+            raise _RetryableHTTP(f"{self.name} empty stream")
+        return content
 
 
 # --------------------------------------------------------------------------- #
@@ -619,6 +678,7 @@ def build_provider(
             api_key_env=spec["api_key_env"],
             send_reasoning_effort=bool(spec.get("send_reasoning_effort", False)),
             no_proxy=bool(spec.get("no_proxy", False)),
+            idle_timeout=float(spec.get("idle_timeout", 90.0)),
             max_concurrent=_max_concurrent(_DEFAULT_API_CONCURRENCY),
         )
     raise ProviderError(

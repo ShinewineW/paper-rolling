@@ -63,21 +63,43 @@ def test_openai_complete_missing_key_raises(monkeypatch: pytest.MonkeyPatch) -> 
         prov.complete("hi")
 
 
+class _StreamResp:
+    """Fake streaming response: a context manager whose iter_lines yields SSE
+    `data:` frames (the new transport contract)."""
+
+    def __init__(self, status_code: int, lines: list[str] | None = None, text: str = "") -> None:
+        self.status_code = status_code
+        self._lines = lines or []
+        self.text = text
+
+    def __enter__(self) -> _StreamResp:
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        return False
+
+    def iter_lines(self, decode_unicode: bool = False):  # noqa: FBT002 - mirror requests API
+        yield from self._lines
+
+
 def test_openai_complete_parses_content(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TEST_KEY_ENV", "sk-test")
     captured: dict = {}
 
-    class _Resp:
-        status_code = 200
-
-        def json(self) -> dict:
-            return {"choices": [{"message": {"content": "hello-world"}}]}
-
-    def _fake_post(url, json, headers, timeout):  # noqa: A002 - mirror requests API
+    def _fake_post(url, json, headers, stream, timeout):  # noqa: A002 - mirror requests API
         captured["url"] = url
         captured["model"] = json["model"]
+        captured["stream"] = stream
         captured["auth"] = headers["Authorization"]
-        return _Resp()
+        # Content arrives as two streamed delta chunks, then the [DONE] sentinel.
+        return _StreamResp(
+            200,
+            [
+                'data: {"choices": [{"delta": {"content": "hello-"}}]}',
+                'data: {"choices": [{"delta": {"content": "world"}}]}',
+                "data: [DONE]",
+            ],
+        )
 
     monkeypatch.setattr(P.requests, "post", _fake_post)
     prov = P.OpenAICompatibleProvider(
@@ -87,20 +109,16 @@ def test_openai_complete_parses_content(monkeypatch: pytest.MonkeyPatch) -> None
         fast_model="FAST",
         api_key_env="TEST_KEY_ENV",
     )
-    assert prov.complete("hi", tier="fast") == "hello-world"
+    assert prov.complete("hi", tier="fast") == "hello-world"  # deltas assembled
     assert captured["url"].endswith("/chat/completions")
     assert captured["model"] == "FAST"  # tier routing
+    assert captured["stream"] is True  # streamed transport
     assert captured["auth"] == "Bearer sk-test"
 
 
 def test_openai_complete_4xx_fails_fast(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TEST_KEY_ENV", "sk-test")
-
-    class _Resp:
-        status_code = 400
-        text = "bad request"
-
-    monkeypatch.setattr(P.requests, "post", lambda *a, **k: _Resp())
+    monkeypatch.setattr(P.requests, "post", lambda *a, **k: _StreamResp(400, text="bad request"))
     prov = P.OpenAICompatibleProvider(
         name="t",
         base_url="https://x/v1",
@@ -110,6 +128,30 @@ def test_openai_complete_4xx_fails_fast(monkeypatch: pytest.MonkeyPatch) -> None
     )
     with pytest.raises(P.ProviderError, match="HTTP 400"):
         prov.complete("hi")
+
+
+def test_openai_complete_empty_stream_retries_then_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 200 stream that yields no content is transient (_RetryableHTTP): the loop
+    retries and, on persistent emptiness, raises ProviderError — never returns ''."""
+    monkeypatch.setenv("TEST_KEY_ENV", "sk-test")
+    monkeypatch.setattr(P.time, "sleep", lambda *_a, **_k: None)  # skip real backoff
+    calls = {"n": 0}
+
+    def _empty_post(*a, **k):
+        calls["n"] += 1
+        return _StreamResp(200, ["data: [DONE]"])  # no delta content
+
+    monkeypatch.setattr(P.requests, "post", _empty_post)
+    prov = P.OpenAICompatibleProvider(
+        name="t",
+        base_url="https://x/v1",
+        strong_model="s",
+        fast_model="f",
+        api_key_env="TEST_KEY_ENV",
+    )
+    with pytest.raises(P.ProviderError):
+        prov.complete("hi")
+    assert calls["n"] > 1  # it retried, did not pass the empty result through
 
 
 def test_load_absent_config_raises(tmp_path: Path) -> None:
