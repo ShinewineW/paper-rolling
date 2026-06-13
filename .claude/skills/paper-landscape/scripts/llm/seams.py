@@ -447,19 +447,33 @@ _URL_RE = re.compile(r"https?://[^\s)>\]}\"']+")
 
 
 def _websearch_prompt(query: str) -> str:
+    # The agent is the JUDGE, not a URL scraper: it searches, then DECIDES which repo (if
+    # any) is genuinely this paper's code — returning only what it endorses, or nothing.
+    # This is what stops loose matches (a citing repo / a different project / an 'awesome'
+    # list / another org's challenge) from entering the SSOT.
     return (
-        "Find the OFFICIAL open-source code repository for this research paper. "
-        "Use the WebSearch tool.\n\n"
+        "You are resolving the code repository for a research paper. Use the WebSearch "
+        "tool to investigate, then JUDGE carefully — the decision is YOURS.\n\n"
         f"Paper: {query}\n\n"
-        "Return ONLY URLs, one per line — the official GitHub repo "
-        "(github.com/<org-or-user>/<repo>) FIRST if it exists; otherwise the project "
-        "page or Hugging Face links. No prose, no commentary, just URLs."
+        "Decide whether a genuine code repository for THIS paper exists, distinguishing:\n"
+        "  - the paper's OFFICIAL repo (released by the paper's own authors),\n"
+        "  - a faithful community REIMPLEMENTATION of this exact paper,\n"
+        "  - repos that merely CITE/relate to it but are NOT this paper's code (a different "
+        "project, a benchmark/challenge, a survey or 'awesome' list).\n\n"
+        "Return ONLY github.com URLs you are CONFIDENT are this paper's official repo or a "
+        "faithful reimplementation of it — official first, one per line. If you are NOT "
+        "confident any repo is genuinely THIS paper's code, return NOTHING. Do NOT return "
+        "loosely-related or merely-citing repos. Output: just the endorsed URL(s), or empty."
     )
 
 
 def web_search(query: str) -> list[str]:
-    """T4 repo-discovery tier (repo_resolve): an independent sub-agent runs WebSearch
-    for the paper's official code repo and returns candidate URLs (highest-trust first).
+    """T4 repo-discovery tier (repo_resolve): an independent sub-agent runs WebSearch AND
+    JUDGES the results — the selection power is the agent's. It returns only the repo URLs
+    it is confident are genuinely this paper's code (official, or a faithful reimplementation),
+    or NOTHING if no repo is genuinely the paper's — so loose matches (a citing repo, a
+    different project, an 'awesome' list) are judged out at the source rather than loosely
+    accepted downstream.
 
     Routed via the OPTIONAL ``web_search`` seam in config/llm.yaml (one config-managed
     place for the backend/key/model — e.g. claude-code with the WebSearch tool). If the

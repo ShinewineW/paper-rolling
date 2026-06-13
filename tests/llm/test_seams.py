@@ -112,3 +112,18 @@ def test_web_search_fails_soft_on_provider_error(monkeypatch) -> None:
 
     monkeypatch.setattr(S, "_cfg", lambda: _FakeCfg(_Prov()))
     assert S.web_search("x") == []  # fail-soft: never aborts a tick
+
+
+def test_web_search_returns_empty_when_agent_endorses_nothing(monkeypatch) -> None:
+    # The agent is the judge: if it concludes no repo is genuinely this paper's code, it
+    # returns prose with NO github URL → the tier yields [] (no loose match enters).
+    from scripts.llm import seams as S
+
+    class _Prov:
+        name = "fake"
+
+        def complete(self, _prompt, **_kw):
+            return "I could not find a repository I am confident is this paper's code."
+
+    monkeypatch.setattr(S, "_cfg", lambda: _FakeCfg(_Prov()))
+    assert S.web_search("ObscurePaper with no code") == []
