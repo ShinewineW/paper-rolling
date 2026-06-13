@@ -237,11 +237,27 @@ def _render_none(*, declared_closed: bool) -> str:
         ]
     else:
         lines += [
-            "**No public repository found** — searched the paper text and the "
-            "Papers-with-Code official-repo index; nothing was found or passed "
+            "**No public repository found** — searched the paper text, the Papers-with-Code "
+            "official-repo index, Hugging Face, and a web search; nothing was found or passed "
             "verification. This is NOT a closed-source determination.",
             "",
         ]
+    return "\n".join(lines)
+
+
+_ARTIFACT_LABEL = {"hf-model": "Model", "hf-dataset": "Dataset", "hf-space": "Space"}
+
+
+def _render_artifacts(artifacts: list[RepoCandidate]) -> str:
+    """A 'Linked artifacts' section for HF models/datasets/spaces — the official weights
+    and data a paper ships on Hugging Face EVEN WHEN it has no GitHub source repo (so
+    'no repo' never reads as 'no code/artifacts'; e.g. FastWAM's yuanty/fastwam model +
+    yuanty/robotwin2.0-fastwam dataset). Appended below the primary repo pointer."""
+    if not artifacts:
+        return ""
+    lines = ["## Linked artifacts (Hugging Face)", ""]
+    lines += [f"- **{_ARTIFACT_LABEL.get(c.source, c.source)}**: {c.url}" for c in artifacts]
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -256,11 +272,14 @@ def build_code_ref(
     title: str | None = None,
     declared_closed: bool = False,
 ) -> None:
-    """Clone-verify candidates in order, write a three-state pointer, delete clones.
+    """Clone-verify the github candidates in order, write a three-state pointer (plus a
+    'Linked artifacts' section for any HF model/dataset/space candidates), delete clones.
 
     Args:
-        candidates: Ordered repo candidates (see resolve_repo_candidates). Empty ->
-            "searched, not found" (or "author-declared closed" if declared_closed).
+        candidates: Ordered repo candidates (see resolve_repo_candidates). github repos
+            (trust official/search) are clone-verified; HF artifacts (trust "artifact")
+            are rendered in a separate section, NOT cloned. No github repo -> "searched,
+            not found" (or "author-declared closed"); artifacts still surface below it.
         innovations: Innovations to locate (also a verification signal).
         out_path: Where to write `code_ref.md`.
         clone_root: Temp root for clones (gitignored, e.g. /tmp/paper-repos).
@@ -269,15 +288,24 @@ def build_code_ref(
         declared_closed: True only if the paper explicitly declares closed-source.
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    if not candidates:
-        out_path.write_text(_render_none(declared_closed=declared_closed), encoding="utf-8")
+    clone_cands = [c for c in candidates if c.trust != "artifact"]
+    artifacts_md = _render_artifacts([c for c in candidates if c.trust == "artifact"])
+
+    def _write(primary: str) -> None:
+        body = primary.rstrip("\n") + "\n"
+        if artifacts_md:
+            body += "\n" + artifacts_md
+        out_path.write_text(body, encoding="utf-8")
+
+    if not clone_cands:
+        _write(_render_none(declared_closed=declared_closed))
         return
 
     repo_dir = clone_root / idbase
     repo_dir.parent.mkdir(parents=True, exist_ok=True)
     unreachable: tuple[RepoCandidate, str] | None = None
     try:
-        for cand in candidates:
+        for cand in clone_cands:
             if repo_dir.exists():
                 shutil.rmtree(repo_dir, ignore_errors=True)
             probe = _clone_and_probe(cand.url, innovations, repo_dir)
@@ -288,12 +316,12 @@ def build_code_ref(
                     unreachable = (cand, probe.clone_error)
                 continue
             if _accepts(cand, probe, arxiv_id=arxiv_id, title=title, repo_dir=repo_dir):
-                out_path.write_text(_render_found(cand, probe.sha, probe.located), encoding="utf-8")
+                _write(_render_found(cand, probe.sha, probe.located))
                 return
         # Nothing accepted: an unreachable declared repo beats a bare "not found".
         if unreachable is not None:
-            out_path.write_text(_render_unreachable(*unreachable), encoding="utf-8")
+            _write(_render_unreachable(*unreachable))
         else:
-            out_path.write_text(_render_none(declared_closed=declared_closed), encoding="utf-8")
+            _write(_render_none(declared_closed=declared_closed))
     finally:
         shutil.rmtree(repo_dir, ignore_errors=True)

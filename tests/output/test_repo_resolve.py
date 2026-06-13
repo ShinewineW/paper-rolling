@@ -152,6 +152,51 @@ def test_t4_websearch_fires_only_when_all_higher_tiers_miss() -> None:
     ]
 
 
+def test_hf_artifacts_surface_as_candidates_even_when_a_github_repo_is_found() -> None:
+    # "Read all of HF, not just githubRepo": linked models/datasets surface as
+    # trust="artifact" candidates ALONGSIDE a found github repo (not gated on its absence).
+    cands = resolve_repo_candidates(
+        "2603.16666",
+        None,
+        {},
+        pwc_lookup=lambda _i: "https://github.com/x/official",
+        hf_artifacts=lambda _i: [
+            ("model", "https://huggingface.co/yuanty/fastwam"),
+            ("dataset", "https://huggingface.co/datasets/yuanty/robotwin2.0-fastwam"),
+        ],
+    )
+    assert RepoCandidate("https://github.com/x/official", "pwc-official", "official") in cands
+    arts = [(c.source, c.url) for c in cands if c.trust == "artifact"]
+    assert arts == [
+        ("hf-model", "https://huggingface.co/yuanty/fastwam"),
+        ("hf-dataset", "https://huggingface.co/datasets/yuanty/robotwin2.0-fastwam"),
+    ]
+
+
+def test_hf_linked_artifacts_parses_models_datasets_spaces() -> None:
+    from scripts.output.repo_resolve import hf_linked_artifacts
+
+    data = {
+        "linkedModels": [{"id": "yuanty/fastwam"}],
+        "linkedDatasets": [{"id": "yuanty/robotwin2.0-fastwam"}],
+        "linkedSpaces": [],
+    }
+    arts = hf_linked_artifacts("2603.16666v2", http_get=lambda _u, _h: data)
+    assert arts == [
+        ("model", "https://huggingface.co/yuanty/fastwam"),
+        ("dataset", "https://huggingface.co/datasets/yuanty/robotwin2.0-fastwam"),
+    ]
+
+
+def test_hf_linked_artifacts_degrades_to_empty_on_error() -> None:
+    from scripts.output.repo_resolve import hf_linked_artifacts
+
+    def _boom(_u, _h):
+        raise OSError("network down")
+
+    assert hf_linked_artifacts("2603.16666", http_get=_boom) == []
+
+
 def test_hf_official_repo_parses_and_strips_version() -> None:
     seen = {}
 

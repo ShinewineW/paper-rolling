@@ -139,6 +139,41 @@ def hf_official_repo(
     return repo or None
 
 
+def hf_linked_artifacts(
+    arxiv_id: str | None,
+    *,
+    http_get: Callable[[str, dict[str, str]], dict] = _default_http_get_json,
+) -> list[tuple[str, str]]:
+    """T2b (broadened) — HF artifacts (models / datasets / spaces) the paper page links,
+    as ``(kind, url)`` pairs in that priority. HF auto-links these; a paper can ship its
+    OFFICIAL weights/data here with NO ``githubRepo`` field at all (e.g. FastWAM:
+    yuanty/fastwam model + yuanty/robotwin2.0-fastwam dataset). Reading only ``githubRepo``
+    threw these away — surfacing them keeps 'no github repo' from reading as 'no
+    code/artifacts'. Network/parse failure degrades to []."""
+    if not arxiv_id:
+        return []
+    from scripts.discovery.hf_papers import _hf_headers
+
+    key = _ARXIV_VERSION.sub("", arxiv_id.strip())
+    try:
+        data = http_get(f"https://huggingface.co/api/papers/{key}", _hf_headers())
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    out: list[tuple[str, str]] = []
+    for kind, field, prefix in (
+        ("model", "linkedModels", "https://huggingface.co/"),
+        ("dataset", "linkedDatasets", "https://huggingface.co/datasets/"),
+        ("space", "linkedSpaces", "https://huggingface.co/spaces/"),
+    ):
+        for item in data.get(field) or []:
+            hid = item.get("id") if isinstance(item, dict) else None
+            if hid:
+                out.append((kind, f"{prefix}{hid}"))
+    return out
+
+
 def resolve_repo_candidates(
     arxiv_id: str | None,
     md_path: Path | None,
@@ -146,6 +181,7 @@ def resolve_repo_candidates(
     *,
     pwc_lookup: Callable[[str | None], str | None] = _pwc_official_repo,
     hf_lookup: Callable[[str | None], str | None] | None = None,
+    hf_artifacts: Callable[[str | None], list[tuple[str, str]]] | None = None,
     web_search: Callable[[str], list[str]] | None = None,
 ) -> list[RepoCandidate]:
     """Ordered, de-duplicated repo candidates, HIGHEST TRUST FIRST: T2a pwc-official
@@ -192,15 +228,31 @@ def resolve_repo_candidates(
         for result in web_search(query):
             for m in _GH.finditer(result or ""):
                 add(m.group(0), "websearch", "search")
+    # HF linked artifacts (models/datasets/spaces): surfaced ALWAYS — even when a github
+    # repo was found, the official weights/data are relevant code semantics ("read all of
+    # HF, not just githubRepo"). NOT clone-verified github repos → trust="artifact", which
+    # build_code_ref renders in a separate "Linked artifacts" section. Not gated on `out`.
+    if hf_artifacts is not None:
+        for kind, url in hf_artifacts(arxiv_id):
+            if url and url not in seen:
+                seen.add(url)
+                out.append(RepoCandidate(url=url, source=f"hf-{kind}", trust="artifact"))
     return out
 
 
 def make_repo_resolver(*, web_search: Callable[[str], list[str]] | None = None) -> Callable:
     """Compose the PRODUCTION code_ref resolver for the driver to inject.
 
-    Wires T1+T2a (always) + **T2b HF-live on by default** (deterministic, free) +
-    **T4 only when `web_search` is supplied** (an Agent WebSearch invocation that
-    returns result strings). Pass the result as `run_campaign(repo_resolver=...)`.
-    Unit tests use the bare `resolve_repo_candidates` instead, so they stay offline.
+    Wires T1+T2a (always) + **T2b HF-live on by default** (deterministic, free) — both
+    the github repo (`hf_lookup`) AND the linked HF artifacts (`hf_artifacts`: models/
+    datasets/spaces) — + **T4 only when `web_search` is supplied** (an Agent WebSearch
+    invocation that returns result strings). Pass the result as
+    `run_campaign(repo_resolver=...)`. Unit tests use the bare `resolve_repo_candidates`
+    instead, so they stay offline.
     """
-    return partial(resolve_repo_candidates, hf_lookup=hf_official_repo, web_search=web_search)
+    return partial(
+        resolve_repo_candidates,
+        hf_lookup=hf_official_repo,
+        hf_artifacts=hf_linked_artifacts,
+        web_search=web_search,
+    )

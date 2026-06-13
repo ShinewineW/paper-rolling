@@ -215,3 +215,52 @@ def test_unresolved_innovations_omit_not_found_rows(tmp_path, monkeypatch):
     assert "_not found_" not in body
     assert "## Innovation → code location" not in body
     assert "not mechanically resolved" in body
+
+
+def test_hf_artifacts_rendered_without_cloning_when_no_github(tmp_path, monkeypatch):
+    # trust="artifact" candidates (HF models/datasets) are NOT clone-verified — they
+    # render in a "Linked artifacts" section. No github candidate → not-found primary,
+    # artifacts surfaced below (so 'no repo' never reads as 'no code/artifacts').
+    def _no_clone(cmd, *a, **k):
+        raise AssertionError(f"artifacts must not be git-cloned: {cmd}")
+
+    monkeypatch.setattr(subprocess, "run", _no_clone)
+    out = tmp_path / "code_ref.md"
+    build_code_ref(
+        candidates=[
+            RepoCandidate("https://huggingface.co/yuanty/fastwam", "hf-model", "artifact"),
+            RepoCandidate(
+                "https://huggingface.co/datasets/yuanty/rt2-fastwam", "hf-dataset", "artifact"
+            ),
+        ],
+        innovations=[],
+        out_path=out,
+        clone_root=tmp_path / "repos",
+        idbase="2603.16666",
+    )
+    body = out.read_text(encoding="utf-8")
+    assert "## Linked artifacts (Hugging Face)" in body
+    assert "**Model**: https://huggingface.co/yuanty/fastwam" in body
+    assert "**Dataset**: https://huggingface.co/datasets/yuanty/rt2-fastwam" in body
+    assert "No public repository found" in body  # no github → not-found primary + artifacts below
+
+
+def test_found_github_repo_keeps_artifacts_section(tmp_path, monkeypatch):
+    # A verified github repo AND linked HF artifacts: both surface (primary repo pointer
+    # + the artifacts section below it).
+    _fake_git(monkeypatch, {_OFFICIAL: {"README.md": "proj\n"}})
+    out = tmp_path / "code_ref.md"
+    build_code_ref(
+        candidates=[
+            RepoCandidate(_OFFICIAL, "pwc-official", "official"),
+            RepoCandidate("https://huggingface.co/yuanty/fastwam", "hf-model", "artifact"),
+        ],
+        innovations=[Innovation(name="X", grep="NoSuchSymbol")],
+        out_path=out,
+        clone_root=tmp_path / "repos",
+        idbase="2401.2",
+    )
+    body = out.read_text(encoding="utf-8")
+    assert "**Pinned commit**" in body  # github repo found + verified (primary)
+    assert "## Linked artifacts (Hugging Face)" in body  # artifacts still surfaced
+    assert "**Model**: https://huggingface.co/yuanty/fastwam" in body
