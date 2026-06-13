@@ -66,10 +66,11 @@ Status keys: `planned` · `in-progress` · `done`.
   block/pass; classify WHAT failed (transcription typo vs fabrication vs
   unverifiable) so findings are actionable. *Source:* ARS claim_audit defect-stage
   taxonomy; AI-Scientist multi-dimension rubric.
-- **C4. NLI / guarded entailment (the deferred B9)** — `done`. anchor /
-  entailment use metric-cue heuristics; route claim↔evidence entailment through a
-  trained NLI / factual-consistency check that generalizes beyond keyword cues.
-  *Source:* ARS uncited-assertion guarded detector; factual-consistency models.
+- **C4. NLI / guarded entailment (the deferred B9)** — `done`. (ADR-0012 rev retired
+  the anchor side of C4 — branch1 anchoring is gone and the `empirical_classifier`
+  seam was removed; this item now covers entailment only.) Entailment uses metric-cue
+  heuristics; route claim↔evidence entailment through a trained NLI / factual-consistency
+  check that generalizes beyond keyword cues. *Source:* factual-consistency models.
 
 ## Carried from the oh-my-codex audit (R21) — RESOLVED + SHIPPED (ADR-0003)
 

@@ -120,7 +120,7 @@ scripts/          the engine code (packages below)
 | `branch2_ara.py` | branch2 ARA producer (runs first). |
 | `branch1_llm.py` | branch1 LLM-written human chain (vivid Chinese sections + grounded assembly + figure curation + self-contained HTML). Wired via optional `write_report` seam. |
 | `branch1_report.py` | branch1 thin deterministic renderer (fallback when no `write_report` seam; from analysis → markdown template). |
-| `branch1_gate.py` | branch1 忠实门 (ADR-0012): kept anchor-form lint + (b) mechanical prose-number grounding vs source MD + (c) optional LLM judge (report ↔ ARA). Returns hard-block `Finding`s; used by both branch1 paths. |
+| `branch1_gate.py` | branch1 opening 「评价」 (ADR-0012 rev): `build_assessment` assembles a NON-blocking `## 评价` note — (b) report prose numbers not in the verified **ARA** (says "未核对" if the ARA is unreadable, never a false all-clear) + (c) an advisory fail-soft LLM judge note + the ARA's `AUDIT_FLAGS` body. NEVER raises; prepended by both branch1 paths. branch1 has no hard gate. |
 | `naming.py` | **The single live vault-key authority**: `vault_key`, `derive_name`, `identity_base`, `find_existing_entries`. |
 | `ara_schema.py` | ARA Seal Level 1 structural validator. |
 | `anchor_lint.py` | Three-layer citation anchor lint (HARD gate) + the anchor-lint CLI. |
@@ -207,7 +207,7 @@ ruff" is the validation gate.
    what the `/loop` tick actually drives. It composes
    `Ledger → make_spoke(seams) → (LS-1 lock) run_campaign_tick`. It is a function, not
    a CLI: the runtime agent must supply `discover`, `http`, `run_cli`, and the **five
-   analysis/audit model seams** (incl. the branch1 忠实门 `faithfulness_judge`, ADR-0012).
+   analysis/audit model seams** (incl. the branch1 「评价」 `faithfulness_judge` note-writer, ADR-0012 rev).
    See `SKILL.md` → "Wiring the model seams" for the exact contract.
    Invoking the module directly prints a usage message and exits (it is intentionally
    not a silent no-op):
@@ -265,10 +265,11 @@ model seams" documents the exact input/output shape of each:
 - **`write_report(ara_bundle, figures) -> dict`** — the human-chain LLM writer
   (optional; if provided, generates vivid Chinese prose + grounded assembly;
   if omitted, branch1 falls back to thin deterministic renderer).
-- **`faithfulness_judge(report_text, ara_dir) -> dict`** — the branch1 忠实门 (c)
-  judge (ADR-0012): compares the human report against the verified ARA, returning
-  `{"faithful": bool, "findings": [...]}` (fails CLOSED). Ground-truth-isolated from
-  `write_report` (tier=fast → a model ≠ the writer's).
+- **`faithfulness_judge(report_text, ara_dir, *, ungrounded=None) -> str`** — the branch1
+  「评价」 (c) note-writer (ADR-0012 rev): compares the human report against the verified
+  ARA and returns a Chinese prose note. ADVISORY + fail-SOFT (any seam/ARA error → a
+  neutral note; NEVER raises, NEVER blocks). Ground-truth-isolated from `write_report`
+  (tier=fast → a model ≠ the writer's).
 
 ## Key dependencies / external services / env
 
