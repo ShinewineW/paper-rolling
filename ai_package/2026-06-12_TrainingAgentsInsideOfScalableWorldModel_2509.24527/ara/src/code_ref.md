@@ -1,11 +1,6 @@
 # Code Reference
 
-- **Repository**: https://github.com/nicklashansen/dreamer4
-- **Pinned commit**: `bdeddfe2058c1025344424d1dbcdb743d9228fc9`
-- **Source**: websearch (verified)
-- **Reproduce**: re-clone at the pinned commit; this workspace keeps no runnable copy.
-
-- **Innovation → code location**: not mechanically resolved at this commit (symbols not located in source); see the repo at the pinned SHA.
+**No public repository found** — searched the paper text, the Papers-with-Code official-repo index, Hugging Face, and a web search; nothing was found or passed verification. This is NOT a closed-source determination.
 
 ## Linked artifacts (Hugging Face)
 
