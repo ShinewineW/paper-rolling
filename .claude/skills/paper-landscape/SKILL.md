@@ -287,11 +287,12 @@ result = run_campaign(
     ),
     http=build_http(),
     run_cli=build_run_cli(),
-    # code_ref repo resolution (P0). make_repo_resolver() turns T2b (HF-live) ON;
-    # to also enable T4, pass web_search=<a callable that runs an Agent WebSearch
-    # and returns result strings>. Omit repo_resolver entirely → the offline
-    # default (T1 grep + T2a PwC + any discovery-carried github_repo), no network.
-    repo_resolver=make_repo_resolver(),
+    # code_ref repo resolution (P0). ALL FOUR tiers on: T2a PwC + T1 paper-text +
+    # discovery + T2b HF-live (always) + T4 websearch via the optional `web_search`
+    # seam (routed in config/llm.yaml → a fresh sub-agent WebSearch per UNRESOLVED
+    # paper; long-tail only, fail-soft). seams["web_search"] is a no-op [] if the
+    # optional seam is unrouted, so this line is always safe.
+    repo_resolver=make_repo_resolver(web_search=seams["web_search"]),
 )
 ```
 

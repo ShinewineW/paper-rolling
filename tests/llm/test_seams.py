@@ -64,3 +64,51 @@ def test_faithfulness_judge_fails_soft_when_ara_unreadable(monkeypatch, tmp_path
 
     monkeypatch.setattr(S, "load_ara_bundle", _boom)
     assert S.faithfulness_judge("r", tmp_path).strip()
+
+
+class _FakeCfg:
+    def __init__(self, provider):
+        self._p = provider
+
+    def resolve_optional(self, _seam):
+        return self._p
+
+
+def test_web_search_off_returns_empty_when_seam_unrouted(monkeypatch) -> None:
+    from scripts.llm import seams as S
+
+    monkeypatch.setattr(S, "_cfg", lambda: _FakeCfg(None))  # optional seam not routed → T4 off
+    assert S.web_search("FastWAM official code") == []
+
+
+def test_web_search_parses_urls_highest_first(monkeypatch) -> None:
+    from scripts.llm import seams as S
+
+    class _Prov:
+        name = "fake"
+
+        def complete(self, _prompt, **_kw):  # accepts tier/effort/timeout/tools
+            return (
+                "Found it:\nhttps://github.com/yuantianyuan01/FastWAM\n"
+                "https://huggingface.co/yuanty/fastwam (model)\n"
+                "dup https://github.com/yuantianyuan01/FastWAM."
+            )
+
+    monkeypatch.setattr(S, "_cfg", lambda: _FakeCfg(_Prov()))
+    assert S.web_search("FastWAM") == [
+        "https://github.com/yuantianyuan01/FastWAM",
+        "https://huggingface.co/yuanty/fastwam",
+    ]
+
+
+def test_web_search_fails_soft_on_provider_error(monkeypatch) -> None:
+    from scripts.llm import seams as S
+
+    class _Prov:
+        name = "fake"
+
+        def complete(self, *_a, **_k):
+            raise RuntimeError("provider/EngineAbort — must not propagate from an enrichment tier")
+
+    monkeypatch.setattr(S, "_cfg", lambda: _FakeCfg(_Prov()))
+    assert S.web_search("x") == []  # fail-soft: never aborts a tick

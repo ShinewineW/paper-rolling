@@ -117,3 +117,7 @@ seams:
   expand: hellorobotaxi        # discovery query expansion (tier=fast → qwen3.7-plus)
   writer: hellorobotaxi-writer # human chain (tier=strong → qwen3.6-plus;2026-06-13 从 qwen3.7-max 换)
   faithfulness: claude-code    # ADR-0012 忠实门 judge → 本地 claude-code (tier=fast → claude-haiku-4-5);2026-06-13 从 qwen3.7-plus 换:qwen 判官假阳性(把 ARA 里确有的细节误判成"不在 ARA")
+  # OPTIONAL seam (T4 长尾码链发现,repo_resolve)。本地 claude-code 派子 agent 用 WebSearch 工具联网搜
+  # 官方仓库,只在 PwC 离线表/论文正文/HF 全空时才触发(长尾才联网,非每篇)。fail-soft:失败→[],绝不拖垮
+  # tick。换后端/token 直接改这里(去掉本行 = T4 关)。
+  web_search: claude-code

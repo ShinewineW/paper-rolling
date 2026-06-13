@@ -113,6 +113,45 @@ def test_t4_websearch_extracts_github_urls_from_results() -> None:
     assert cands == [RepoCandidate("https://github.com/xiaomi-mlab/Orion", "websearch", "search")]
 
 
+def test_t4_websearch_skipped_when_a_higher_tier_already_found_a_repo() -> None:
+    # Cost gate: T4 (a live websearch sub-agent) must fire ONLY for the long tail —
+    # never when PwC/paper-text/discovery/HF already yielded a candidate.
+    def _boom(_q):
+        raise AssertionError("web_search must NOT run when a higher tier already found a repo")
+
+    cands = resolve_repo_candidates(
+        "2401.00001",
+        None,
+        {},
+        pwc_lookup=lambda _i: "https://github.com/pwc/official",
+        web_search=_boom,
+    )
+    assert [c.source for c in cands] == ["pwc-official"]
+
+
+def test_t4_websearch_fires_only_when_all_higher_tiers_miss() -> None:
+    # The long-tail recovery path (e.g. FastWAM): PwC frozen-table miss + no github link
+    # in the paper + HF has no githubRepo → T4 websearch is the tier that recovers it.
+    called = {"n": 0}
+
+    def _search(_q):
+        called["n"] += 1
+        return ["https://github.com/yuantianyuan01/FastWAM official codebase"]
+
+    cands = resolve_repo_candidates(
+        "2603.16666",
+        None,
+        {},
+        pwc_lookup=lambda _i: None,
+        hf_lookup=lambda _i: None,
+        web_search=_search,
+    )
+    assert called["n"] == 1
+    assert cands == [
+        RepoCandidate("https://github.com/yuantianyuan01/FastWAM", "websearch", "search")
+    ]
+
+
 def test_hf_official_repo_parses_and_strips_version() -> None:
     seen = {}
 

@@ -9,9 +9,16 @@ link — see resolve_repo_candidates for why):
   T1  paper-text   — github links the authors wrote in the frozen MD (verify:
                      could also be a cited baseline's repo, so it is not trusted blindly)
   discovery        — a github_repo carried by a discovery source, if any (verify)
+  T2b hf-live      — the repo (or, soon, artifacts) HF Papers links; injected `hf_lookup`,
+                     ON by default in make_repo_resolver
+  T4  websearch    — long-tail recovery; injected `web_search` seam (config/llm.yaml →
+                     a fresh sub-agent WebSearch). ONLY fires when every higher tier
+                     came up empty (cost-correct), and is FAIL-SOFT. This is the tier
+                     that recovers repos the PwC freeze + a project-page-only paper + an
+                     HF-no-githubRepo paper would otherwise miss (e.g. FastWAM).
 
-T2b (HF live) and T4 (websearch) are Phase 2: they add injected seams to this
-function without changing its callers (kwargs-only, defaulted).
+Both T2b and T4 are injected seams (kwargs-only, defaulted) so they add to this
+function without changing its pure/offline callers.
 
 Candidate GENERATION lives here (pure + offline); candidate VERIFICATION (clone +
 match) lives in build_code_ref — the two concerns are deliberately split.
@@ -173,9 +180,13 @@ def resolve_repo_candidates(
     # T2b — HF live (post-PwC-freeze papers); injected, verify.
     if hf_lookup is not None:
         add(hf_lookup(arxiv_id), "hf-live", "search")
-    # T4 — websearch long-tail; injected. The seam returns result strings; we
-    # extract github repo URLs from them (driver does the actual search).
-    if web_search is not None:
+    # T4 — websearch long-tail; injected. ONLY fires when every higher-trust tier came
+    # up empty (cost-correct: one websearch sub-agent per UNRESOLVED paper, not per
+    # paper — a paper already resolved by PwC/paper-text/HF never pays the search). This
+    # is the tier that recovers repos PwC's frozen table + a project-page-only paper +
+    # an HF-no-githubRepo paper would otherwise miss (e.g. FastWAM). The seam returns
+    # result strings; we extract repo URLs from them (the driver does the actual search).
+    if web_search is not None and not out:
         title = candidate.get("title") or ""
         query = f"{title} {arxiv_id or ''} official code github".strip()
         for result in web_search(query):

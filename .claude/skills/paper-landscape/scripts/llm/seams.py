@@ -16,6 +16,7 @@ dict the driver passes to run_campaign.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -442,12 +443,61 @@ def faithfulness_judge(
     return (note or "").strip() or "整体与已验证知识包一致。"
 
 
+_URL_RE = re.compile(r"https?://[^\s)>\]}\"']+")
+
+
+def _websearch_prompt(query: str) -> str:
+    return (
+        "Find the OFFICIAL open-source code repository for this research paper. "
+        "Use the WebSearch tool.\n\n"
+        f"Paper: {query}\n\n"
+        "Return ONLY URLs, one per line — the official GitHub repo "
+        "(github.com/<org-or-user>/<repo>) FIRST if it exists; otherwise the project "
+        "page or Hugging Face links. No prose, no commentary, just URLs."
+    )
+
+
+def web_search(query: str) -> list[str]:
+    """T4 repo-discovery tier (repo_resolve): an independent sub-agent runs WebSearch
+    for the paper's official code repo and returns candidate URLs (highest-trust first).
+
+    Routed via the OPTIONAL ``web_search`` seam in config/llm.yaml (one config-managed
+    place for the backend/key/model — e.g. claude-code with the WebSearch tool). If the
+    seam is not routed, the tier is OFF (returns []). FAIL-SOFT: any provider/parse
+    failure also returns [] — a long-tail enrichment tier must NEVER abort a tick, unlike
+    the correctness-critical seams (so the cost guard's EngineAbort is swallowed here).
+    """
+    provider = _cfg().resolve_optional("web_search")
+    if provider is None:
+        return []
+    try:
+        _log(f"web_search: querying for repo of {query[:60]!r}")
+        raw = provider.complete(
+            _websearch_prompt(query),
+            tier="fast",
+            effort="medium",
+            timeout=300.0,
+            tools=("WebSearch",),
+        )
+    except Exception as exc:  # noqa: BLE001 — enrichment tier never aborts a tick
+        _log(f"web_search: degraded to no results ({type(exc).__name__}: {exc})")
+        return []
+    urls: list[str] = []
+    for m in _URL_RE.finditer(raw or ""):
+        u = m.group(0).rstrip(".,;)")
+        if u not in urls:
+            urls.append(u)
+    return urls
+
+
 def build_seams() -> dict:
-    """The seven provider-routed, fallback-wrapped LLM seams for run_campaign.
+    """The seven provider-routed, fallback-wrapped LLM seams for run_campaign, plus the
+    optional ``web_search`` enrichment seam.
 
     Each value is an independent Agent-tool-equivalent callable whose transport is
     chosen per config/llm.yaml. Pass these into run_campaign(...). (write_report is
-    the human-chain writer seam consumed by branch1.)
+    the human-chain writer seam consumed by branch1; web_search is the T4 repo-discovery
+    tier consumed by make_repo_resolver — a no-op [] when its optional seam is unrouted.)
     """
     return {
         "resolve_analysis": resolve_analysis,
@@ -457,4 +507,5 @@ def build_seams() -> dict:
         "expand_llm": expand_llm,
         "write_report": write_report,
         "faithfulness_judge": faithfulness_judge,
+        "web_search": web_search,
     }

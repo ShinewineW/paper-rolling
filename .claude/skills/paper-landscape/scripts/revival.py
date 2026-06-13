@@ -434,13 +434,15 @@ if __name__ == "__main__":
     args = ap.parse_args()
     ws = Path(args.workspace)
     _ledger = Ledger(ws)
-    # R10:构造与生产同款 repo_resolver(默认 T2b HF-live;对齐 run_campaign)。
-    _resolver = make_repo_resolver()
+    # R10:构造与生产同款 repo_resolver(对齐 run_campaign)。T2b HF-live 默认开;T4 websearch
+    # 经可选 web_search seam 注入(config/llm.yaml 路由了才开),与 /loop 驱动一致。
+    _seams = build_seams()
+    _resolver = make_repo_resolver(web_search=_seams.get("web_search"))
     with _ledger.acquire():  # LS-1:与 /loop tick 互斥;整批持锁=复活期间 /loop 停摆
         _res = revive_all(
             workspace=ws,
             ledger=_ledger,
-            seams=build_seams(),
+            seams=_seams,
             repo_resolver=_resolver,
             human_directive=args.directive,
         )

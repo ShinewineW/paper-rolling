@@ -44,6 +44,12 @@ from scripts.llm.providers import (
 LLM_CONFIG_REL = Path("config") / "llm.yaml"
 
 SEAMS = ("analyzer", "skeptic", "rigor", "entailment", "expand", "writer", "faithfulness")
+# OPTIONAL seams: routed via config like any other (so the backend/key/model is managed
+# in one place — config/llm.yaml), but NOT required. An optional seam left unrouted is
+# simply OFF — used for fail-soft ENRICHMENT tiers whose absence degrades gracefully
+# (e.g. web_search = the T4 long-tail repo-discovery tier in repo_resolve), as opposed
+# to the correctness-critical SEAMS whose absence is a hard error.
+OPTIONAL_SEAMS = ("web_search",)
 VALID_MODES = ("inline", "grounded", "agent_team")
 
 # Per-seam default execution MODE only (the finalized spec). Only the heavy
@@ -87,6 +93,12 @@ class LLMConfig:
         degrading to another backend or the Claude Code subscription.
         """
         return StrictProvider(self.for_seam(seam))
+
+    def resolve_optional(self, seam: str) -> StrictProvider | None:
+        """Like :meth:`resolve` but returns None when an OPTIONAL seam is not routed
+        (the tier is simply OFF). The caller is responsible for fail-soft behavior —
+        an enrichment seam must not abort a tick on its own failure."""
+        return StrictProvider(self.providers[self.routing[seam]]) if seam in self.routing else None
 
 
 def _seam_entry(value, default_mode: str) -> tuple[str, str]:
@@ -177,6 +189,25 @@ def load_llm_config(workspace: Path) -> LLMConfig:
                 f"{LLM_CONFIG_REL}: seam {s!r} mode=grounded requires a grounded-capable "
                 f"provider (a local agent, or a pool whose every member is one); "
                 f"{provider!r} is not (an HTTP member cannot read local files)."
+            )
+        routing[s], modes[s] = provider, mode
+
+    # OPTIONAL seams: routed the same way (one config-managed place for the backend/
+    # key/model) but absence is OK — the tier is just OFF. Validate the provider when
+    # present; do NOT require it.
+    for s in OPTIONAL_SEAMS:
+        entry = seams_cfg.get(s)
+        if entry is None:
+            continue
+        provider, mode = _seam_entry(entry, _DEFAULT_MODES.get(s, "inline"))
+        if provider not in providers:
+            raise ValueError(
+                f"{LLM_CONFIG_REL}: optional seam {s!r} routed to undefined provider "
+                f"{provider!r}; defined: {sorted(providers)}"
+            )
+        if mode not in VALID_MODES:
+            raise ValueError(
+                f"{LLM_CONFIG_REL}: optional seam {s!r} has invalid mode {mode!r}; {VALID_MODES}"
             )
         routing[s], modes[s] = provider, mode
     return LLMConfig(providers=providers, routing=routing, modes=modes)
