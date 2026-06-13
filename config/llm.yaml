@@ -109,20 +109,20 @@ providers:
 # the task independently and the main process judges + cherry-picks. The single
 # value below is the v1 form; the routing schema is shaped to grow into a list.
 # ----------------------------------------------------------------------------
-# Each seam routes to a provider AND (for seams that go through the shared call layer —
-# _ask_json/_ask_text) can pin its LLM-call knobs HERE: tier (strong|fast → the provider's
-# strong_model|fast_model), effort, timeout. This master config owns those knobs so a
-# model/effort/timeout change never needs a code edit; the seam code carries only a
-# fallback default. (analyzer + writer call their provider directly inside their own
-# modules — analyzer=strong; writer=strong for sections + fast for figure-curation, a
-# mixed/structural case — so their tier is set in-module, not here yet.)
+# Each seam routes to a provider AND pins its LLM-call knobs HERE: tier (strong|fast → the
+# provider's strong_model|fast_model), effort, timeout. This master config owns those knobs
+# so a model/effort/timeout change never needs a code edit; the seam code carries only a
+# fallback default. (analyzer's tier applies to its chunk calls; the writer's tier applies
+# to the report SECTIONS — figure-curation stays fast internally, a trivial classification,
+# not a "writer model" choice. tier is a no-op for providers with a single model, e.g. the
+# codex_cli analyzer ignores it until analyzer routes to a tiered provider/pool.)
 seams:
-  analyzer: { provider: codex, mode: grounded }  # codex-only this round (2026-06-12): verify codex solo (medium reasoning) before re-enabling the round-robin analyzer-pool; tier=strong in-module
+  analyzer: { provider: codex, mode: grounded, tier: strong }  # codex-only this round (2026-06-12): verify codex solo before re-enabling the analyzer-pool (codex ignores tier; honored if routed to a tiered provider)
   skeptic: { provider: hellorobotaxi, tier: fast }       # G2 number-fidelity (fast → qwen3.7-plus)
   rigor: { provider: hellorobotaxi, tier: strong }       # G3 6-dim rigor (strong → qwen3.7-max)
   entailment: { provider: hellorobotaxi, tier: fast }    # G3 entailment — tiny in/out (fast → qwen3.7-plus)
   expand: { provider: hellorobotaxi, tier: fast }        # discovery query expansion (fast → qwen3.7-plus)
-  writer: hellorobotaxi-writer # human chain; tier set in-module (strong sections + fast figures; qwen3.6-plus)
+  writer: { provider: hellorobotaxi-writer, tier: strong }  # human chain SECTIONS (strong → qwen3.6-plus); figure-curation stays fast in-module
   faithfulness: { provider: claude-code, tier: fast }    # ADR-0012 忠实门 judge → claude-code fast = claude-haiku-4-5
   # OPTIONAL seam (T4 长尾码链发现,repo_resolve)。本地 claude-code 派子 agent 用 WebSearch 工具联网搜 +
   # 自行研判(官方/忠实复现/无关),只背书确信的仓库。tier=strong → claude-sonnet-4-6(判断任务,非 haiku:

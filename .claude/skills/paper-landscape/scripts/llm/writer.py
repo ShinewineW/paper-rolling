@@ -179,6 +179,7 @@ def write_human_sections(
     provider: LLMProvider,
     *,
     outdir: Path | None = None,
+    tier: str = "strong",
     max_workers: int = 6,
     timeout: float = 600.0,
     log=lambda _m: None,
@@ -200,7 +201,7 @@ def write_human_sections(
         prompt = _section_prompt(
             title, focus, _read_sources(ara_dir, rel_files), prior_failure=prior_failure
         )
-        md = provider.complete(prompt, tier="strong", timeout=timeout).strip()
+        md = provider.complete(prompt, tier=tier, timeout=timeout).strip()
         if outdir is not None:
             (outdir / f"{sid}.md").write_text(md, encoding="utf-8")
         return sid, md

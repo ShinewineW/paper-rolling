@@ -134,13 +134,18 @@ def resolve_analysis(md_path: Path, candidate: dict, *, prior_failure: str | Non
             "use the agent-driven runner (the runtime agent dispatches the Workflow)."
         )
     aid = candidate.get("arxiv_id", "")
-    _log(f"analyzer[{provider.name}]: {aid} chunked-parallel mode={mode}")
+    # tier/timeout are config-overridable per seam (config/llm.yaml); strong/1500s default.
+    a_tier, _a_effort, a_timeout = _cfg().resolved_call(
+        "analyzer", tier="strong", effort="high", timeout=1500.0
+    )
+    _log(f"analyzer[{provider.name}]: {aid} chunked-parallel mode={mode} tier={a_tier}")
     bundle = analyze_chunked(
         Path(md_path),
         candidate,
         provider,
         grounded=(mode == "grounded"),
-        timeout=1500.0,
+        tier=a_tier,
+        timeout=a_timeout,
         log=_log,
         prior_failure=prior_failure,
     )
@@ -362,9 +367,14 @@ def write_report(
     ``md_path`` enables the figure inventory.
     """
     provider = _provider_for("writer")
-    _log(f"write_report: writer provider = {provider.name}")
+    # writer SECTIONS tier is config-overridable (config/llm.yaml); strong default. (Figure
+    # curation stays fast — a trivial internal classification, not a "writer model" choice.)
+    w_tier, _w_effort, _w_timeout = _cfg().resolved_call(
+        "writer", tier="strong", effort="high", timeout=600.0
+    )
+    _log(f"write_report: writer provider = {provider.name} tier={w_tier}")
     sections = write_human_sections(
-        Path(ara_dir), provider, outdir=outdir, log=_log, prior_failure=prior_failure
+        Path(ara_dir), provider, outdir=outdir, tier=w_tier, log=_log, prior_failure=prior_failure
     )
     figs = extract_figures(Path(md_path)) if md_path else []
     if figs:

@@ -230,6 +230,7 @@ def analyze_chunked(
     provider: LLMProvider,
     *,
     grounded: bool = False,
+    tier: str = "strong",
     timeout: float = 900.0,
     max_workers: int = 5,
     log=lambda _m: None,
@@ -272,7 +273,7 @@ def analyze_chunked(
         last: Exception | None = None
         for attempt in range(2):
             raw = provider.complete(
-                base + (nudge if attempt else ""), tier="strong", timeout=timeout, tools=tools
+                base + (nudge if attempt else ""), tier=tier, timeout=timeout, tools=tools
             )
             try:
                 obj = extract_json(raw)
