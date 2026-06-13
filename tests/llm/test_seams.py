@@ -73,6 +73,9 @@ class _FakeCfg:
     def resolve_optional(self, _seam):
         return self._p
 
+    def resolved_call(self, _seam, *, tier, effort, timeout):
+        return tier, effort, timeout  # fake: no config override, passed defaults stand
+
 
 def test_web_search_off_returns_empty_when_seam_unrouted(monkeypatch) -> None:
     from scripts.llm import seams as S

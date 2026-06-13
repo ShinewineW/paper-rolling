@@ -684,3 +684,42 @@ def test_round_robin_members_keep_independent_caps() -> None:
     pool = P.RoundRobinProvider("p", (claude, codex))
     caps = {m.name: m._sem._value for m in pool.members}
     assert caps == {"c": 5, "x": 3}
+
+
+def test_seam_call_params_parsed_and_resolved(tmp_path: Path) -> None:
+    # A seam entry may pin tier/effort/timeout — the master config owns the LLM-call knobs.
+    (tmp_path / "config").mkdir()
+    analyzer = "{ provider: claude-code, mode: grounded, tier: fast, effort: low, timeout: 123 }"
+    (tmp_path / "config" / "llm.yaml").write_text(
+        _full_seam_yaml(analyzer=analyzer), encoding="utf-8"
+    )
+    cfg = load_llm_config(tmp_path)
+    assert cfg.call_params["analyzer"] == {"tier": "fast", "effort": "low", "timeout": 123}
+    # config override wins over the passed code default
+    assert cfg.resolved_call("analyzer", tier="strong", effort="high", timeout=900) == (
+        "fast",
+        "low",
+        123.0,
+    )
+    # a seam with no override → the passed default stands
+    assert cfg.resolved_call("skeptic", tier="strong", effort="high", timeout=900) == (
+        "strong",
+        "high",
+        900.0,
+    )
+
+
+def test_seam_invalid_tier_raises(tmp_path: Path) -> None:
+    (tmp_path / "config").mkdir()
+    bad = "{ provider: claude-code, mode: grounded, tier: turbo }"
+    (tmp_path / "config" / "llm.yaml").write_text(_full_seam_yaml(analyzer=bad), encoding="utf-8")
+    with pytest.raises(ValueError, match="tier"):
+        load_llm_config(tmp_path)
+
+
+def test_seam_invalid_timeout_raises(tmp_path: Path) -> None:
+    (tmp_path / "config").mkdir()
+    bad = "{ provider: claude-code, mode: grounded, timeout: -5 }"
+    (tmp_path / "config" / "llm.yaml").write_text(_full_seam_yaml(analyzer=bad), encoding="utf-8")
+    with pytest.raises(ValueError, match="timeout"):
+        load_llm_config(tmp_path)

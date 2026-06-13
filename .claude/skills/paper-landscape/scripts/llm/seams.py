@@ -87,7 +87,11 @@ def _ask_json(
     Transport is chosen per seam by config/llm.yaml (claude -p / opencode / any
     OpenAI-compatible API); this layer only handles JSON extraction + a re-ask
     nudge. The provider handles its own transient/rate-limit/timeout retry.
+
+    tier/effort/timeout are CONFIG-OVERRIDABLE per seam (config/llm.yaml); the args here
+    are only the fallback default when the master config doesn't pin them.
     """
+    tier, effort, timeout = _cfg().resolved_call(seam, tier=tier, effort=effort, timeout=timeout)
     provider = _provider_for(seam)
     last: Exception | None = None
     nudge = (
@@ -402,7 +406,9 @@ def _ask_text(
     prompt: str, *, seam: str, tier: str = "fast", timeout: float = 600.0, effort: str = "medium"
 ) -> str:
     """Call the seam's routed provider and return the RAW text (for prose seams like
-    the branch1 「评价」). Mirrors _ask_json but with no JSON parsing/retry."""
+    the branch1 「评价」). Mirrors _ask_json but with no JSON parsing/retry. tier/effort/
+    timeout are config-overridable per seam (config/llm.yaml); args are the fallback."""
+    tier, effort, timeout = _cfg().resolved_call(seam, tier=tier, effort=effort, timeout=timeout)
     return _provider_for(seam).complete(prompt, tier=tier, effort=effort, timeout=timeout)
 
 
@@ -484,17 +490,20 @@ def web_search(query: str) -> list[str]:
     provider = _cfg().resolve_optional("web_search")
     if provider is None:
         return []
+    # This is a JUDGMENT task (official vs faithful-reimpl vs unrelated), not a cheap
+    # extraction — DEFAULT to the strong tier (claude-sonnet-4-6 on claude-code), high
+    # effort, a generous timeout (it WebSearches + reads + reasons). All three are
+    # config-overridable per seam in config/llm.yaml — the master config owns the knobs.
+    tier, effort, timeout = _cfg().resolved_call(
+        "web_search", tier="strong", effort="high", timeout=420.0
+    )
     try:
         _log(f"web_search: querying for repo of {query[:60]!r}")
-        # tier=STRONG: this is a JUDGMENT task (official vs faithful-reimpl vs unrelated),
-        # not a cheap extraction — route to the provider's strong model (claude-sonnet-4-6
-        # on claude-code), not the fast one (haiku made loose calls). effort=high for the
-        # reasoning; a generous timeout since it WebSearches + reads + reasons.
         raw = provider.complete(
             _websearch_prompt(query),
-            tier="strong",
-            effort="high",
-            timeout=420.0,
+            tier=tier,
+            effort=effort,
+            timeout=timeout,
             tools=("WebSearch",),
         )
     except Exception as exc:  # noqa: BLE001 — enrichment tier never aborts a tick

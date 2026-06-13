@@ -70,11 +70,29 @@ _DEFAULT_MODES = {
 
 @dataclass(frozen=True)
 class LLMConfig:
-    """Resolved providers + per-seam {provider, mode}."""
+    """Resolved providers + per-seam {provider, mode} + per-seam LLM call params.
+
+    ``call_params[seam]`` holds the OPTIONAL per-seam {tier, effort, timeout} overrides
+    from config/llm.yaml. The single master config is where every LLM-call knob lives —
+    code supplies only a fallback default, so changing a seam's model tier / effort /
+    timeout never requires a code edit (the provider/key/model already live here too)."""
 
     providers: dict[str, LLMProvider]
     routing: dict[str, str]
     modes: dict[str, str]
+    call_params: dict[str, dict]
+
+    def resolved_call(
+        self, seam: str, *, tier: str, effort: str, timeout: float
+    ) -> tuple[str, str, float]:
+        """Per-seam (tier, effort, timeout): config override wins, else the passed default.
+        Lets config/llm.yaml own every LLM-call knob without touching seam code."""
+        p = self.call_params.get(seam) or {}
+        return (
+            str(p.get("tier", tier)),
+            str(p.get("effort", effort)),
+            float(p.get("timeout", timeout)),
+        )
 
     def for_seam(self, seam: str) -> LLMProvider:
         """Return the provider explicitly routed to ``seam`` (load_llm_config
@@ -101,19 +119,33 @@ class LLMConfig:
         return StrictProvider(self.providers[self.routing[seam]]) if seam in self.routing else None
 
 
-def _seam_entry(value, default_mode: str) -> tuple[str, str]:
-    """Normalize a seam config value (provider string, or {provider, mode}).
+_CALL_PARAM_KEYS = ("tier", "effort", "timeout")
+_VALID_TIERS = ("strong", "fast")
 
-    The provider is REQUIRED — there is no default routing. Only the execution
-    ``mode`` falls back to ``default_mode``.
-    """
+
+def _seam_entry(value, default_mode: str) -> tuple[str, str, dict]:
+    """Normalize a seam config value (provider string, or {provider, mode, tier, effort,
+    timeout}). Returns (provider, mode, call_params).
+
+    The provider is REQUIRED — there is no default routing. ``mode`` falls back to
+    ``default_mode``. ``tier``/``effort``/``timeout`` are OPTIONAL per-seam LLM-call
+    overrides (omitted → the seam's code default applies)."""
     if isinstance(value, str):
-        return value, default_mode
+        return value, default_mode, {}
     if isinstance(value, dict):
         provider = value.get("provider")
         if not provider:
             raise ValueError("seam entry mapping must include 'provider'")
-        return provider, value.get("mode", default_mode)
+        params = {k: value[k] for k in _CALL_PARAM_KEYS if k in value}
+        if "tier" in params and params["tier"] not in _VALID_TIERS:
+            raise ValueError(f"seam tier must be one of {_VALID_TIERS}, got {params['tier']!r}")
+        if "timeout" in params and not (
+            isinstance(params["timeout"], (int, float))
+            and not isinstance(params["timeout"], bool)
+            and params["timeout"] > 0
+        ):
+            raise ValueError(f"seam timeout must be a positive number, got {params['timeout']!r}")
+        return provider, value.get("mode", default_mode), params
     raise ValueError(
         f"seam entry must be a provider string or a mapping, got {type(value).__name__}"
     )
@@ -161,6 +193,7 @@ def load_llm_config(workspace: Path) -> LLMConfig:
         raise ValueError(f"{LLM_CONFIG_REL}: 'seams' must be a mapping")
     routing: dict[str, str] = {}
     modes: dict[str, str] = {}
+    call_params: dict[str, dict] = {}
     for s in SEAMS:
         entry = seams_cfg.get(s)
         if entry is None:
@@ -169,7 +202,7 @@ def load_llm_config(workspace: Path) -> LLMConfig:
                 f"seam must be explicitly routed (no default). Defined providers: "
                 f"{sorted(providers)}."
             )
-        provider, mode = _seam_entry(entry, _DEFAULT_MODES.get(s, "inline"))
+        provider, mode, params = _seam_entry(entry, _DEFAULT_MODES.get(s, "inline"))
         if provider not in providers:
             raise ValueError(
                 f"{LLM_CONFIG_REL}: seam {s!r} routed to undefined provider {provider!r}; "
@@ -191,6 +224,8 @@ def load_llm_config(workspace: Path) -> LLMConfig:
                 f"{provider!r} is not (an HTTP member cannot read local files)."
             )
         routing[s], modes[s] = provider, mode
+        if params:
+            call_params[s] = params
 
     # OPTIONAL seams: routed the same way (one config-managed place for the backend/
     # key/model) but absence is OK — the tier is just OFF. Validate the provider when
@@ -199,7 +234,7 @@ def load_llm_config(workspace: Path) -> LLMConfig:
         entry = seams_cfg.get(s)
         if entry is None:
             continue
-        provider, mode = _seam_entry(entry, _DEFAULT_MODES.get(s, "inline"))
+        provider, mode, params = _seam_entry(entry, _DEFAULT_MODES.get(s, "inline"))
         if provider not in providers:
             raise ValueError(
                 f"{LLM_CONFIG_REL}: optional seam {s!r} routed to undefined provider "
@@ -210,4 +245,6 @@ def load_llm_config(workspace: Path) -> LLMConfig:
                 f"{LLM_CONFIG_REL}: optional seam {s!r} has invalid mode {mode!r}; {VALID_MODES}"
             )
         routing[s], modes[s] = provider, mode
-    return LLMConfig(providers=providers, routing=routing, modes=modes)
+        if params:
+            call_params[s] = params
+    return LLMConfig(providers=providers, routing=routing, modes=modes, call_params=call_params)

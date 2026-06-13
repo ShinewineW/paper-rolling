@@ -109,16 +109,23 @@ providers:
 # the task independently and the main process judges + cherry-picks. The single
 # value below is the v1 form; the routing schema is shaped to grow into a list.
 # ----------------------------------------------------------------------------
+# Each seam routes to a provider AND (for seams that go through the shared call layer —
+# _ask_json/_ask_text) can pin its LLM-call knobs HERE: tier (strong|fast → the provider's
+# strong_model|fast_model), effort, timeout. This master config owns those knobs so a
+# model/effort/timeout change never needs a code edit; the seam code carries only a
+# fallback default. (analyzer + writer call their provider directly inside their own
+# modules — analyzer=strong; writer=strong for sections + fast for figure-curation, a
+# mixed/structural case — so their tier is set in-module, not here yet.)
 seams:
-  analyzer: { provider: codex, mode: grounded }  # codex-only this round (2026-06-12): verify codex solo (medium reasoning) before re-enabling the round-robin analyzer-pool
-  skeptic: hellorobotaxi       # G2 number-fidelity (tier=fast → qwen3.7-plus)
-  rigor: hellorobotaxi         # G3 6-dim rigor (tier=strong → qwen3.7-max);analyzer 走 claude+codex,审计在 qwen,跨模型不破
-  entailment: hellorobotaxi    # G3 entailment — tiny in/out (tier=fast → qwen3.7-plus)
-  expand: hellorobotaxi        # discovery query expansion (tier=fast → qwen3.7-plus)
-  writer: hellorobotaxi-writer # human chain (tier=strong → qwen3.6-plus;2026-06-13 从 qwen3.7-max 换)
-  faithfulness: claude-code    # ADR-0012 忠实门 judge → 本地 claude-code (tier=fast → claude-haiku-4-5);2026-06-13 从 qwen3.7-plus 换:qwen 判官假阳性(把 ARA 里确有的细节误判成"不在 ARA")
+  analyzer: { provider: codex, mode: grounded }  # codex-only this round (2026-06-12): verify codex solo (medium reasoning) before re-enabling the round-robin analyzer-pool; tier=strong in-module
+  skeptic: { provider: hellorobotaxi, tier: fast }       # G2 number-fidelity (fast → qwen3.7-plus)
+  rigor: { provider: hellorobotaxi, tier: strong }       # G3 6-dim rigor (strong → qwen3.7-max)
+  entailment: { provider: hellorobotaxi, tier: fast }    # G3 entailment — tiny in/out (fast → qwen3.7-plus)
+  expand: { provider: hellorobotaxi, tier: fast }        # discovery query expansion (fast → qwen3.7-plus)
+  writer: hellorobotaxi-writer # human chain; tier set in-module (strong sections + fast figures; qwen3.6-plus)
+  faithfulness: { provider: claude-code, tier: fast }    # ADR-0012 忠实门 judge → claude-code fast = claude-haiku-4-5
   # OPTIONAL seam (T4 长尾码链发现,repo_resolve)。本地 claude-code 派子 agent 用 WebSearch 工具联网搜 +
-  # 自行研判(官方/忠实复现/无关),只背书确信的仓库。seam 用 tier=strong → claude-sonnet-4-6(判断任务,
-  # 非 haiku:haiku 会做松散判断)。只在 PwC/正文/HF 全空时才触发(长尾才联网);fail-soft:失败→[],绝不
-  # 拖垮 tick。换后端/token 直接改这里(去掉本行 = T4 关)。
-  web_search: claude-code
+  # 自行研判(官方/忠实复现/无关),只背书确信的仓库。tier=strong → claude-sonnet-4-6(判断任务,非 haiku:
+  # haiku 会做松散判断);effort/timeout 也在此配。只在 PwC/正文/HF 全空时才触发(长尾才联网);fail-soft:
+  # 失败→[],绝不拖垮 tick。换后端/档位/token 直接改这里(去掉本条 = T4 关)。
+  web_search: { provider: claude-code, tier: strong, effort: high, timeout: 420 }
