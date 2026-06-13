@@ -50,6 +50,15 @@ CLIs are **not** on that path — invoke them with the prefix:
 `scripts.output.anchor_lint`, `scripts.bibliography`). Run `scripts.preflight`
 first — it gates on `pandoc` + `mineru` being installed.
 
+**State / progress / compliance: read it via `scripts.status`, never infer it from
+directory existence.** `PYTHONPATH=.claude/skills/paper-landscape uv run python -m
+scripts.status` (read-only, lock-free, no-LLM) prints a per-paper table; `--card`
+renders an ASCII status card — use it for any "show progress" request; `--json` feeds
+external tooling / CI. A paper is promoted-AND-compliant only on a content check, not
+because `person_vault/`+`ai_package/` are paired: the ARA must pass the 最终门 level-2
+seal (`passes_seal2`) and `report.md` must be new-form (opens with a 评价 section, no
+retired `<!--ref/anchor-->`).
+
 ## Architecture: the seam-injection model (the key mental model)
 
 The engine is a **pure core composed at runtime**. There is **no `__main__` that
@@ -165,6 +174,12 @@ point-in-time observations/audits of this repo; `adr/` is self-managed by the
 `mp-grill-me` skill (exempt); `guides/codemaps/` holds the architecture maps
 (code-awareness). Doc metadata follows
 `~/.claude/rules/common/docs-metadata-standard.md`.
+
+**Don't stack ADRs; keep ADRs + `CONTEXT.md` aligned to the code.** On an
+architecture/decision change, do NOT append yet another ADR — first prune/merge the
+existing ADRs and delete entries that no longer match the code, then fold the new
+decision in; update `CONTEXT.md` to the current code state (rewrite/remove stale or
+non-compliant terms). Never let ADRs / `CONTEXT.md` drift from the code.
 
 ## Tests are the executable spec
 
