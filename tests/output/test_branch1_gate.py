@@ -109,6 +109,21 @@ def test_assessment_surfaces_ungrounded_numbers_as_facts(tmp_path) -> None:
     assert "99.9" in note and "未在已验证知识包" in note
 
 
+def test_assessment_demotes_judge_headings_to_keep_one_h1(tmp_path) -> None:
+    # Live ORION/Genie run: the judge (haiku) emitted its own `# 忠实性评价` H1 inside
+    # the note, injecting a SECOND H1 into the report. build_assessment must demote any
+    # heading in the note to plain bold so the report keeps exactly one H1.
+    ara = _mk_ara(tmp_path, "28.4")
+
+    def _heading_judge(report_text, ara_dir, *, ungrounded=None):
+        return "# 忠实性评价\n报告与知识包一致。\n## 细节\n无矛盾。"
+
+    note = build_assessment("本文达到 28.4 NDS。", ara, judge=_heading_judge)
+    assert "\n# " not in note and not note.startswith("# 忠实性评价")  # no rogue H1
+    assert "# 细节" not in note  # the sub-heading is demoted too
+    assert "**忠实性评价**" in note and "报告与知识包一致" in note
+
+
 def test_assessment_clears_when_all_numbers_grounded(tmp_path) -> None:
     ara = _mk_ara(tmp_path, "28.4", "24.6")
     report = "本文达到 28.4 NDS,基线 24.6。"

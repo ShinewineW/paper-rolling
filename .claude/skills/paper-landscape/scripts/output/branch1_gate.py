@@ -100,6 +100,19 @@ def _read_audit_flags(ara_dir: Path) -> str:
     return f.read_text(encoding="utf-8").strip() if f.exists() else ""
 
 
+_ATX_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$")
+
+
+def _demote_headings(text: str) -> str:
+    """Turn any markdown ATX heading line into plain **bold** text, so a free-form
+    judge note can never inject a rogue H1/H2 that breaks the report's one-H1 hierarchy."""
+    out = []
+    for ln in text.splitlines():
+        m = _ATX_HEADING.match(ln)
+        out.append(f"**{m.group(1)}**" if m and m.group(1) else (ln if not m else ""))
+    return "\n".join(out)
+
+
 def build_assessment(report_text: str, ara_dir: Path, *, judge=None) -> str:
     """branch1 opening 「评价」 (ADR-0012 rev) — NEVER raises, NEVER blocks.
     Deterministic facts ((b) report numbers not in the ARA + 数字门 AUDIT_FLAGS) plus
@@ -123,7 +136,10 @@ def build_assessment(report_text: str, ara_dir: Path, *, judge=None) -> str:
     if judge is not None:
         try:
             out = judge(report_text, ara_dir, ungrounded=ungrounded)
-            note = str(out).strip() if out else ""
+            # The judge note is PROSE under `## 评价`; a free-form LLM may emit its own
+            # ATX heading (e.g. `# 忠实性评价`), which would inject a second H1 and break
+            # the report's one-H1 hierarchy. Demote any heading line to plain bold text.
+            note = _demote_headings(str(out)).strip() if out else ""
         except Exception:  # noqa: BLE001 — 评价 never blocks; a judge failure just drops the note
             note = ""
     lines = ["## 评价", ""]
