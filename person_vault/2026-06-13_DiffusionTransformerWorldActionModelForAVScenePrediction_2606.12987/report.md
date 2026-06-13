@@ -506,7 +506,7 @@ flowchart TB
 
 ## 工程与复现要点
 
-**结论：** 复现该工作的核心壁垒并非算力堆叠，而是对“紧凑隐空间下扩散目标、残差锚定与开链推理”的严格对齐。主干模型仅约 5.4M 参数，但训练管线中的 $x_0$ 预测目标、动作条件 Dropout 与训练集派生校准缺一不可。目前官方未公开代码库，复现需从零搭建 DiT 管线并精确复现论文披露的超参配置。
+**结论：** 复现该工作的核心壁垒并非算力堆叠，而是对“紧凑隐空间下扩散目标、残差锚定与开链推理”的严格对齐。主干模型仅约 5.4M 参数，但训练管线中的 $x_0$ 预测目标、动作条件 Dropout 与训练集派生校准缺一不可。作者已公开代码库(`https://github.com/dlcv-team/latent-world-models-av`),复现可基于官方实现并精确对照论文披露的超参配置。
 
 ### 模型规模与关键结构
 **结论：** 架构采用极轻量 DiT 设计，通过“残差锚定+逐步傅里叶动作注入”在 32×32×4 隐空间内实现长程预测，但共享锚点会引发运动退化，需切换至 Jump 模型进行开环重锚定。
@@ -562,9 +562,9 @@ flowchart TD
 环境配置呈现“黑盒化”特征：论文仅提及使用云端计算基础设施，未说明具体 GPU 型号、Python 版本或主训练框架（如 PyTorch/JAX）。关键依赖链包括 `nuScenes v1.0-trainval`、`CAN-bus data`、`Stable-Diffusion VAE`、`DiT formulation`、`DDIM`、`torchmetrics`，以及用于 Encoder 对比的 `V-JEPA2`、`DINOv2-S/14`、`CLIP ViT-B/32`、`ViT-S/16` 与 `VQ-VAE Tracker`。实验严谨性方面，Encoder Benchmark、FID/KID 评估与过拟合分析均明确使用 3 个随机种子并报告 Bootstrap 95% 置信区间；仅容量探测（capacity probe）因资源限制使用单种子。
 
 ### 开源状态与复现入口
-**结论：** 经多源检索未发现官方公开仓库，复现需从零搭建管线并严格对照论文附录配置，建议优先验证 encoder probe 与单步扩散基线。
+**结论：** 作者在论文正文声明已公开源码与权重(`https://github.com/dlcv-team/latent-world-models-av`),复现可基于官方实现并严格对照论文附录配置,建议优先验证 encoder probe 与单步扩散基线。
 
-作者在论文正文、Papers-with-Code 官方索引、Hugging Face 及公开网络中均未留下可验证的代码库。这并非闭源声明，而是当前处于未公开状态。对于工程复现，建议按以下路径推进：
+作者在论文中声明源码、权重与评估产物公开于 `https://github.com/dlcv-team/latent-world-models-av`(已 clone 验证、锁定提交见 ARA 的 code_ref)。对于工程复现，建议按以下路径推进：
 1. **数据切分**：严格按 Scene 级别划分 630/70/150 训练/验证/测试集，避免场景泄漏污染 Held-out 评估。
 2. **基线对齐**：优先复现 2 层 MLP Probe（384→256 GELU→2）与 Direct Regression 基线（$\tau=0$ 无噪声单步前向），确认隐空间表征与确定性预测上限。
 3. **校准隔离**：推理时务必仅使用训练集统计量计算逐通道均值与缩放偏移，严禁引入测试集信息；论文指出该校准是解锁 KID 优势并使结果可部署的必要条件。

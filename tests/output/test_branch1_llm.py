@@ -5,6 +5,7 @@ from pathlib import Path
 from scripts.output.branch1_llm import (
     _quote_mermaid_labels,
     _strip_emoji,
+    _strip_thinking,
     write_branch1_llm,
 )
 
@@ -118,6 +119,18 @@ def test_strip_emoji_removes_emoji_keeps_text_and_arrows() -> None:
     assert _strip_emoji("结果 ✅ 很好") == "结果 很好"
     assert _strip_emoji("A → B 的流程") == "A → B 的流程"  # plain arrow (U+2192) kept
     assert _strip_emoji("普通中文文本无表情") == "普通中文文本无表情"
+
+
+def test_strip_thinking_removes_leaked_cot() -> None:
+    # Regression (2603.27287): a writer section emitted as raw chain-of-thought instead of
+    # prose must not reach the reader. <think> blocks and a trailing "Here's a thinking
+    # process:" dump are stripped; legitimate prose is untouched.
+    leaked = "正文结论。\n\nHere's a thinking process:\n\n1. Analyze User Input...\n2. ..."
+    assert _strip_thinking(leaked) == "正文结论。"
+    assert _strip_thinking("<think>plan the section</think>真正的正文") == "真正的正文"
+    assert (
+        _strip_thinking("普通正文,讨论 thinking 模型的过程") == "普通正文,讨论 thinking 模型的过程"
+    )
 
 
 def test_quote_mermaid_labels_only_inside_blocks() -> None:

@@ -46,6 +46,26 @@ def _strip_emoji(text: str) -> str:
     return _EMOJI.sub("", text)
 
 
+# A writer model occasionally leaks its chain-of-thought into the section body instead of
+# (or trailing) the prose — observed once as a whole "趋势与展望" section emitted as
+# "Here's a thinking process:\n1. Analyze User Input..." (2603.27287). Strip <think> blocks
+# and any trailing reasoning-preamble dump so raw monologue never reaches the reader.
+_THINK_BLOCK = re.compile(r"<think\b[^>]*>.*?</think>", re.DOTALL | re.IGNORECASE)
+_THINK_LEAK = re.compile(
+    r"\n*(?:here'?s?|here\s+is)\s+(?:a|the|my)\s+thinking\s+process\b.*$"
+    r"|\n*<think\b[^>]*>.*$",  # an unclosed <think> dump runs to the end
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _strip_thinking(text: str) -> str:
+    """Remove leaked LLM chain-of-thought (``<think>`` blocks + a trailing 'here's a
+    thinking process…' dump). Conservative: only well-known leak markers, so legitimate
+    prose is never touched."""
+    text = _THINK_BLOCK.sub("", text)
+    return _THINK_LEAK.sub("", text).strip()
+
+
 def _quote_mermaid_labels(report: str) -> str:
     """Quote ``[label]`` node/subgraph labels inside ```mermaid blocks so labels
     with special chars (>, +, parentheses, …) parse under strict mermaid 11."""
@@ -238,7 +258,7 @@ def write_branch1_llm(
 
     for sid in sorted(sections):
         parts.append("")
-        parts.append(str(sections[sid]).strip())
+        parts.append(_strip_thinking(str(sections[sid])))  # drop any leaked CoT monologue
         if sid.startswith("01"):  # 初始定调:总体架构图紧跟导读
             _place(primary_arch, "**论文总体架构(原图):**")
         elif sid.startswith("04"):  # 方法论:模型结构与子图紧跟方法
