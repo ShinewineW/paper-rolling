@@ -114,6 +114,43 @@ def test_closed_source_combo_bypass_flagged(tmp_path):
     assert any("asserts closed-source" in v for v in check_bundle(ara))
 
 
+_NOT_FOUND_ROWS = (
+    "# Code Reference\n\n- **Repository**: x\n- **Pinned commit**: `abc`\n\n"
+    "## Innovation → code location\n\n| Innovation | Location (`file:line`) |\n|---|---|\n"
+    "| foo | model.py:10 |\n| bar | _not found_ |\n"
+)
+_DOC_LOCATIONS = (
+    "# Code Reference\n\n- **Repository**: x\n- **Pinned commit**: `abc`\n\n"
+    "## Innovation → code location\n\n| Innovation | Location (`file:line`) |\n|---|---|\n"
+    "| foo | README.md:20 |\n| bar | docs/api.rst:5 |\n"
+)
+_REAL_SOURCE_LOCATIONS = (
+    "# Code Reference\n\n- **Repository**: x\n- **Pinned commit**: `abc`\n\n"
+    "## Innovation → code location\n\n| Innovation | Location (`file:line`) |\n|---|---|\n"
+    "| foo | src/model.py:10 |\n| bar | train.py:42 |\n"
+)
+
+
+def test_not_found_rows_flagged(tmp_path):
+    # Codex R1: a stale shipped file still carrying the retired '_not found_' table form
+    # (the two reverted papers) must be flagged — the gate gap that let it pass green.
+    ara = _bundle(tmp_path, code_ref=_NOT_FOUND_ROWS, tables={"t1.md": "x\n"})
+    assert any("_not found_" in v for v in check_bundle(ara))
+
+
+def test_non_source_innovation_location_flagged(tmp_path):
+    # Codex R1: a Location pointing at prose/docs (README.md:20, *.rst) is dishonest —
+    # the honest renderer cites SOURCE only. Both bad locations are surfaced.
+    vs = check_bundle(_bundle(tmp_path, code_ref=_DOC_LOCATIONS, tables={"t1.md": "x\n"}))
+    assert any("non-source" in v and "README.md:20" in v and "docs/api.rst:5" in v for v in vs)
+
+
+def test_real_source_locations_pass(tmp_path):
+    # A genuine found pointer whose Locations are real source files passes cleanly.
+    ara = _bundle(tmp_path, code_ref=_REAL_SOURCE_LOCATIONS, tables={"t1.md": "x\n"})
+    assert check_bundle(ara) == []
+
+
 def test_drift_catches_descriptions_and_no_numbers_phrasings(tmp_path):
     # Codex Round 5: reviewer phrasings the narrow regex missed — "only ... table
     # descriptions" and "only metadata with no actual numerical data".

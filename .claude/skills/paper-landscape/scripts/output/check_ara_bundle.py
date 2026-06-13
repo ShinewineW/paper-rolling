@@ -52,6 +52,14 @@ _VALID_MARKERS = (
     "unavailable — clone failed",  # declared repo unreachable
 )
 
+# Innovation→location honesty (Codex R1). The honest renderer OMITS unresolved rows and
+# cites SOURCE files only; a shipped file still carrying the retired fabricated-map form
+# — a literal "_not found_" cell, or a Location pointing at prose/docs (README.md:20,
+# *.rst, AGENTS.md) instead of source — is a regression a green gate must NOT let pass.
+_NOT_FOUND_ROW = "_not found_"
+_LOC_CELL = re.compile(r"\|\s*([^|]+?:\d+)\s*\|")  # a `path:line` Location cell in a table row
+_DOC_EXT = (".md", ".rst", ".txt", ".yaml", ".yml", ".cfg", ".ini", ".toml", ".json", ".csv")
+
 # level2 text claiming the tables/numbers are absent (P1-b drift), lower-cased match.
 # Covers the family of "tables are only descriptions / metadata / not included / no
 # real numbers" phrasings a reviewer uses when it was fed the index but not the tables.
@@ -95,6 +103,23 @@ def check_bundle(ara_dir: Path) -> list[str]:
             )
         elif not any(marker in text for marker in _VALID_MARKERS):
             violations.append("code_ref.md is not a recognized three-state pointer")
+        if _NOT_FOUND_ROW in text:
+            violations.append(
+                "code_ref.md innovation table carries '_not found_' rows (retired "
+                "fabricated-map form; the honest renderer omits unresolved rows)"
+            )
+        bad_locs = sorted(
+            {
+                loc
+                for loc in _LOC_CELL.findall(text)
+                if loc.rsplit(":", 1)[0].strip().lower().endswith(_DOC_EXT)
+            }
+        )
+        if bad_locs:
+            violations.append(
+                "code_ref.md innovation location(s) point at non-source files "
+                f"(prose/docs, not code): {', '.join(bad_locs)}"
+            )
 
     tables = ara / "evidence" / "tables"
     has_table = _has_table(tables)

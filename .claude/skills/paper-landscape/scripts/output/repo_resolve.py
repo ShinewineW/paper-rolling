@@ -6,8 +6,12 @@ HIGHEST-TRUST-FIRST (the curated official repo must beat an unverified paper-tex
 link — see resolve_repo_candidates for why):
 
   T2a pwc-official — Papers-with-Code `is_official` offline table (high trust)
-  T1  paper-text   — github links the authors wrote in the frozen MD (verify:
-                     could also be a cited baseline's repo, so it is not trusted blindly)
+  T1a paper-declared — a repo the AUTHORS explicitly declare as their own ("(our)
+                     code is/will be available/released at <url>") — high trust
+                     (accept on clone), so a real author-declared repo is not lost to
+                     the README-must-cite-arxiv verification gate
+  T1b paper-text   — other github links in the frozen MD (verify: could also be a
+                     cited baseline's repo, so it is not trusted blindly)
   discovery        — a github_repo carried by a discovery source, if any (verify)
   T2b hf-live      — the repo (or, soon, artifacts) HF Papers links; injected `hf_lookup`,
                      ON by default in make_repo_resolver
@@ -53,6 +57,22 @@ _CLOSED = re.compile(
     r")"
 )
 
+# Author-declared OPEN cue: the authors pointing at their OWN code release —
+# "(our) code is/will be available/released/accessed at <github url>" — within ONE
+# sentence (the `[^.\n]` windows never cross a period/newline). HIGH-PRECISION (mirror
+# of _CLOSED): it requires BOTH a code noun AND a release verb+word before the URL, so
+# a bare cited-baseline link ("see github.com/x for the baseline", "Code: <url>") does
+# NOT match and never gets promoted over the real repo. Fixes the false-negative where a
+# genuine author-declared repo (World4Drive: "Codes will be accessed at
+# github.com/ucaszyp/World4Drive") was rejected only because its README omits its own
+# arxiv id/title — the clone-verification signal the "search" tier relies on.
+_DECLARED_OPEN = re.compile(
+    r"(?i)\b(?:our\s+)?(?:codes?|source\s+code|implementation)\b"
+    r"[^.\n]{0,40}?\b(?:is|are|will\s+be|will|can\s+be|to\s+be)\b"
+    r"[^.\n]{0,30}?\b(?:available|released|accessed|accessible|found|public|open[-\s]?sourced)\b"
+    r"[^.\n]{0,30}?(github\.com[/:][A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+)"
+)
+
 
 @dataclass(frozen=True)
 class RepoCandidate:
@@ -92,6 +112,25 @@ def _grep_md_github(md_path: Path) -> list[str]:
     seen: set[str] = set()
     for m in _GH.finditer(text):
         url = _to_repo_url(m.group(0))
+        if url and url not in seen:
+            seen.add(url)
+            out.append(url)
+    return out
+
+
+def _grep_md_declared_open(md_path: Path) -> list[str]:
+    """Ordered, de-duplicated github URLs the AUTHORS explicitly declare as their own.
+
+    High-precision (see `_DECLARED_OPEN`): only "(our) code is/will be available/
+    released/accessed at <github url>" qualifies. These enter the cascade as "official"
+    trust (accept on clone) so a genuine author-declared repo is not lost just because
+    its README does not cite its own arxiv id/title.
+    """
+    text = md_path.read_text(encoding="utf-8", errors="ignore")
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in _DECLARED_OPEN.finditer(text):
+        url = _to_repo_url(m.group(1))
         if url and url not in seen:
             seen.add(url)
             out.append(url)
@@ -185,7 +224,7 @@ def resolve_repo_candidates(
     web_search: Callable[[str], list[str]] | None = None,
 ) -> list[RepoCandidate]:
     """Ordered, de-duplicated repo candidates, HIGHEST TRUST FIRST: T2a pwc-official
-    → T1 paper-text → discovery → T2b hf-live → T4 websearch.
+    → T1a paper-declared → T1b paper-text → discovery → T2b hf-live → T4 websearch.
 
     Order matters: build_code_ref accepts the FIRST candidate that verifies, so the
     curated `is_official` repo must be tried BEFORE the paper-text grep — a paper's
@@ -207,9 +246,16 @@ def resolve_repo_candidates(
     # T2a — Papers-with-Code is_official offline table (high trust): tried FIRST so a
     # curated official repo beats an unverified paper-text link (see docstring).
     add(pwc_lookup(arxiv_id), "pwc-official", "official")
-    # T1 — links the authors wrote in the paper (verify; may be a cited baseline).
     if md_path is not None and Path(md_path).exists():
-        for url in _grep_md_github(Path(md_path)):
+        mdp = Path(md_path)
+        # T1a — a repo the AUTHORS explicitly declare as their own ("(our) code is/will be
+        # available/released at <url>") is HIGH trust (accept on clone), tried BEFORE the
+        # generic paper-text grep so the declared repo wins and is never lost to the
+        # README-must-cite-arxiv verification gate (see _DECLARED_OPEN).
+        for url in _grep_md_declared_open(mdp):
+            add(url, "paper-declared", "official")
+        # T1b — other github links in the paper (verify; may be a cited baseline).
+        for url in _grep_md_github(mdp):
             add(url, "paper-text", "search")
     # A repo a discovery source already carried (e.g. HF Papers); verify.
     add(candidate.get("github_repo"), "discovery", "search")

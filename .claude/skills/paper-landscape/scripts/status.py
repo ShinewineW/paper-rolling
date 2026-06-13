@@ -180,7 +180,14 @@ def collect(workspace: Path) -> list[dict]:
                 }
             )
     for r in recs:  # enrich with the engine's own recorded status (latest ledger row)
-        r["ledger"] = (led.get(r["idbase"]) or {}).get("status")
+        led_status = (led.get(r["idbase"]) or {}).get("status")
+        r["ledger"] = led_status
+        # Ledger↔product divergence (Codex R1): a published+compliant product whose latest
+        # ledger row is NOT 'done' is a silent inconsistency — the next /loop tick would
+        # both reprocess it (it is absent from skip_set) AND consistency_check would prune
+        # its vault dirs (ADR-0011 preserves the ARA, but person_vault is rebuilt). Surface
+        # it so an "all green" status never hides a paper the engine is about to redo.
+        r["ledger_diverged"] = r["state"] == "compliant" and led_status != "done"
     return recs
 
 
@@ -301,7 +308,10 @@ def render_card(recs: list[dict], *, width: int = 60) -> str:
             else:
                 cur += sep + nm
         lines.append(row(cur))
-    if not stale and not failed and not corrupt:
+    diverged = [r for r in recs if r.get("ledger_diverged")]
+    if diverged:
+        lines.append(row(f"  ⚠ 账本未同步 {len(diverged)}  合规但 ledger≠done(会被重跑/清理)"))
+    if not stale and not failed and not corrupt and not diverged:
         lines.append(row("  全部合规 ✓"))
     lines.append("╰" + "─" * width + "╯")
     return "\n".join(lines)
@@ -342,8 +352,18 @@ def main(argv: list[str] | None = None) -> int:
             "orphan": "‼️ ",
         }.get(r["state"], "?")
         det = f"  ({r['detail']})" if r["detail"] else ""
+        if r.get("ledger_diverged"):
+            det += f"  ⚠ ledger={r['ledger']}≠done"
         print(f"  {mark} {r['state']:14} {r['idbase']:14} {r['key'][:46]}{det}")
     print("\n" + "  ".join(f"{s}={n}" for s, n in counts.items()))
+    diverged = [r for r in recs if r.get("ledger_diverged")]
+    if diverged:
+        keys = ", ".join(r["idbase"] for r in diverged)
+        print(
+            f"\n⚠ {len(diverged)} compliant product(s) with ledger≠done ({keys}) — the next "
+            "/loop tick will reprocess AND consistency_check will prune their vault dirs. "
+            "Reconcile the ledger (append a done row) or invalidate explicitly."
+        )
     return 0
 
 

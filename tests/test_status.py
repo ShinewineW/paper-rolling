@@ -111,6 +111,54 @@ def test_collect_flags_corrupt_report_not_compliant(tmp_path: Path) -> None:
     assert "ARA-not-loaded" in recs["9999.99999"]["detail"]
 
 
+def _compliant_pair(ws: Path, key: str) -> None:
+    pv = ws / "person_vault" / key
+    pv.mkdir(parents=True)
+    (pv / "report.md").write_text("# A\n\n## 评价\n> ok\n\n本文达到 1。", encoding="utf-8")
+    _seal(ws / "ai_package" / key, passes=True)
+
+
+def test_collect_flags_ledger_divergence(tmp_path: Path) -> None:
+    # Codex R1: a compliant, sealed product whose latest ledger row is NOT 'done' is a
+    # divergence — the next /loop would reprocess it AND consistency_check would prune it.
+    ws = tmp_path
+    _compliant_pair(ws, "2026-01-01_A_1111.11111")
+    (ws / "_ledger").mkdir()
+    (ws / "_ledger" / "processed_ledger.yaml").write_text(
+        "processed:\n- key: '1111.11111'\n  status: failed\n", encoding="utf-8"
+    )
+    rec = {r["idbase"]: r for r in collect(ws)}["1111.11111"]
+    assert rec["state"] == "compliant" and rec["ledger_diverged"] is True
+
+
+def test_collect_no_divergence_when_ledger_done(tmp_path: Path) -> None:
+    ws = tmp_path
+    _compliant_pair(ws, "2026-01-01_A_1111.11111")
+    (ws / "_ledger").mkdir()
+    (ws / "_ledger" / "processed_ledger.yaml").write_text(
+        "processed:\n- key: '1111.11111'\n  status: done\n", encoding="utf-8"
+    )
+    rec = {r["idbase"]: r for r in collect(ws)}["1111.11111"]
+    assert rec["ledger_diverged"] is False
+
+
+def test_render_card_surfaces_ledger_divergence() -> None:
+    recs = [
+        {
+            "idbase": "1.1",
+            "key": "k_1.1",
+            "state": "compliant",
+            "detail": "",
+            "sealed": True,
+            "ledger_diverged": True,
+        }
+    ]
+    card = render_card(recs)
+    assert "账本未同步" in card  # divergence surfaced
+    assert "全部合规" not in card  # and it must NOT read as all-clear
+    assert len({_dw(ln) for ln in card.splitlines()}) == 1  # still width-aligned
+
+
 def test_render_card_surfaces_corrupt_and_funnel() -> None:
     recs = [
         {"idbase": "1.1", "key": "k_1.1", "state": "compliant", "detail": "", "sealed": True},

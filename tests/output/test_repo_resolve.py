@@ -76,6 +76,46 @@ def test_author_declares_closed_is_high_precision(tmp_path: Path) -> None:
     assert author_declares_closed(None) is False
 
 
+def test_author_declared_open_url_is_high_trust_official(tmp_path: Path) -> None:
+    # World4Drive case: an explicit author declaration of their OWN repo is promoted to
+    # "official" (accept on clone) and tried FIRST, so it is not lost to the
+    # README-must-cite-arxiv verification gate (the false-negative this fixes).
+    md = tmp_path / "p.md"
+    md.write_text(
+        "We achieve SOTA. Codes will be accessed at https://github.com/ucaszyp/World4Drive.\n",
+        encoding="utf-8",
+    )
+    cands = resolve_repo_candidates("2507.00603", md, {}, pwc_lookup=lambda _i: None)
+    assert cands[0] == RepoCandidate(
+        "https://github.com/ucaszyp/World4Drive", "paper-declared", "official"
+    )
+
+
+def test_declared_open_precedes_other_paper_text_links(tmp_path: Path) -> None:
+    md = tmp_path / "p.md"
+    md.write_text(
+        "We build on the baseline at https://github.com/base/line for comparison. "
+        "Our code is available at https://github.com/team/ours.\n",
+        encoding="utf-8",
+    )
+    cands = resolve_repo_candidates("2401.00001", md, {}, pwc_lookup=lambda _i: None)
+    assert cands[0] == RepoCandidate("https://github.com/team/ours", "paper-declared", "official")
+    assert RepoCandidate("https://github.com/base/line", "paper-text", "search") in cands
+
+
+def test_cited_baseline_or_bare_code_colon_link_not_promoted(tmp_path: Path) -> None:
+    # No code+release-verb cue → must NOT be promoted to official: a bare citation and a
+    # bare "Code: <url>" both stay paper-text/search (the precision guard that keeps a
+    # baseline repo from beating the real one).
+    md = tmp_path / "p.md"
+    md.write_text(
+        "See https://github.com/foo/baseline for the baseline. Code: https://github.com/foo/two\n",
+        encoding="utf-8",
+    )
+    cands = resolve_repo_candidates("2401.00001", md, {}, pwc_lookup=lambda _i: None)
+    assert cands and all(c.trust == "search" and c.source == "paper-text" for c in cands)
+
+
 def test_t2b_t4_off_by_default(tmp_path: Path) -> None:
     # No hf_lookup / web_search injected → only T1/T2a/discovery, no network tiers.
     cands = resolve_repo_candidates(
