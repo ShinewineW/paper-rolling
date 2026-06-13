@@ -526,8 +526,7 @@ flowchart TB
 关键依赖库涵盖多模态预处理与评估管线：`DepthAnything2`（逐帧深度估计并归一化至 [0, 1]）、`GroundingDINO`（开放集目标检测）、`SAM2`（视频实例分割掩码提取）、`Real-ESRGAN`（4KUpscaler 训练时的高分辨率退化增强）。评估侧依赖 `DOVER`（视频感知质量）与 `LPIPS`（生成多样性），自动驾驶评估则接入 `StreamPetr` 与 `Hydra-MDP`。论文未明确报告随机种子设置，复现时需注意结果可能存在的微小方差。
 
 ### 开源代码与复现入口
-**结论：官方已开源核心仓库与特定提交版本，但部分关键控制逻辑与并行策略尚未完全公开。** 代码托管于 `https://github.com/nvidia-cosmos/cosmos-transfer1`，锁定提交为 `5005e823dbd478ad8e51f6bc28a913a13a994b5f`。目前可定位的模块包括：`README.md:28` 处的 `Cosmos-Transfer1-7B-4KUpscaler`（基于 ControlNet 的视频超分，采用 3×3 网格分块推理，重叠区域取平均以消除拼接伪影），以及 `.git/index:26` 处的 Prompt Upsampler 微调入口。
-然而，多模态自适应 DiT ControlNet 实现、时空控制图生成逻辑、独立训练与推理融合管线、SalientObject 自动权重算法，以及 GB200 实时推理并行策略在仓库中均标记为 `_not found_`。这意味着复现者需自行补齐控制分支的注入逻辑与动态权重调度代码。
+**结论：官方已开源核心仓库与特定提交版本，逐模块的文件/行号映射未在该提交上机械解析，复现者需在锁定提交处自行定位。** 代码托管于 `https://github.com/nvidia-cosmos/cosmos-transfer1`，锁定提交为 `5005e823dbd478ad8e51f6bc28a913a13a994b5f`。相关 HuggingFace 模型权重包括 `Cosmos-Transfer1-7B`、`Cosmos-Transfer1-7B-Sample-AV`、`Cosmos-Transfer1-7B-4KUpscaler` 及 `Cosmos-Transfer1-7B-Sample-AV-Single2MultiView`。各创新模块（多模态自适应 DiT ControlNet 实现、时空控制图生成逻辑、独立训练与推理融合管线、SalientObject 自动权重算法、Prompt Upsampler 微调入口，以及 GB200 实时推理并行策略）的具体文件与行号未在本文档中机械解析——请在上述锁定提交处查阅仓库源码。这意味着复现者需在仓库中自行定位控制分支注入逻辑与动态权重调度代码。
 
 <details><summary><strong>复现边界条件与未公开细节</strong></summary>
 - **显存与算力门槛**：单模态控制分支训练需 1024 块 H100，若尝试缩减规模，论文未提供替代配置或缩放定律，收敛时间可能呈非线性增长。

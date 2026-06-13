@@ -661,7 +661,7 @@ flowchart TD
 
 框架基于 PyTorch，训练效率评测在 8-GPU cluster 上进行；真实世界评测部署于 25 台物理机器人，跨越 AgileX、Agibot G1、Galaxea R1Pro 三个商业平台。关键依赖包括 `Qwen2.5-VL`、`Qwen3-VL-235B-A22B`（用于任务与子任务指令标注）、`LingBot-Depth`、Flow Matching、FSDP/FSDP2、`FlexAttention`、`torch.compile`，以及 `rosbag`、GM-100、RoboTwin 2.0、Libero 等仿真/数据工具。
 
-开源仓库地址为 `https://github.com/robbyant/lingbot-vla`，建议锁定提交 `4eb34b7693a056567433f8fac9c59a2e67eb60b`。经核对，README.md 第 95 行提及了三视角 learnable queries 与深度 tokens 的空间蒸馏对齐，但基于 Mixture-of-Transformers 的 VLM 与 action expert 分路径建模、面向连续动作的 Flow Matching action expert、action expert 专属 shard groups 的 FSDP 策略，以及 FlexAttention 与 torch.compile 优化在仓库中均标记为 `_not found_`。这表明当前开源版本可能侧重数据管线与蒸馏模块，核心训练架构与分布式策略需结合论文公式与描述进行二次实现或等待后续更新。
+开源仓库地址为 `https://github.com/robbyant/lingbot-vla`，建议锁定提交 `4eb34b7693a0565c67433f8fac9c59a2e67eb60b`。各创新点（MoT 分路径建模、Flow Matching action expert、FSDP shard groups、FlexAttention 与 torch.compile 优化等）在该提交中的具体文件与行号未经机械定位解析，如需查阅实现细节，请直接在上述锁定 SHA 的仓库中检索。
 
 ## 局限与适用边界
 

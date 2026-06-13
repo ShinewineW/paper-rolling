@@ -635,7 +635,7 @@ $$\mathcal { L } = \alpha \mathcal { L } _ { s e m } + \beta \mathcal { L } _ { 
 
 ### 开源代码与复现入口
 **结论：** 核心仓库已公开，但创新模块的代码映射存在断层，需对照论文手动定位。
-官方代码托管于 `https://github.com/ucaszyp/World4Drive`，建议锁定提交哈希 `cffb51adeb1f7d02b49c4b74d7262ded62a33ac8` 以保证环境一致性。经核对，仓库中 `README.md` 明确列出了 intention-aware latent world model 的入口，且 `custom_mmdet3d/ops/paconv/paconv.py:12` 附近包含了 World Model Selector 的训练逻辑。然而，**Driving World Encoding 的具体实现、open-vocabulary semantic supervision 的伪标签生成管线、以及 scale-aware depth forward projection 的 3D 映射代码在仓库中均标记为 `_not found_`**。这通常意味着相关逻辑被封装在闭源依赖、未提交的预处理脚本中，或散落在未索引的辅助文件里。复现者需重点排查数据加载器与特征提取阶段的钩子函数，必要时需自行实现 Grounded-SAM 的离线推理与 Metric3D 的深度图投影管线。
+官方代码已开源于 `https://github.com/ucaszyp/World4Drive`，建议锁定提交哈希 `cffb51adeb1f7d02b49c4b74d7262ded62a33ac8` 以保证环境一致性。各核心创新模块（Driving World Encoding、open-vocabulary semantic supervision 伪标签生成管线、scale-aware depth forward projection 的 3D 映射、World Model Selector 训练逻辑等）的逐文件逐行位置未经机械解析确认，如需定位具体实现，请直接在上述固定提交处检索仓库源码。复现者在探查数据加载器与特征提取阶段的钩子函数时，必要时需自行实现 Grounded-SAM 的离线推理与 Metric3D 的深度图投影管线。
 
 ## 局限与适用边界
 

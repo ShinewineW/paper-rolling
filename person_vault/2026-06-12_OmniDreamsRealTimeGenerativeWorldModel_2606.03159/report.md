@@ -646,9 +646,9 @@ flowchart TD
 推理环境明确依赖 `torch.compile`、`CUDA Graphs` 与 `Flex-Attention`，并配合自研 ring-attention 实现沿 view 和 temporal 轴的 hierarchical context-parallel。单视角配置可在单张 GB300 上达到实时吞吐，而四视角同步生成需 16-GPU GB300 机柜（并行分解为 view 与 temporal 维度组合）。视频模型以 stateful server 形态运行，经 gRPC 与 `AlpaSim` 客户端通信，rank 0 接收请求后通过 NCCL events 转发至其他 ranks，返回 JPEG-encoded 帧。该架构将多 GPU 调度逻辑隔离于仿真系统之外，降低部署侵入性，但 gRPC 序列化与 NCCL 事件同步会引入固定通信开销，论文未提供端到端延迟的误差范围。
 
 ### 开源现状与复现实操
-**结论：** 官方仓库目前仅开放 FlashDreams 推理栈与部分 API 文档，核心训练、蒸馏与 AlpaSim 集成逻辑处于闭源状态，复现需以论文配置为蓝本进行模块级重建，且需自行处理未公开的权重初始化与并行调度逻辑。
+**结论：** 目前未找到 OmniDreams 模型的公开代码仓库，核心训练、蒸馏与 AlpaSim 集成逻辑均未公开，复现需以论文配置为蓝本进行模块级重建，且需自行处理权重初始化与并行调度逻辑。
 
-代码仓库位于 `https://github.com/NVIDIA/flashdreams`，锁定提交为 `caf870e1f03a68d0a15167332c8b62cf2154a4c5`。经核对，仓库内可定位面向闭环 AV 的 action-conditioned autoregressive diffusion world model 概念说明与 streaming KV cache 的 API 接口，但轻量 control branch 实现、多视角 cross-view attention、Diffusion Forcing 因果化转换、Self Forcing + DMD 蒸馏管线、AlpaSim session-based state 集成等核心模块均标记为 `_not found_`。这意味着复现工程师无法直接运行完整训练脚本，必须依据论文披露的超参（如 1:1 文本到视频/图像到视频混合比例、93→189 帧扩展策略、`K=2` 与 `[1000, 450]` 蒸馏 schedule）自行搭建训练循环。建议优先对齐数据过滤管线（移除 unreliable sensor data、按 ego-trajectory 去重）与渐进教师微调流程，这两步对长 rollout 稳定性的影响权重最高；若受限于硬件，可先用单视角 SV 配置验证因果掩码与 KV cache 滚动逻辑，再逐步扩展至多视角并行。
+经检索论文全文、Papers-with-Code 官方仓库索引、Hugging Face 及公开网络，**未找到 OmniDreams 模型的公开代码仓库**（检索结论来自 SSOT 代码引用核查；这不代表项目闭源，仅说明当前尚无可验证的公开代码）。论文提及 FlashDreams（`https://github.com/NVIDIA/flashdreams`）作为推理加速栈，但这是作者团队的独立推理工具，并非 OmniDreams 的训练或完整模型仓库。因此，复现工程师目前无法直接获取完整训练脚本，必须依据论文披露的超参（如 1:1 文本到视频/图像到视频混合比例、93→189 帧扩展策略、`K=2` 与 `[1000, 450]` 蒸馏 schedule）自行搭建训练循环。建议优先对齐数据过滤管线（移除 unreliable sensor data、按 ego-trajectory 去重）与渐进教师微调流程，这两步对长 rollout 稳定性的影响权重最高；若受限于硬件，可先用单视角 SV 配置验证因果掩码与 KV cache 滚动逻辑，再逐步扩展至多视角并行。
 
 ## 局限与适用边界
 
