@@ -515,3 +515,19 @@ processed:
   person_vault_path: person_vault/2026-06-13_APragmaticVLAFoundationModel_2601.18692
   ai_package_path: ai_package/2026-06-13_APragmaticVLAFoundationModel_2601.18692
   processed_at: '2026-06-13T04:57:05Z'
+- key: '2405.12399'
+  md_sha256: null
+  status: done
+  failure_class: null
+  retry_after: null
+  person_vault_path: person_vault/2026-06-12_DiffusionForWorldModelingVisualDetailsMa_2405.12399
+  ai_package_path: ai_package/2026-06-12_DiffusionForWorldModelingVisualDetailsMa_2405.12399
+  processed_at: '2026-06-13T19:41:12Z'
+- key: '2408.14197'
+  md_sha256: null
+  status: done
+  failure_class: null
+  retry_after: null
+  person_vault_path: person_vault/2026-06-12_DrivingInTheOccupancyWorldVisionCentric4_2408.14197
+  ai_package_path: ai_package/2026-06-12_DrivingInTheOccupancyWorldVisionCentric4_2408.14197
+  processed_at: '2026-06-13T19:41:12Z'
