@@ -56,8 +56,13 @@ fabricated numbers), and "不能毒化历史" is the governing constraint.
 - A shared discard-or-preserve primitive encodes the **litmus** — *contains a
   non-empty ARA → move to `失败现场`; otherwise → `rm` freely* — plus scene-before-rm
   ordering. The reflex-`rm` sites route through it: `produce_outputs`' `finally`
-  (EngineAbort with a built ARA), the spoke's G3 re-emit product removal, and
-  `consistency_check`'s orphan prune of `ai_package/` (asymmetric — a `person_vault/`
+  (EngineAbort with a built ARA), the **`SpokeCancelled` stall path** (a cancel
+  before/during promotion now preserves the built ARA — pre-promotion staging is kept,
+  a mid-promotion ARA is moved BACK to `staging/ai` rather than `rm`'d — and the spoke
+  scenes it as `最终门`+`report.md` root so revival reuses it; previously this path
+  reflex-deleted the ARA, the one documented residual, now closed), the spoke's G3
+  re-emit product removal, and `consistency_check`'s orphan prune of `ai_package/`
+  (asymmetric — a `person_vault/`
   orphan, an empty/garbage `ai_package/` orphan, `.clones`, and atomic-write temp
   files are still hard-deleted: "该删的不受影响"). An ARA-bearing orphan is moved to
   `_failed/_orphans/<name>/` (latest-one wins) — a new, gitignored layout slot.

@@ -41,10 +41,16 @@ from scripts.ingest.ingest import IngestFailed, IngestResult, ingest, quarantine
 from scripts.output.produce import (
     ProduceGateBlocked,
     ProduceResult,
+    SpokeCancelled,
     StructuralSealFailed,
     produce_outputs,
 )
-from scripts.paths import FAILURE_AUDIT_BLOCK, FAILURE_CONVERT_ERROR, EngineAbort
+from scripts.paths import (
+    FAILURE_AUDIT_BLOCK,
+    FAILURE_CONVERT_ERROR,
+    FAILURE_STALLED,
+    EngineAbort,
+)
 
 
 def _synthesize_content_list(md_path: Path) -> Path:
@@ -247,6 +253,39 @@ def make_spoke(
                 staged_dir=staged,
             )
 
+        def _stall_scene(exc) -> SpokeResult:
+            # ADR-0011: a stall cancel (wall-clock budget exceeded) reaches the daemon
+            # spoke AFTER the hub abandoned it and recorded FAILURE_STALLED. produce_outputs
+            # now PRESERVES the built ARA (moved back to staging, staged_dir attached)
+            # instead of the old reflex-delete; scene it so the paid-for ARA survives. A
+            # cancel before the ARA was built carries no staged_dir → nothing to preserve.
+            # failed_gate 最终门 + report.md root → revival's use_branch1 reuses the ARA,
+            # re-emits branch1, runs G3, promotes (the stall fires before G3 ran).
+            staged = getattr(exc, "staged_dir", None)
+            if staged is not None:
+                write_scene(
+                    workspace=workspace,
+                    key=cand_key,
+                    ledger_key=cand_key,
+                    failed_gate="最终门",
+                    findings=[{"target": "report.md", "observation": str(exc), "severity": "hard"}],
+                    engine_commit=current_commit(workspace),
+                    candidate=candidate,
+                    md_path=ing.md_path,
+                    content_list_path=content_list_path,
+                    analysis=None,
+                    staged_dir=staged,
+                )
+            return SpokeResult(
+                status="failed",
+                person_vault_path=None,
+                ai_package_path=None,
+                failure_class=FAILURE_STALLED,
+                failure_reason="stall budget exceeded; built ARA preserved as a _failed scene",
+                source_url=source_url,
+                attempted_tier=str(ing.tier),
+            )
+
         # 5. branch2 -> Seal-1 -> G2 -> branch1, with a G2 blind-retry budget. A
         #    number-gate hard block re-runs the analyzer (fresh sampling, NO verdict
         #    injection — ADR-0006) up to g2_blind_retry_rounds times; each intermediate
@@ -286,6 +325,13 @@ def make_spoke(
                 # then re-raise (tick still aborts; cost guard unchanged).
                 _abort_scene(exc)
                 raise
+            except SpokeCancelled as exc:
+                # ADR-0011: a stall cancel preserves the built ARA (produce_outputs moved
+                # it back to staging + attached staged_dir); scene it for revival instead
+                # of the old reflex-delete. The hub already recorded this paper stalled;
+                # this just preserves the paid-for ARA. Does NOT re-raise (per-paper stall,
+                # not a tick abort).
+                return _stall_scene(exc)
         assert produced is not None  # the loop either broke with a result or returned a scene
 
         # 6. G3 seal (after both branches), bounded. On re-emit, rebuild branches.

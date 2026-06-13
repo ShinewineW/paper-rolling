@@ -98,9 +98,17 @@ class SpokeCancelled(Exception):
     A daemon spoke that overran its wall-clock budget keeps running (Python can't
     kill threads); this lets it bail out at the last safe point — right before the
     atomic vault promotion — so a late finisher never writes products the hub has
-    already recorded as failed (Codex R17 stall-isolation gap). Staging is cleaned
-    up in produce_outputs' `finally`.
+    already recorded as failed (Codex R17 stall-isolation gap).
+
+    ADR-0011: a stall must NOT reflex-delete the token-expensive built ARA. When the
+    cancel fires with an ARA already built, produce_outputs preserves staging (moving
+    a mid-promotion ARA back to staging/ai) and attaches ``staged_dir`` so the spoke
+    can scene it for revival, instead of letting `finally` delete it.
     """
+
+    def __init__(self, message: str, *, staged_dir: Path | None = None) -> None:
+        self.staged_dir = staged_dir
+        super().__init__(message)
 
 
 def _write_audit_flags(ara_dir: Path, verdict: Any) -> None:
@@ -266,15 +274,29 @@ def promote(
     # window (the moves, then the code-ref note). store.consistency_check prunes any
     # orphan vault dir (no `done` row) at the next tick start, so it self-heals.
     if cancel is not None and cancel.is_set():
-        shutil.rmtree(person_dest, ignore_errors=True)
-        shutil.rmtree(ai_dest, ignore_errors=True)
-        raise SpokeCancelled("spoke cancelled during vault promotion (stall budget exceeded)")
+        _revert_promotion(person_dest, ai_dest, staging)
+        raise SpokeCancelled(
+            "spoke cancelled during vault promotion (stall budget exceeded)", staged_dir=staging
+        )
     ledger.record_code_ref(key, str(ai_dest / "ara" / "src/code_ref.md"))
     if cancel is not None and cancel.is_set():
-        shutil.rmtree(person_dest, ignore_errors=True)
-        shutil.rmtree(ai_dest, ignore_errors=True)
-        raise SpokeCancelled("spoke cancelled after vault promotion (stall budget exceeded)")
+        _revert_promotion(person_dest, ai_dest, staging)
+        raise SpokeCancelled(
+            "spoke cancelled after vault promotion (stall budget exceeded)", staged_dir=staging
+        )
     return ProduceResult(key=key, person_path=person_dest, ai_path=ai_dest)
+
+
+def _revert_promotion(person_dest: Path, ai_dest: Path, staging: Path) -> None:
+    """Revert a cancel-interrupted promotion. ADR-0011: the token-expensive ARA is
+    MOVED BACK to ``staging/ai`` (never reflex-rm'd) so the stall scene can preserve it;
+    the cheap person report is dropped (revival re-emits it). ``staging/ai`` is a free
+    slot here — promote() already moved it out into the vault."""
+    shutil.rmtree(person_dest, ignore_errors=True)
+    if ara_is_nonempty(ai_dest / "ara"):
+        shutil.move(str(ai_dest), str(staging / "ai"))
+    else:
+        shutil.rmtree(ai_dest, ignore_errors=True)
 
 
 def produce_outputs(
@@ -396,6 +418,17 @@ def produce_outputs(
         # empty ARA first; the guard only fires on revival's Seal-1-free path. An
         # empty ARA is worthless, so letting `finally` clean it is correct.)
         handed_off = True
+        raise
+    except SpokeCancelled as exc:
+        # ADR-0011: a stall cancel must NOT let `finally` delete a built ARA. The
+        # pre-promotion cancel (line above) leaves staging/ai/ara intact; promote()'s
+        # mid/post-move revert moves the promoted ARA back to staging/ai. Either way, if
+        # an ARA exists, hand `staging` to the spoke (which scenes it) via the same
+        # `staged_dir` contract the gate/abort exceptions use, then re-raise. A cancel
+        # BEFORE any ARA was built leaves nothing → fall through to the finally rm.
+        if ara_is_nonempty(staging / "ai" / "ara"):
+            exc.staged_dir = staging
+            handed_off = True
         raise
     except EngineAbort as exc:
         # ADR-0011: a transport abort (e.g. the Qwen audit endpoint dropped) must

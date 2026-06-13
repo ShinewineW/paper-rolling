@@ -148,8 +148,10 @@ codex, grounded) and the other 5 seams to `openai_compatible`, keys from `.env`.
   `paths.ara_is_nonempty`), never `rm`'d; an `ai_package/` orphan holding a real ARA
   goes to `_failed/_orphans/`, not pruned. Cheap dirs (person_vault, empty shells,
   `.clones`, temp) are still hard-deleted. The `失败现场` is a one-way sink — a
-  gate-failed ARA flows in for debug, never back out (revival re-samples). Known
-  residual: the `SpokeCancelled` (stall) path still deletes the built ARA.
+  gate-failed ARA flows in for debug, never back out (revival re-samples). The
+  `SpokeCancelled` (stall) path also preserves its built ARA now (moved back to
+  staging, scened as `最终门`+`report.md` root for revival) — the former delete-on-stall
+  residual is closed.
 - **Tracked = products, ignored = regenerable inputs** (基调-D2): converted
   `corpus/{ID}/{ID}.md` + `.md_contract.json` + `content_list.json`, `person_vault/`,
   `ai_package/`, `_ledger/`, `landscapes/`, engine + `config/` are tracked; original

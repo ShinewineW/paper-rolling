@@ -337,3 +337,65 @@ def test_branch1_refuses_empty_ara_input(tmp_path, monkeypatch):
         (tmp_path / "person_vault").iterdir()
     )
     assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
+
+
+def test_spoke_cancelled_preserves_built_ara_in_staging(
+    tmp_path, candidate, ledger, md_path, analyzer
+):
+    """ADR-0011: a stall cancel (pre-promotion) must PRESERVE the built ARA — attach
+    staged_dir + hand staging off — not reflex-delete it. Mirrors the EngineAbort
+    preserve contract (this was the documented known residual: stall path deleted the ARA)."""
+    import shutil as _sh
+    import threading
+
+    from scripts.output.produce import SpokeCancelled
+
+    cancel = threading.Event()
+    cancel.set()
+    with pytest.raises(SpokeCancelled) as ei:
+        produce_outputs(
+            md_path, candidate, ledger, root=tmp_path, resolve_analysis=analyzer, cancel=cancel
+        )
+    staged = getattr(ei.value, "staged_dir", None)
+    assert staged is not None, "SpokeCancelled must carry staged_dir when an ARA was built"
+    ara = Path(staged) / "ai" / "ara"
+    assert ara.is_dir() and any(ara.iterdir()), "built ARA must survive the stall cancel"
+    # OT-5 still holds: neither vault was written.
+    assert not (tmp_path / "person_vault").exists() or not any(
+        (tmp_path / "person_vault").iterdir()
+    )
+    assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
+    _sh.rmtree(staged, ignore_errors=True)  # handed off → finally didn't clean it
+
+
+def test_spoke_cancelled_mid_promotion_moves_ara_back_to_staging(
+    tmp_path, candidate, ledger, md_path, analyzer
+):
+    """ADR-0011: a cancel landing DURING promote() (after the vault move) must move the
+    promoted ARA BACK to staging (not rmtree it) and still preserve it via staged_dir."""
+    import shutil as _sh
+
+    from scripts.output.produce import SpokeCancelled
+
+    class _FlipCancel:
+        def __init__(self):
+            self.calls = 0
+
+        def is_set(self):
+            self.calls += 1
+            return self.calls >= 2  # pre-promotion check: not set; mid-move check: set
+
+    cancel = _FlipCancel()
+    with pytest.raises(SpokeCancelled) as ei:
+        produce_outputs(
+            md_path, candidate, ledger, root=tmp_path, resolve_analysis=analyzer, cancel=cancel
+        )
+    staged = getattr(ei.value, "staged_dir", None)
+    assert staged is not None
+    ara = Path(staged) / "ai" / "ara"
+    assert ara.is_dir() and any(ara.iterdir()), (
+        "promoted ARA must be moved back to staging, not deleted"
+    )
+    # vault reverted (no orphan).
+    assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
+    _sh.rmtree(staged, ignore_errors=True)

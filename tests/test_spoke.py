@@ -483,6 +483,35 @@ def test_spoke_happy_path_produces_both_vaults(tmp_path, fake_http, fake_cli):
     assert (ai / "ara" / "level2_report.json").exists()
 
 
+def test_spoke_stall_cancel_preserves_built_ara_as_scene(tmp_path, fake_http, fake_cli):
+    """ADR-0011: a stall cancel must PRESERVE the paid-for ARA as a self-contained
+    _failed scene, not reflex-delete it (the former known residual). The spoke catches
+    SpokeCancelled, scenes the handed-off ARA, and reports FAILURE_STALLED."""
+    import threading
+
+    from scripts.paths import FAILURE_STALLED
+
+    _tier2_http(fake_http, dict(_CANDIDATE))
+    spoke = _make_spoke(tmp_path, fake_http, fake_cli, analysis_md=_SOURCE_MD)
+    cancel = threading.Event()
+    cancel.set()  # the hub's stall guard already fired before promotion
+
+    result = spoke(dict(_CANDIDATE), cancel=cancel)
+
+    assert result.status == "failed"
+    assert result.failure_class == FAILURE_STALLED
+    # The built ARA survives in a self-contained scene (NOT deleted).
+    scenes = list((tmp_path / "_failed").glob("*/scene.json"))
+    assert scenes, "stall must leave a _failed/<key>/scene.json"
+    ara_dirs = list((tmp_path / "_failed").glob("*/ai/ara"))
+    assert ara_dirs and any(ara_dirs[0].iterdir()), "the built ARA must be preserved in the scene"
+    # OT-5: neither vault holds a partial entry.
+    assert not (tmp_path / "person_vault").exists() or not any(
+        (tmp_path / "person_vault").iterdir()
+    )
+    assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())
+
+
 def test_spoke_honest_skeptic_passes_and_links_paired_ai_package(tmp_path, fake_http, fake_cli):
     # Codex Round-10 regression (both findings): (1) an HONEST skeptic (a number
     # grounds iff it appears in the source MD) must NOT hard-block legitimate
