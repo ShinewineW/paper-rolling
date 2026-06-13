@@ -1,0 +1,90 @@
+{
+  "artifact": "2026-06-13_DriveVAVideoActionModelsAreZeroShotDrivers_2604.04198",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.83,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Evidence is perfectly type-matched to claims (e.g., causal claims supported by targeted ablations, generalization claims supported by cross-dataset zero-shot evaluations).",
+        "Every claim explicitly references specific tables and experiments that directly measure the stated phenomenon without relying on proxy or irrelevant metrics."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly specific, actionable, and directly tied to the metrics and experimental setups used.",
+        "Criteria explicitly define the exact conditions under which the claims would fail (e.g., specific baseline performance thresholds, ablation outcomes, or protocol mismatches)."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Claims are carefully bounded and precisely scoped (e.g., explicitly specifying 'zero-shot setting', 'NAVSIM Navtest', and 'compared methods').",
+        "Assumptions and boundary conditions are explicitly documented in problem.md and concepts.md, effectively preventing over-claiming and clarifying what the model does not do."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "Clear and logical arc from observations of loose coupling in existing world models to the insight of joint latent generation, culminating in the DriveVA architecture.",
+        "Every identified gap (zero-shot transfer, visual-action coupling, long-horizon consistency) is directly addressed by a specific architectural choice and validated by corresponding experiments."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "Exploration tree includes a genuine dead-end (X1) detailing failure modes in cyclist/intersection scenarios where video-trajectory consistency is maintained but causal reasoning fails.",
+        "Pivots and decisions (e.g., P1, D3) are backed by concrete experimental results (Table 10) rather than post-hoc rationalizations, showing a faithful research process."
+      ],
+      "weaknesses": [],
+      "suggestions": [
+        "Consider expanding the dead-end X1 into a dedicated quantitative analysis (e.g., measuring failure rates specifically in long-tail interaction scenarios) to further strengthen the discussion on the limits of video-trajectory consistency."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Exceptional baseline coverage, comparing against both traditional end-to-end and recent world-model methods across multiple benchmarks (NAVSIM, nuScenes, Bench2Drive).",
+        "Comprehensive ablation study covering architectural choices, training strategies, inference steps, and model scaling, leaving no major design choice unjustified."
+      ],
+      "weaknesses": [
+        "Lacks statistical reporting such as error bars, confidence intervals, or variance across multiple random seeds, which is critical for stochastic diffusion-based models."
+      ],
+      "suggestions": [
+        "Report mean and standard deviation/variance for key metrics (especially PDMS and Collision Rate) across multiple seeds to establish statistical significance against close baselines like PWM.",
+        "Include a computational cost analysis (e.g., inference latency in ms, FPS, memory footprint) to contextualize the real-time deployability of the 5B parameter diffusion decoder."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "The empirical evaluation relies on single-point estimates for all metrics across all tables. Given the stochastic nature of the diffusion-based DiT decoder, reporting variance (e.g., standard deviation over multiple seeds) is necessary to confirm that the performance gains over baselines like PWM or DriveVLA-W0 are statistically significant and not due to random seed variance."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "suggestion",
+      "observation": "While the paper extensively evaluates planning and consistency metrics and optimizes sampling steps (Table 8), it lacks a detailed breakdown of actual inference latency and computational overhead. For a 5B parameter model utilizing a diffusion decoder, understanding real-time feasibility is critical for autonomous driving deployment claims."
+    },
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "suggestion",
+      "observation": "The dead-end X1 regarding causal misjudgment in complex interactions (cyclists, intersections) is a highly valuable and honest insight. Quantifying this specific failure mode (e.g., tracking collision rates specifically in intersection/long-tail scenarios) would elevate the paper's analysis of the boundaries of video-action consistency."
+    }
+  ]
+}

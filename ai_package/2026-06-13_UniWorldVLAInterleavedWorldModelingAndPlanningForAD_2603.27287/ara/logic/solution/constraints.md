@@ -1,0 +1,7 @@
+- 论文未设置单独局限性章节；以下为从实验设置归纳的适用边界(分析推断,论文未显式声明)。
+- 实验集中在 NAVSIM，并 follow official train/validation/test split；跨真实道路或其他 benchmark 的泛化没有在本文中系统证明。
+- 输入实现只使用 front-view camera；虽然与 camera + LiDAR 方法比较，但本文系统本身没有利用 LiDAR 或多视角输入。
+- 默认预测 N = 8 个未来帧、0.5 s 间隔、4.0 seconds horizon；更长 horizon 下的稳定性没有由本文表格直接覆盖。
+- 部分 ablation 需要 10 Hz sampled trajectories，而 NAVSIM only provides 2 Hz logs，因此 full 10 Hz trajectories supplemented from nuPlan，可能引入与主评估协议不同的数据来源。
+- 深度只作为 historical visual prompts 的 conditioning；相关工作段落明确说不是 future-frame generation 中的 explicit depth modeling。
+- 训练资源为 32 NVIDIA H20 GPUs、batch size 3；论文未讨论低资源训练或部署延迟。

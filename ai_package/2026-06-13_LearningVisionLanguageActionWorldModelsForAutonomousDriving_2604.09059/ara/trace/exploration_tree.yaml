@@ -1,0 +1,191 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: VLA 与 World Model 的缺口是什么
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3.1
+  description: 论文先提出 VLA 缺少显式时空动态和 world consistency，而 World Model 能模拟未来却通常不能评价未来是否安全、可行或理想。
+  children:
+  - id: D1
+    type: decision
+    title: 选择统一 predictive imagination 与 reflective reasoning
+    support_level: explicit
+    source_refs:
+    - Sec 1
+    - Sec 3.2
+    choice: 构建 VLA-World，把短期未来图像生成与基于生成未来的反思推理放在同一框架内。
+    alternatives:
+    - 仅使用 VLA 直接从观测映射到轨迹
+    - 仅使用 World Model 生成未来场景再外部规划
+  - id: Q2
+    type: question
+    title: 未来图像是否能作为驾驶推理证据
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    description: 模型先预测短期轨迹并生成 expected visual observation，再把 generated image 作为 explicit
+      cue 进行 reflective reasoning。
+- id: E1
+  type: experiment
+  title: 用多视角未来帧预训练激活生成能力
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  - Supp B.1
+  - Supp B.2
+  result: 预训练让模型学习多视角时空先验，并为后续安全感知规划提供生成基础。
+  also_depends_on:
+  - D1
+- id: Q3
+  type: question
+  title: 如何把驾驶概念知识灌入统一模型
+  support_level: explicit
+  source_refs:
+  - Sec 3.4
+  - Supp B.1
+  description: 论文用 SFT 的多任务混合数据组织 perception、short-term prediction、condition-guided
+    generation、thinking、action 和 trajectory planning。
+  children:
+  - id: E2
+    type: experiment
+    title: 用多任务混合数据训练结构化输出链条
+    support_level: explicit
+    source_refs:
+    - Sec 3.4
+    - Table 7
+    result: 混合数据带来更稳健的特征表示，移除 mixed data 后规划表现变差。
+- id: D2
+  type: decision
+  title: 采用 SFT 作为 RL 前冷启动
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  choice: 先用 supervised fine-tuning 建立 coherent policies 和 causal chains，再进入 GRPO。
+  alternatives:
+  - 直接用 RL 在结构化多步推理空间中探索
+  - 只使用预训练和模仿式轨迹监督
+- id: E3
+  type: experiment
+  title: 用 GRPO 强化推理与决策
+  support_level: explicit
+  source_refs:
+  - Sec 3.5
+  - Supp A.1
+  - Supp B.2
+  result: GRPO 通过组内相对优势和 rule-based rewards 细化输出，使策略更偏向结构正确、视觉一致、行为安全的响应。
+  also_depends_on:
+  - D2
+- id: D3
+  type: decision
+  title: 使用 rule-based verifiers 而非 neural reward model
+  support_level: explicit
+  source_refs:
+  - Sec 3.5
+  - Supp A.1
+  choice: 用 format、prediction、visual、action、trajectory 等规则奖励评估候选响应。
+  alternatives:
+  - 训练独立 neural reward model
+  - 只依赖重建损失或轨迹回归损失
+  also_depends_on:
+  - E3
+- id: E4
+  type: experiment
+  title: 端到端规划与未来帧生成主评估
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Table 1
+  - Table 2
+  result: VLA-World 在规划和未来帧生成基准上相对 VLA 与 World Model baselines 表现更好。
+  also_depends_on:
+  - E1
+  - E2
+  - E3
+- id: E5
+  type: experiment
+  title: 训练阶段消融验证三阶段必要性
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  - Table 4
+  result: 每个阶段都正向贡献；缺少 SFT 时 RL 难以有效探索结构化多步推理空间。
+  also_depends_on:
+  - D2
+- id: E6
+  type: experiment
+  title: 模块消融比较 perception、generation 与 reasoning
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  - Table 4
+  result: 三个组件都有正向作用，其中 perception 和 reasoning 的影响大于 visual generation。
+  also_depends_on:
+  - Q3
+- id: E7
+  type: experiment
+  title: reward 消融比较不同规则奖励
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  - Table 4
+  result: 所有 reward terms 都有正向作用，trajectory 和 action rewards 贡献最大。
+  also_depends_on:
+  - D3
+- id: P1
+  type: pivot
+  title: 从像素保真转向驾驶任务回报
+  support_level: explicit
+  source_refs:
+  - Supp A.3
+  from: 只优化 World Model reconstruction 或只做 marginal VLA policy。
+  to: 联合优化 policy 与 imagination，使 future-image tokens 也受到驾驶 reward 强化。
+  trigger: 理论分析指出生成准确性和规划安全之间的错配会形成瓶颈。
+  also_depends_on:
+  - D1
+  - D3
+- id: X1
+  type: dead_end
+  title: 无冷启动直接强化学习
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  hypothesis: 仅靠 RL 也许能在结构化多步推理任务中探索出有效策略。
+  failure_mode: 论文指出 reinforcement learning without cold-start supervision 难以有效探索大的结构化多步推理搜索空间。
+  lesson: SFT 应作为 RL 前的概念链条和 coherent policy 基础。
+  also_depends_on:
+  - D2
+  - E5
+- id: X2
+  type: dead_end
+  title: 只追求未来帧生成而不反思
+  support_level: explicit
+  source_refs:
+  - Sec 2.2
+  - Supp A.3
+  hypothesis: 高保真未来帧本身足以支持可靠驾驶规划。
+  failure_mode: 纯 World Model 主要最大化 pixel fidelity，与 driving safety 弱耦合；生成出碰撞场景仍可能是有效重建但不利于智能体。
+  lesson: 未来生成必须与 action-aware reasoning 和任务回报耦合。
+  also_depends_on:
+  - P1
+- id: Q4
+  type: question
+  title: 模型容量和输入分辨率如何影响上限
+  support_level: explicit
+  source_refs:
+  - Table 5
+  - Table 6
+  - Supp B.3
+  description: 补充实验分别改变 input view resolutions 与 Qwen2-VL backbone size，观察长期规划稳定性和容量扩展趋势。
+  children:
+  - id: E8
+    type: experiment
+    title: 分辨率与模型规模敏感性实验
+    support_level: explicit
+    source_refs:
+    - Table 5
+    - Table 6
+    - Supp B.3
+    result: 更高分辨率通常提升长时域稳健性，更大模型容量显著增强轨迹规划表现。

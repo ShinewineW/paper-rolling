@@ -1,0 +1,135 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 大规模视频生成模型能否作为可泛化驾驶 video action model 的基础
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  description: 论文从 zero-shot driving 泛化不足出发，提出核心问题：视频生成模型是否能把时空动态和物理合理性先验迁移到自动驾驶规划。
+- id: D1
+  type: decision
+  title: 选择 Wan2.2-TI2V-5B 作为预训练视频骨干
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Sec 5.2
+  choice: 采用 Wan2.2-TI2V-5B 的 frozen text encoder 与 3D-causal VAE，并以 Wan2.2-TI2V-5B
+    作为 pre-trained backbone。
+  alternatives: 从头训练视频动作模型、只做 LoRA Fine-tune、或依赖 VLM 风格静态图文预训练。
+- id: Q2
+  type: question
+  title: 视频与轨迹是否应分支解码
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 4.1
+  - Appendix B
+  description: 论文认为现有 world model 常把视觉想象与轨迹生成分开或弱耦合，容易产生 video–trajectory mismatch，因此需要检验统一生成是否更合适。
+  also_depends_on:
+  - Q1
+- id: D2
+  type: decision
+  title: 采用 shared latent generative process 联合解码
+  support_level: explicit
+  source_refs:
+  - Sec 4.1
+  - Sec 4.3
+  - Appendix B
+  choice: 将 future video latents 与 action tokens 放入同一 DiT 和 shared latent space 中联合生成。
+  alternatives: 分别训练 video predictor 和 inverse dynamics model，或把 future video 作为动作生成的被动上下文。
+  also_depends_on:
+  - Q2
+- id: E1
+  type: experiment
+  title: NAVSIM 闭环规划验证统一建模收益
+  support_level: explicit
+  source_refs:
+  - Sec 5.3
+  - Table 1
+  result: DriveVA 在 NAVSIM closed-loop metrics 上优于传统端到端方法和 world model 方法，论文将收益主要归因于
+    unified video-action formulation。
+  also_depends_on:
+  - D2
+- id: E2
+  type: experiment
+  title: nuScenes 与 Bench2Drive 零样本迁移验证泛化
+  support_level: explicit
+  source_refs:
+  - Sec 5.4
+  - Table 2
+  - Table 3
+  result: 在不做 target-domain fine-tuning 的设置下，DriveVA 在 nuScenes 和 Bench2Drive 上表现优于对比
+    world-model methods，并显示 real-to-simulation transfer 能力。
+  also_depends_on:
+  - D1
+  - D2
+- id: E3
+  type: experiment
+  title: DPVO 外部重建检验 video–trajectory consistency
+  support_level: explicit
+  source_refs:
+  - Sec 5.5
+  - Appendix D
+  - Table 4
+  result: 用 DPVO 从生成视频重建的轨迹与模型预测轨迹保持接近，支持视觉演化与规划行为在几何上耦合。
+  also_depends_on:
+  - D2
+- id: E4
+  type: experiment
+  title: Video Loss 消融检验视频监督是否是主因
+  support_level: explicit
+  source_refs:
+  - Sec 5.7
+  - Table 5
+  result: 移除 Video Loss 后闭环指标显著变差，说明视频级监督不是边缘辅助项，而是规划收益的关键来源。
+  also_depends_on:
+  - D2
+- id: E5
+  type: experiment
+  title: future frames 与 sampling steps 的窗口选择
+  support_level: explicit
+  source_refs:
+  - Sec 5.7
+  - Table 6
+  - Table 8
+  result: 中等长度未来视频窗口与少量 flow-based sampling steps 更适合闭环规划；过短覆盖不足，过长更容易漂移，过少采样会失败。
+  also_depends_on:
+  - E1
+- id: D3
+  type: decision
+  title: 保留 Bidirectional interaction 而非 Causal Mask
+  support_level: explicit
+  source_refs:
+  - Appendix E
+  - Table 10
+  choice: 默认允许 future video tokens 与 future action tokens 双向交互。
+  alternatives: 使用 Causal Mask，使 future action tokens 可以访问 future video tokens，但 future
+    video tokens 不能访问 future action tokens。
+  also_depends_on:
+  - D2
+- id: P1
+  type: pivot
+  title: 从单纯动作预测转向 dual-prediction
+  support_level: explicit
+  source_refs:
+  - Appendix E
+  - Table 10
+  from: Action Only，只对 action tokens 施加 denoising objective。
+  to: Default dual-prediction，同时预测 future videos 与 actions。
+  trigger: Action Only 使动作不再 grounded in explicit future scene evolution，导致闭环规划和一致性明显下降。
+  also_depends_on:
+  - E4
+- id: X1
+  type: dead_end
+  title: 只让动作预测跟随失败视觉想象不能解决因果误判
+  support_level: explicit
+  source_refs:
+  - Appendix F
+  - Fig. 8
+  hypothesis: 如果 video–trajectory consistency 足够强，即使场景困难也能得到可靠规划。
+  failure_mode: 在 cyclist interaction 和 intersection 两类案例中，DriveVA 预测 incorrect stop；轨迹仍与失败的
+    future video imagination 一致，但与 ground-truth 行为不一致。
+  lesson: 一致性不是充分条件；还需要增强 visual causal reasoning 和 scene understanding，避免未来视觉预测模式本身错误。
+  also_depends_on:
+  - E3

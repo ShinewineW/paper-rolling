@@ -1,0 +1,281 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 应该在哪个 latent space 预测未来驾驶场景
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3
+  - Sec 5.1
+  description: 论文首先比较 frozen visual encoders 与 Stable-Diffusion-VAE latent，目标是确定 compact
+    AV world model 的预测空间。
+  children:
+  - id: E1
+    type: experiment
+    title: 六种 frozen encoder 的 ego-action probe benchmark
+    support_level: explicit
+    source_refs:
+    - Sec 4.1
+    - Table 1
+    - Sec 5.1
+    result: V-JEPA2 rep64 的 temporal context 明显优于 single-frame encoders，说明时序视频表征更适合动作相关预测。
+  - id: D1
+    type: decision
+    title: 转向带 spatial tokens 的 SD-VAE encode-predict-decode pipeline
+    support_level: explicit
+    source_refs:
+    - Sec 3
+    - Fig 1
+    - Sec 4.2
+    choice: 采用 frozen Stable-Diffusion VAE 的 32×32×4 latent grid，并 patchify 成 spatial
+      tokens 供 DiT 预测。
+    alternatives:
+    - 继续只在 384-d pooled vectors 上预测
+    - 直接在 pixel space 生成未来帧
+    - 固定某一个 single-frame encoder 作为唯一表征
+- id: Q2
+  type: question
+  title: compact pooled latents 中 DiT 为什么没有自然胜出
+  support_level: explicit
+  source_refs:
+  - Sec 5.2
+  description: 作者用 controlled diagnostic chain 检查 capacity、objective、horizon 与 action-seq
+    conditioning，定位 DiT 的收益条件。
+  also_depends_on:
+  - E1
+  children:
+  - id: E2
+    type: experiment
+    title: capacity hypothesis 检查
+    support_level: explicit
+    source_refs:
+    - Sec 5.2
+    result: DiT-direct 与 MLP 表现相近，方向性结果是否定 capacity 是主要瓶颈。
+  - id: D2
+    type: decision
+    title: 拒绝单纯加容量的解释
+    support_level: explicit
+    source_refs:
+    - Sec 5.2
+    choice: 把后续诊断重点放在 objective、representation、anchoring 与 sampling，而不是只扩大模型。
+    alternatives:
+    - 把 compact DiT underperformance 归因于参数不足
+    - 直接扩大到 large-scale video prior
+  - id: E3
+    type: experiment
+    title: objective hypothesis 检查
+    support_level: explicit
+    source_refs:
+    - Sec 5.2
+    - Fig 3
+    result: 从 epsilon-prediction 切换到 x_0-prediction 后性能方向明显改善，epsilon objective 在
+      compact latent 中趋向 collapse。
+  - id: D3
+    type: decision
+    title: 采用 x_0-prediction 作为 diffusion 目标
+    support_level: explicit
+    source_refs:
+    - Sec 4.2
+    - Sec 5.2
+    choice: 训练 diffusion model 预测 clean future sequence，而不是预测 noise。
+    alternatives:
+    - epsilon-prediction objective
+    - direct regression objective
+  - id: E4
+    type: experiment
+    title: horizon hypothesis 检查
+    support_level: explicit
+    source_refs:
+    - Sec 5.2
+    result: 更长 horizon 没有让 DiT 更占优，说明 logged actions 条件下 2 Hz posterior 更接近 near-unimodal。
+  - id: E5
+    type: experiment
+    title: per-token action-seq conditioning 检查
+    support_level: explicit
+    source_refs:
+    - Sec 5.2
+    result: per-token action sequence 对 DiT 的帮助方向大于 MLP，说明 self-attention 能利用 perstep
+      temporal structure。
+- id: Q3
+  type: question
+  title: DiT 需要哪些结构因素才在 compact latent 中有效
+  support_level: explicit
+  source_refs:
+  - Sec 5.2
+  description: 在 pooled latent 诊断后，论文恢复 spatial tokens 与 residual anchoring，并总结必要因素。
+  also_depends_on:
+  - D2
+  - D3
+  children:
+  - id: E6
+    type: experiment
+    title: 恢复 spatial tokens 与 residual anchoring
+    support_level: explicit
+    source_refs:
+    - Sec 4.2
+    - Sec 5.2
+    result: DiT 在 matched-parameter 设置下方向性超过 MLP，支持 spatial tokens 与 residual anchoring
+      的必要性。
+  - id: D4
+    type: decision
+    title: 保留四个 DiT recipe 成分
+    support_level: explicit
+    source_refs:
+    - Sec 5.2
+    - Sec 6
+    choice: 使用 spatial tokens、x_0 objective、residual anchoring、sampling matched to
+      target uncertainty。
+    alternatives:
+    - 只使用 pooled latent
+    - 移除 residual anchor
+    - 使用不匹配 uncertainty 的 sampling
+- id: Q4
+  type: question
+  title: 为什么 distortion metrics 与 distribution metrics 给出相反排序
+  support_level: explicit
+  source_refs:
+  - Sec 5.3
+  - Table 2
+  description: SD-VAE pipeline 中 direct regressor 在 distortion 指标上占优，但 diffusion 在
+    FID/KID 这类 distribution metrics 上占优。
+  children:
+  - id: E7
+    type: experiment
+    title: perception-distortion frontier 评估
+    support_level: explicit
+    source_refs:
+    - Sec 5.3
+    - Fig 4
+    - Fig 5
+    result: direct regression 更接近 ground truth 的点估计但更模糊；calibrated diffusion 更接近真实帧分布。
+  - id: D5
+    type: decision
+    title: 同时报告 distortion 与 distribution metrics
+    support_level: explicit
+    source_refs:
+    - Sec 4.3
+    - Sec 6
+    choice: 使用 FID/KID 衡量 distribution realism，并保留 CosSim/SSIM/L2 作为 distortion 视角。
+    alternatives:
+    - 只报告 cosine similarity
+    - 只报告 L2 或 SSIM
+    - 只做 qualitative examples
+  - id: D6
+    type: decision
+    title: 采用 train-derived calibration 而不是 test-time oracle
+    support_level: explicit
+    source_refs:
+    - Sec 4.3
+    - Sec 5.3
+    choice: 只在 training split 上估计 per-channel mean and scale shift，并在 test time 应用。
+    alternatives:
+    - 使用 test statistics 做 post-hoc calibration
+    - 不做 latent calibration
+- id: Q5
+  type: question
+  title: single-pass diffusion 为什么 motion fidelity 不足
+  support_level: explicit
+  source_refs:
+  - Sec 5.4
+  - Fig 6
+  description: 论文把 decoded sequence 分解成 low-frequency coherent motion 与 high-frequency
+    texture variation，以区分纹理变化和真实场景位移。
+  children:
+  - id: E8
+    type: experiment
+    title: 低频与高频 motion decomposition
+    support_level: explicit
+    source_refs:
+    - Sec 4.4
+    - Sec 5.4
+    - Fig 6
+    result: single-pass diffusion 更能产生 texture variation，但 coherent scene motion 方向不足。
+  - id: X1
+    type: dead_end
+    title: motion-targeted fine-tune 未解决 motion limitation
+    support_level: explicit
+    source_refs:
+    - Sec 5.4
+    hypothesis: 加入 temporal-difference loss 应能提升 coherent motion。
+    failure_mode: fine-tune 后 motion numbers 没有改善，说明问题不是简单 loss-surface。
+    lesson: motion limitation 更可能来自 shared-present anchoring 与训练-推理参数化，而不是缺少一个额外 temporal
+      loss。
+  - id: P1
+    type: pivot
+    title: 从 single-pass shared anchor 转向 chain-anchor jump model
+    support_level: explicit
+    source_refs:
+    - Sec 4.4
+    - Sec 5.4
+    from: single-pass model 每个 future token 都从同一个 present z_t 做 residual prediction
+    to: Δ=4 jump model 在推理时用自己的输出逐步 re-anchoring
+    trigger: motion-targeted fine-tune 失败且诊断指向 shared-present anchor。
+  - id: E9
+    type: experiment
+    title: open-loop jump rollout motion test
+    support_level: explicit
+    source_refs:
+    - Sec 4.4
+    - Sec 5.4
+    - Fig 8
+    result: compact jump model 恢复 forward motion direction，并在 held-out scenes 上超过
+      larger single-pass baseline 的 motion 方向表现。
+    also_depends_on:
+    - P1
+- id: Q6
+  type: question
+  title: 模型是否真正使用 action condition
+  support_level: explicit
+  source_refs:
+  - Sec 5.5
+  description: 论文通过 steering sweep 固定 diffusion noise，测量 induced horizontal scene
+    displacement，验证 action controllability。
+  children:
+  - id: E10
+    type: experiment
+    title: steering sweep controllability probe
+    support_level: explicit
+    source_refs:
+    - Sec 5.5
+    - Fig 9
+    result: diffusion world model 的 scene displacement 随 steering 单调变化，而 direct regression
+      baseline 不呈相关方向。
+  - id: D7
+    type: decision
+    title: 把 controllability 作为 world-action model 的关键评估
+    support_level: explicit
+    source_refs:
+    - Sec 5.5
+    - Sec 6
+    choice: 除 realism 与 distortion 外，还检查 action 对未来场景的可控影响。
+    alternatives:
+    - 只看生成帧是否真实
+    - 只看重建误差
+    - 只看 logged-action prediction
+- id: Q7
+  type: question
+  title: failure modes 如何限制工程使用
+  support_level: explicit
+  source_refs:
+  - Sec 5.6
+  description: 论文明确记录 diffusion color tint、over-sharpening、direct blur 与 jump model
+    coarse prediction。
+  children:
+  - id: X2
+    type: dead_end
+    title: direct regression 作为视觉世界模型的主路径受限
+    support_level: explicit
+    source_refs:
+    - Sec 5.3
+    - Sec 5.6
+    - Fig 10
+    hypothesis: deterministic regressor 在 distortion metrics 上更好，因此可作为主要视觉预测路径。
+    failure_mode: 它 collapse 到 blurry conditional mean，车辆与 lane markings 细节不可识别。
+    lesson: distortion 指标的胜利不能替代 distribution realism 与可识别场景内容。
+  - id: Q8
+    type: question
+    title: 如何把 coarse motion 转成高保真 appearance
+    support_level: inferred
+    description: 分析推断,论文未显式声明：jump model 解决了 motion 方向的一部分，但高保真多秒预测仍需要 capacity、data、frame
+      rate 与 stronger temporal supervision 的后续组合。

@@ -58,8 +58,8 @@ force_include:
   title: UniWorldVLAInterleavedWorldModelingAndPlanningForAD
 - arxiv_id: '2605.31476'
   title: IDOLInverseDynamicsGuidedFuturePredictionForE2EAD
-- arxiv_id: '2605.10426'
-  title: CoWorldVLAMultiExpertWorldModelForAutonomousDriving
+- arxiv_id: '2604.04198'
+  title: DriveVAVideoActionModelsAreZeroShotDrivers
 is_ad_domain: true
 n_per_tick: 5
 topic: world models for autonomous driving and embodied AI

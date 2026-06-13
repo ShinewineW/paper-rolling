@@ -1,0 +1,7 @@
+- 论文 markdown 中 DriveVA 的若干公式被抽取为不完整片段,尤其是 Eq. 4 至 Eq. 9,因此不能还原完整 token 定义或联合训练损失。
+- 论文只文字说明训练目标包含 future-frame generation 的 flow-matching loss 与 trajectory prediction loss,没有显式给出 trajectory prediction loss 公式。
+- failure cases 显示当未来视觉预测偏离 ground truth 时,轨迹仍会跟随错误的视觉 forecast,例如错误停车。
+- 论文指出需要增强 Video Action Models 的 visual causal reasoning 和 scene understanding,否则未来视频预测错误会传导到 trajectory prediction 与 closed-loop planning。
+- DPVO 外部验证依赖 monocular visual odometry,论文说明其尺度存在固有歧义,需要先做 2D similarity transform 对齐。
+- zero-shot 结论主要围绕 NAVSIM 到 nuScenes 与 Bench2Drive 的评估,论文未证明任意传感器配置、任意道路域或任意长尾交互都能泛化。
+- 视频 continuation 能改善长时域一致性,但论文消融也显示过长 rollout 会累积 drift。

@@ -1,0 +1,8 @@
+- 单前置相机与 compact scale 设定，论文明确未回答 GAIA-1 或 Cosmos scale 下是否保持同样因素。
+- single-pass shared-present anchoring 会限制 coherent temporal motion，倾向重渲染当前布局而不是累积 ego-motion。
+- diffusion samples 存在 mild per-channel color tint，需要 train-derived calibration 移除。
+- diffusion samples 有 slight over-sharpening，小模型会产生 high-frequency artifacts。
+- direct regression 的主要失败模式是 conditional mean blur，车辆与 lane markings 的细节会塌缩。
+- jump model 只能恢复 coarse motion，decoded predictions 仍然 blurry，随 open-loop chain 会累积退化。
+- 高保真多秒预测仍依赖更大 capacity、更多 data、更高 frame rate 或 stronger temporal supervision。
+- 论文使用 logged actions；closed-loop evaluation with predicted actions 与 multicamera setups 留给 future work。

@@ -1,0 +1,304 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何让 future prediction 对 planning 更可执行
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  description: 论文把核心问题定义为 predicted future evolution 不能自动转化为 planning-relevant trajectory
+    updates，现有 world-model-based planners 的桥接机制仍偏弱。
+  children:
+  - id: Q2
+    type: question
+    title: transition 是否比 future state 本身更关键
+    support_level: explicit
+    source_refs:
+    - Sec 1
+    - Sec 3.1
+    description: 论文提出 missing signal 不只在 predicted future states，而更在 adjacent latent
+      futures 的 transitions；inverse dynamics 用于恢复 motion-consistent change。
+  - id: D1
+    type: decision
+    title: 选择 inverse dynamics 作为桥接机制
+    support_level: explicit
+    source_refs:
+    - Sec 1
+    - Sec 2.3
+    - Sec 3.4.1
+    choice: 采用 IDM 对 adjacent latent imagined BEV states 解码，输出 spatial dynamics map
+      与 global dynamics feature。
+    alternatives:
+    - 仅使用 future latent BEV states
+    - 使用 trajectory evaluation 或 reward-guided selection
+    - 使用 direct adjacent-feature difference
+    also_depends_on:
+    - Q2
+- id: Q3
+  type: question
+  title: 如何生成候选相关的 latent future
+  support_level: explicit
+  source_refs:
+  - Sec 3.2
+  - Sec 3.3
+  description: 模型先用 TransFuser 风格 multi-modal image-LiDAR backbone 得到 BEV representation，再结合
+    offline trajectory-anchor vocabulary 和 ego-state feature 形成 anchor-conditioned
+    ego query。
+  children:
+  - id: D2
+    type: decision
+    title: 采用 anchor-conditioned latent BEV rollout
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    - Sec 3.3
+    choice: 对每个候选 anchor 注入 ego query，使用 transformer-based latent world model 逐步 rollout
+      candidate-specific latent future trajectory。
+    alternatives:
+    - 直接从当前 scene regression trajectory
+    - 只对全局 scene 做无候选条件预测
+    also_depends_on:
+    - D1
+  - id: E1
+    type: experiment
+    title: NAVSIM v1 navtest 主比较
+    support_level: explicit
+    source_refs:
+    - Table 1
+    - Sec 4.3
+    result: IDOL 在相同 ResNet-34 setting 下优于列出的强 baselines，支持 inverse-dynamics-guided
+      future reasoning 对 planning quality 有正向作用。
+    also_depends_on:
+    - D2
+- id: Q4
+  type: question
+  title: IDM 应该输出空间动态还是全局动态
+  support_level: explicit
+  source_refs:
+  - Sec 3.4.1
+  - Sec 3.4.2
+  description: 论文认为 purely pooled inverse dynamics feature 过粗，规划还需要知道关键变化发生在哪里，因此同时保留
+    spatial dynamics 与 global dynamics。
+  children:
+  - id: D3
+    type: decision
+    title: 采用 spatial-global dual-branch refinement
+    support_level: explicit
+    source_refs:
+    - Sec 3.4.2
+    choice: 用 spatial cross-attention 从 spatial dynamics map 检索局部 motion evidence，再用
+      MLN 融合 global dynamics feature 做 calibration。
+    alternatives:
+    - 只用 pooled global feature
+    - 只用 spatial branch
+    - 把 global feature 简单加到 query
+    also_depends_on:
+    - D1
+  - id: E2
+    type: experiment
+    title: 空间与全局分支消融
+    support_level: explicit
+    source_refs:
+    - Table 5
+    result: 移除任一分支都弱于 dual-branch IDM，说明 local transition evidence 与 holistic calibration
+      互补。
+    also_depends_on:
+    - D3
+  - id: E3
+    type: experiment
+    title: global dynamics fusion 策略消融
+    support_level: explicit
+    source_refs:
+    - Table 11
+    - Appendix D
+    result: Additive、Concat-MLP 与 MLN 都能保持较强表现，MLN-based fusion 方向性最好，说明 global inverse-dynamics
+      cue 一贯有益但融合机制仍重要。
+    also_depends_on:
+    - D3
+- id: Q5
+  type: question
+  title: closed-loop refinement 是否提升长程一致性
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 3.4.2
+  description: 论文引入 lightweight closed-loop refinement，将优化后的 query 重新用于 future-aware
+    reasoning，以改善 long-horizon consistency。
+  children:
+  - id: D4
+    type: decision
+    title: 固定采用两次 closed-loop refinement
+    support_level: explicit
+    source_refs:
+    - Table 3
+    - Table 6
+    choice: 默认 closed-loop refinement iterations 设为 2。
+    alternatives:
+    - 不使用 closed-loop refinement
+    - 使用 3 次 refinement
+    also_depends_on:
+    - D2
+    - D3
+  - id: E4
+    type: experiment
+    title: IDM 与 closed-loop 主消融
+    support_level: explicit
+    source_refs:
+    - Table 3
+    - Sec 4.4
+    result: 加入 IDM 相比无 IDM 更好，进一步加入 closed-loop refinement 继续提升；更多 iteration 反而出现轻微回落，显示过度修正风险。
+    also_depends_on:
+    - D4
+- id: Q6
+  type: question
+  title: 相邻两帧是否足够表达 transition cue
+  support_level: explicit
+  source_refs:
+  - Table 4
+  - Sec 4.4
+  description: 论文比较 two-frame 与 four-frame temporal input，检验更长窗口是否能更好支持 IDM。
+  children:
+  - id: D5
+    type: decision
+    title: 使用 adjacent two-frame IDM
+    support_level: explicit
+    source_refs:
+    - Table 4
+    choice: 采用 adjacent BEV transitions 的 two-frame design。
+    alternatives:
+    - 使用 four-frame longer future window
+    also_depends_on:
+    - D1
+  - id: E5
+    type: experiment
+    title: IDM temporal input 消融
+    support_level: explicit
+    source_refs:
+    - Table 4
+    result: two-frame setting 优于 four-frame variant，论文解释为更长窗口可能稀释 immediate refinement
+      所需的 local transition cues。
+    also_depends_on:
+    - D5
+- id: Q7
+  type: question
+  title: learned IDM 是否优于更简单的 future-state 使用方式
+  support_level: explicit
+  source_refs:
+  - Appendix D
+  - Table 10
+  description: 附录进一步检验 learned inverse dynamics 是否比 future-state-only 或 latent difference
+    更有效。
+  children:
+  - id: E6
+    type: experiment
+    title: transition-aware future modeling 消融
+    support_level: explicit
+    source_refs:
+    - Table 10
+    - Appendix D
+    result: transition-based variants 优于 future-state-only，learned IDM 方向性最好，说明模型收益不只是访问
+      imagined future states，而是来自 transition-to-motion mapping。
+    also_depends_on:
+    - D1
+    - D5
+- id: P1
+  type: pivot
+  title: 从被动 future context 转向 transition-to-motion mapping
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Appendix D
+  from: 把 future latent BEV states 当作静态 planning features 或评价候选轨迹的上下文。
+  to: 解码 adjacent latent transitions 中的 motion-aware cues，并将其注入 trajectory refinement。
+  trigger: 现有方法的 predicted futures 对 motion generation 连接较弱，future-state-only 消融也弱于
+    transition-based variants。
+  also_depends_on:
+  - Q1
+  - E6
+- id: E7
+  type: experiment
+  title: NAVSIM v2 navhard two-stage 主比较
+  support_level: explicit
+  source_refs:
+  - Table 2
+  - Sec 4.3
+  result: IDOL 在更困难的 two-stage navhard evaluation 中优于 comparable methods，支持该方法在 long-tail
+    challenging setting 下仍保持鲁棒性。
+  also_depends_on:
+  - P1
+- id: E8
+  type: experiment
+  title: NAVSIM v2 navtest 与 navhard stage-1 扩展评估
+  support_level: explicit
+  source_refs:
+  - Table 8
+  - Table 9
+  - Appendix C
+  result: 扩展评估显示 IDOL 在 standard navtest 与 challenging navhard stage-1 setting 中均保持强表现，进一步支撑方法的
+    generality。
+  also_depends_on:
+  - P1
+- id: E9
+  type: experiment
+  title: qualitative visualization 验证 spatial dynamics 使用
+  support_level: explicit
+  source_refs:
+  - Sec 4.5
+  - Appendix E
+  result: 可视化显示 IDM spatial response 与 latent BEV change regions 一致，refinement query
+    attention 会关注这些动态区域，refined trajectory 方向上更贴近 expert trajectory。
+  also_depends_on:
+  - D3
+- id: X1
+  type: dead_end
+  title: 仅靠 IDM 不能恢复错误 maneuver intention
+  support_level: explicit
+  source_refs:
+  - Appendix F
+  hypothesis: 如果 latent transition cue 足够强，IDM refinement 可以纠正初始轨迹到 expert trajectory。
+  failure_mode: 在 ambiguous road geometry 中，refined trajectory 明显偏离 expert trajectory
+    并走向错误空间方向，说明模型未能正确推断 maneuver intention。
+  lesson: IDM refinement 的有效性依赖 scene topology 与 trajectory intent 的正确融合，不能单独保证恢复期望路径。
+  also_depends_on:
+  - E9
+- id: X2
+  type: dead_end
+  title: 复杂拓扑场景仍有空间偏移
+  support_level: explicit
+  source_refs:
+  - Appendix F
+  - Appendix G
+  hypothesis: IDM 捕获 motion trend 后可在 complex intersection 或 roundabout-like structure
+    中得到准确 trajectory。
+  failure_mode: refined trajectory 只捕获部分 motion trend，但相对 expert trajectory 仍存在 spatial
+    offset。
+  lesson: topology-sensitive scenarios 仍需要更精确的 lane connectivity、road curvature 与
+    maneuver timing reasoning，未来可加入 topology-aware constraints 和 uncertainty-aware
+    refinement。
+  also_depends_on:
+  - X1
+- id: Q8
+  type: question
+  title: 轻量 IDM 的容量边界在哪里
+  support_level: explicit
+  source_refs:
+  - Appendix G
+  description: 论文指出 IDM 设计为 lightweight 以保持效率，但这可能限制复杂 long-horizon interactions 与
+    subtle motion patterns 的捕捉。
+  children:
+  - id: D6
+    type: decision
+    title: 当前实现优先保持 IDM lightweight
+    support_level: explicit
+    source_refs:
+    - Appendix A
+    - Appendix G
+    choice: 使用 lightweight MLP-based IDM，而不是扩大 temporal context、transition modeling
+      或预训练规模。
+    alternatives:
+    - 更大的 temporal context
+    - 更强 transition modeling
+    - broader driving sequences 上预训练
+    also_depends_on:
+    - Q8

@@ -1,0 +1,5 @@
+- IDM 设计为 lightweight，保持效率但可能限制复杂 long-horizon interactions 与 subtle motion patterns 的建模能力。
+- IDOL 依赖 BEV world model 产生的 imagined latent BEV futures；在高度 ambiguous 或 rare scenarios 中 future prediction 不准时，inverse-dynamics cues 也可能不可靠。
+- closed-loop refinement 使用 fixed refinement setting，不同场景可能需要不同 future-aware reasoning 强度。
+- 失败案例显示，当 maneuver intention 推断错误或 topology-sensitive scenarios 需要更精确的 lane connectivity、road curvature、maneuver timing 时，IDM refinement alone 可能不能完全恢复目标路径。
+- 实验虽覆盖 NAVSIM 标准与困难设置，但论文仍将 more interactive、long-tail、real-world driving scenarios 作为后续 broader evaluation。

@@ -1,0 +1,7 @@
+- 论文将 generation of the next frame 定位为辅助后续 reasoning 的中间步骤，最终目标仍是 trajectory planning。
+- visual generation 会产生大量 tokens，论文认为这会主导梯度更新，并可能限制模型性能上界探索。
+- RL without cold-start supervision 在结构化多步推理的大搜索空间中较难有效导航，因此 SFT 冷启动是关键依赖。
+- reward 是 rule-based verifiers，效果受 format、prediction、visual、action、trajectory 各 verifier 设计质量约束。
+- 未来帧生成依赖 visual tokenizer 和 valid codebook，token 数量或合法性错误会影响图像重建。
+- 论文的短期轨迹预测使用历史惯性与意图控制的物理先验；复杂交互中的真实动态仍需由后续反思和 RL 调整。
+- 论文评估主要围绕 nuScenes、trajectory planning 和 future frame generation，跨数据集泛化边界未在本块材料中充分展开。

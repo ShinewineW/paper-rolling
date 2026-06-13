@@ -1,0 +1,108 @@
+{
+  "artifact": "2026-06-13_IDOLInverseDynamicsGuidedFuturePredictionForE2EAD_2605.31476",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 5,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Every claim is supported by type-appropriate evidence (e.g., causal claims supported by targeted ablations, generalization claims supported by multi-split main results).",
+        "Ablations perfectly isolate the proposed components (IDM, closed-loop refinement, temporal window, dual-branch fusion) without confounding variables."
+      ],
+      "weaknesses": [
+        "None significant; the mapping between claims and experiments is exceptionally tight."
+      ],
+      "suggestions": [
+        "Consider adding qualitative evidence (e.g., attention maps or gradient visualizations) directly linked to C1 to further substantiate the 'executable planning signal' claim beyond quantitative metrics."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly specific, actionable, and directly tied to the ablation studies (e.g., 'If removing IDM doesn't drop closed-loop metrics...').",
+        "Criteria for C2 explicitly account for non-linear effects (over-correction risk), showing deep understanding of the claim's boundaries."
+      ],
+      "weaknesses": [
+        "None."
+      ],
+      "suggestions": [
+        "For C5, explicitly define the statistical or practical threshold for 'surpassing' (e.g., >0.5 PDMS) to avoid disputes over marginal gains on the leaderboard."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Claims are carefully scoped; C5 explicitly restricts the comparison to 'comparable learning-based methods' and correctly excludes privileged planners like PDM-Closed.",
+        "Assumptions and boundary conditions for core concepts (e.g., IDM is not a low-level controller, latent BEV is not pixel-level video) are explicitly documented."
+      ],
+      "weaknesses": [
+        "None."
+      ],
+      "suggestions": [
+        "Explicitly state the computational overhead (inference latency/FLOPs) boundary in the scope, as 'lightweight' is claimed but exact real-time feasibility bounds are not strictly defined in the claims summary."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "The logical arc from Observations (future prediction != planning) to Gaps (missing transition signals, coarse pooled features) to Insight (inverse dynamics for motion cues) is seamless.",
+        "Every identified gap is directly addressed by a specific architectural choice and verified by a corresponding experiment."
+      ],
+      "weaknesses": [
+        "None."
+      ],
+      "suggestions": [
+        "Briefly connect the 'over-correction' risk in C2 back to the initial observations to close the loop on why lightweight refinement was chosen over deep iterative planning."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "The exploration tree includes genuine, insightful dead-ends (X1, X2) that highlight the limitations of IDM in ambiguous topologies and complex intersections.",
+        "Decision rationales (e.g., D1, D3) clearly articulate why alternatives (like direct feature difference or purely global pooling) were rejected based on empirical or theoretical grounds."
+      ],
+      "weaknesses": [
+        "None."
+      ],
+      "suggestions": [
+        "Include a brief note on whether the dead-ends (X1, X2) were discovered during initial prototyping or post-hoc failure analysis to further cement exploration integrity."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 5,
+      "strengths": [
+        "Baseline coverage is exhaustive, including recent SOTA methods (DiffusionDrive, WoTE, SeerDrive) across multiple NAVSIM splits and protocols.",
+        "Ablation coverage is exceptionally thorough, testing not just component presence but also structural variations (temporal windows, fusion strategies, transition modeling types)."
+      ],
+      "weaknesses": [
+        "Lacks variance reporting (e.g., standard deviation across multiple seeds), though this is standard for fixed test-server evaluations in large-scale AD benchmarks."
+      ],
+      "suggestions": [
+        "Report inference latency and FLOPs for the IDM and closed-loop refinement modules to quantitatively substantiate the 'lightweight' design claim.",
+        "Report variance on the validation set across multiple random seeds to strengthen the robustness claims beyond single-point test server estimates."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "minor",
+      "observation": "While the methodological scope is well-calibrated regarding baselines and datasets, the claim of 'lightweight' closed-loop refinement lacks explicit computational boundaries (e.g., exact ms added per iteration) in the claims summary."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "suggestion",
+      "observation": "Statistical reporting is limited to single-point estimates on the test server. While standard for NAVSIM, reporting variance on the validation set across multiple random seeds would strengthen the robustness claims."
+    },
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "suggestion",
+      "observation": "The dead-ends X1 and X2 provide excellent qualitative insights into failure modes. Adding quantitative metrics for these specific failure subsets (e.g., EPDMS on ambiguous intersections only) would make the negative results even more rigorous."
+    }
+  ]
+}

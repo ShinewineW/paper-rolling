@@ -1,0 +1,232 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何避免先想象完整未来再规划导致的滞后决策
+  support_level: explicit
+  source_refs:
+  - Sec 1 Introduction
+  - Fig 1
+  description: 论文从 parallel predict-and-plan 与 sequential predict-then-plan 的局限出发，提出需要让规划随着新生成的未来观察持续更新。
+  children:
+  - id: D1
+    type: decision
+    title: 采用 interleaved modeling and planning
+    support_level: explicit
+    source_refs:
+    - Sec 1 Introduction
+    - Sec 3 Interleaved frame-action generation
+    choice: 选择逐步交替生成 future frame 与 ego action，让 action query 在每个时间步反馈给 LLM。
+    alternatives:
+    - parallel predict-and-plan
+    - sequential predict-then-plan
+    - 先生成完整 rollout 再规划
+    children:
+    - id: E1
+      type: experiment
+      title: 比较五种 frame-action 生成顺序
+      support_level: explicit
+      source_refs:
+      - Sec 4.3 Table 4
+      result: 与高频密集动作、混合密集再粗粒度、滑动动作窗口等方案相比，2 Hz 对齐的严格 F→A alternation 整体最好。
+    - id: DE1
+      type: dead_end
+      title: 滑动动作窗口带来监督冲突
+      support_level: explicit
+      source_refs:
+      - Sec 4.3 Table 4
+      hypothesis: 每个未来帧后预测一个滑动动作窗口可能提供更丰富的局部规划监督。
+      failure_mode: 重叠 horizon 引入 conflicting supervision signals，规划表现最低。
+      lesson: 动作监督窗口不能只追求密集，必须避免同一未来区间被不一致目标重复约束。
+    - id: DE2
+      type: dead_end
+      title: 严格 10 Hz dense action-frame alternation 与评测协议不匹配
+      support_level: explicit
+      source_refs:
+      - Sec 4.3 Table 4
+      hypothesis: 更高频率的动作与帧交替可能提升时间分辨率。
+      failure_mode: dense training supervision 与 2 Hz evaluation protocol 存在 mismatch，导致表现下降。
+      lesson: 生成和监督频率需要服务于规划评测协议，而不是越密越好。
+- id: Q2
+  type: question
+  title: 未来世界状态是否应该显式参与轨迹规划
+  support_level: explicit
+  source_refs:
+  - Sec 1 Introduction
+  - Sec 4.3 Table 3
+  description: 论文认为显式建模 future world states 能为 trajectory planning 提供额外上下文。
+  also_depends_on:
+  - D1
+  children:
+  - id: E2
+    type: experiment
+    title: 消融 future frames 对规划的作用
+    support_level: explicit
+    source_refs:
+    - Sec 4.3 Table 3
+    result: 启用 future-frame generation 后，规划相关指标整体优于仅预训练而不生成 future frames 的设置。
+- id: Q3
+  type: question
+  title: 单目深度能否补足 RGB 世界模型的几何线索
+  support_level: explicit
+  source_refs:
+  - Sec 2 Related Work
+  - Sec 3 Depth integration
+  description: 论文指出多数 prior methods 主要依赖 RGB 输入，几何推理受限，因此引入 Depth Anything 3 估计 monocular
+    depth。
+  children:
+  - id: D2
+    type: decision
+    title: 用 CDE 与 DDE 分别融合两种尺度深度特征
+    support_level: explicit
+    source_refs:
+    - Sec 3 Depth integration
+    choice: 将 depth map resize 为 256×448 和 128×224，分别输入 context-depth-encoder 与 dynamic-depth-encoder，再通过
+      cross-attention 融合。
+    alternatives:
+    - 仅 RGB 输入
+    - 只在单一尺度加入 depth
+    - 显式生成未来 depth
+    children:
+    - id: E3
+      type: experiment
+      title: 比较有无 depth fusion
+      support_level: explicit
+      source_refs:
+      - Sec 4.3 Table 3
+      - Fig 5
+      result: 加入 depth 后，视频生成质量改善，长时域预测的空间结构更清晰，整体规划表现也更好。
+- id: Q4
+  type: question
+  title: 历史视觉信息应如何组织为上下文和运动线索
+  support_level: explicit
+  source_refs:
+  - Sec 3 Inputs and tokenization
+  - Sec 4.3 Table 5
+  description: 论文把 NAVSIM 历史视频分成 contextual tokens 与 dynamic tokens，分别承载高分辨率语义结构和短期运动变化。
+  children:
+  - id: E4
+    type: experiment
+    title: 比较 2.0 s、1.0 s、Context Only 与 Dynamic Only 历史输入
+    support_level: explicit
+    source_refs:
+    - Sec 4.3 Table 5
+    result: 2.0 s Context+Dynamic 提供最佳整体平衡；Dynamic Only 明显退化，Context Only 仍较有竞争力。
+  - id: DE3
+    type: dead_end
+    title: 仅使用 dynamic tokens 不足以支撑规划和生成
+    support_level: explicit
+    source_refs:
+    - Sec 4.3 Table 5
+    hypothesis: 低分辨率动态 token 或许足够捕捉驾驶所需的短期运动。
+    failure_mode: 缺少高分辨率场景结构后，规划和视频生成指标都显著下降。
+    lesson: 运动线索需要与空间语义结构配合，不能替代 contextual tokens。
+- id: Q5
+  type: question
+  title: 如何让离散视觉 token 预测更关注动态区域
+  support_level: explicit
+  source_refs:
+  - Sec 3 Training objectives
+  description: 论文指出相邻帧中大量 frame tokens 倾向保持不变，普通 cross-entropy 容易弱化动态区域。
+  children:
+  - id: D3
+    type: decision
+    title: 采用 Dynamic Focal Loss
+    support_level: explicit
+    source_refs:
+    - Sec 3 Training objectives
+    choice: 用动态权重提高变化 token 的相对重要性，同时保留静态 token 监督。
+    alternatives:
+    - 普通 cross-entropy
+    - 只监督轨迹
+    - 不区分动态与静态 token
+    also_depends_on:
+    - D1
+- id: Q6
+  type: question
+  title: 如何在多模态离散序列中复用 text-only LLM
+  support_level: explicit
+  source_refs:
+  - Appendix A
+  description: Phi-1.5 是 text-only large language model，不能直接处理多模态输入，因此需要扩展原始 LLM vocabulary
+    并把不同模态映射为共享离散 token。
+  children:
+  - id: D4
+    type: decision
+    title: 扩展词表并引入 special tokens
+    support_level: explicit
+    source_refs:
+    - Appendix A
+    - Fig 6
+    choice: 沿用 Show-o 的共享 token 空间思想，加入视觉 tokens 和边界/任务 special tokens。
+    alternatives:
+    - 直接连续特征拼接到 LLM
+    - 不用 special tokens 区分模态边界
+    children:
+    - id: E5
+      type: experiment
+      title: 统一 token 序列支撑 interleaved 生成
+      support_level: inferred
+      result: 统一 token 设计使 prompt、contextual tokens、dynamic tokens、ego tokens 与 action
+        tokens 可在同一自回归序列中被处理。(分析推断,论文未显式声明)
+- id: Q7
+  type: question
+  title: 深度融合训练是否需要分阶段稳定收敛
+  support_level: explicit
+  source_refs:
+  - Sec 4.1 Implementation details
+  - Stage 1
+  - Stage 2
+  description: 论文采用 two-stage progressive paradigm，以平衡 feature extraction 稳定性和 cross-module
+    fusion 适应性。
+  children:
+  - id: D5
+    type: decision
+    title: 先训练深度特征模块再联合训练
+    support_level: explicit
+    source_refs:
+    - Stage 1
+    - Stage 2
+    choice: Stage 1 训练 CDE/DDE 且冻结 foundation model；Stage 2 冻结 CDE/DDE 并解冻 fusion
+      module 与 foundation model。
+    alternatives:
+    - 端到端一次性联合训练
+    - 只冻结所有 foundation 相关权重
+    - 只训练轨迹头
+    also_depends_on:
+    - D2
+- id: Q8
+  type: question
+  title: 推理阶段如何降低自回归交替生成成本
+  support_level: explicit
+  source_refs:
+  - Sec 3 Inference
+  description: 每一步都要生成视觉 tokens 和 action tokens，如果重复处理完整上下文会增加计算。
+  children:
+  - id: D6
+    type: decision
+    title: 使用 KV-cache reuse
+    support_level: explicit
+    source_refs:
+    - Sec 3 Inference
+    - Fig 3
+    choice: 保存 previous steps 的 key 和 value 表征，让 LLM 只计算 newly generated tokens。
+    alternatives:
+    - 每步重新处理完整序列
+    - 只生成动作不生成未来帧
+    also_depends_on:
+    - D1
+- id: P1
+  type: pivot
+  title: 从开放式世界 rollout 转向评测频率对齐的闭环交替
+  support_level: explicit
+  source_refs:
+  - Sec 1 Introduction
+  - Sec 4.3 Table 4
+  from: 先生成多秒 future rollout 后再规划，或使用高频密集动作监督。
+  to: 按 2 Hz evaluation protocol 采用严格 F→A interleaving。
+  trigger: 论文发现 multi-second rollout 会形成 frozen hallucination，而 Scheme E 在生成方案消融中整体最好。
+  also_depends_on:
+  - DE1
+  - DE2
+  - E1

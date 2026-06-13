@@ -1,0 +1,112 @@
+{
+  "artifact": "ai",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.83,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Evidence perfectly matches claim types (e.g., causal claims use interventions/ablations, improvement uses baselines).",
+        "Distribution vs. distortion metrics are correctly aligned with the descriptive claims in C2, avoiding metric-claim mismatch."
+      ],
+      "weaknesses": [
+        "The 'sampling matched to target uncertainty' component of C5 is slightly under-detailed in the E5 procedure steps compared to the other three design factors."
+      ],
+      "suggestions": [
+        "Explicitly detail the sampling ablation (e.g., noise schedule, CFG scale, or DDIM steps) in E5 to fully substantiate the 4-part design combo."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly specific and actionable, mentioning exact metrics, baselines, and failure conditions.",
+        "Criteria successfully avoid triviality by including negative controls (e.g., 'if calibration relies on test-time GT')."
+      ],
+      "weaknesses": [
+        "For C3, the phrase 'accumulates sufficient ego-motion' is slightly qualitative compared to the strict quantitative bounds used in other criteria."
+      ],
+      "suggestions": [
+        "Define a quantitative threshold or specific metric bound for 'sufficient ego-motion' in C3's falsification criteria."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Boundary conditions are explicitly documented in concepts.md, preventing over-generalization to closed-loop or multi-camera settings.",
+        "Claims are carefully scoped to the 'compact latent regime' and 'frozen VAE' pipeline, avoiding sweeping architectural claims."
+      ],
+      "weaknesses": [
+        "The trade-off of the chain-anchor jump model (coarse prediction/texture loss) is acknowledged in concepts but not strictly bounded in the C3 claim scope."
+      ],
+      "suggestions": [
+        "Add a quantitative bound or explicit trade-off statement to C3 regarding the acceptable drop in high-frequency texture when using the jump model."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "Perfect alignment from observations to gaps to insights; the narrative arc is logical and compelling.",
+        "Every identified gap (G1-G3) is directly addressed by a specific claim and corresponding experiment without leaving loose ends."
+      ],
+      "weaknesses": [
+        "The transition from G1 (compact DiT underperformance) to the final 4-part recipe involves multiple diagnostic steps that could be slightly more synthesized in the core insight."
+      ],
+      "suggestions": [
+        "Ensure the link between G1 and the final 4-part recipe is explicitly summarized as a unified principle in the Key Insight section."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "Excellent use of genuine dead-ends (X1, X2) and pivots (P1), showing a faithful representation of the iterative research process.",
+        "Decision nodes include explicit alternatives, demonstrating real rationale rather than post-hoc justification."
+      ],
+      "weaknesses": [
+        "Q8 is marked as 'inferred' rather than explicit, which is acceptable but slightly disconnected from the explicit text."
+      ],
+      "suggestions": [
+        "Explicitly link inferred questions like Q8 to the paper's 'Future Work' or 'Limitations' section to ground them in the text."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Excellent baseline selection across all experiments, including strong ceilings (VAE-GT) and matched-parameter baselines.",
+        "Proper statistical reporting with bootstrap CIs and multiple seeds; thorough ablation/diagnostic chain in E5."
+      ],
+      "weaknesses": [
+        "Hardware and compute budget details are explicitly marked as 'unspecified' (论文未说明) across all experiments, which hinders full reproducibility and context for the 'compact' regime claims."
+      ],
+      "suggestions": [
+        "Include GPU types, training hours, and FLOPs/throughput to contextualize the 'compact' model efficiency and ensure full reproducibility."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "major",
+      "observation": "Hardware and compute specifications are missing across all experiment setups, which is critical for validating the 'compact' and 'deployable' nature of the proposed world model."
+    },
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "minor",
+      "observation": "The 'sampling matched to target uncertainty' aspect of Claim 5 lacks explicit procedural detail in the E5 experiment description compared to the other three design factors."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "minor",
+      "observation": "Claim 3 promotes the chain-anchor jump model for motion fidelity but does not explicitly scope the resulting degradation in high-frequency texture within the claim statement itself."
+    },
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "suggestion",
+      "observation": "Inferred questions in the exploration tree (e.g., Q8) should be explicitly tied to the manuscript's limitations or future work sections to maintain strict traceability."
+    }
+  ]
+}
