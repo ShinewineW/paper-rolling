@@ -142,6 +142,21 @@ def test_collect_no_divergence_when_ledger_done(tmp_path: Path) -> None:
     assert rec["ledger_diverged"] is False
 
 
+def test_collect_flags_rescinded_done_as_divergence(tmp_path: Path) -> None:
+    # 2026-06-11 blind spot: a `done` row that was rescinded (invalidated for reprocess)
+    # leaves the key OUT of skip_set, so the next tick reprocesses the compliant product.
+    # status must flag it even though the latest status string is still "done".
+    ws = tmp_path
+    _compliant_pair(ws, "2026-01-01_A_1111.11111")
+    (ws / "_ledger").mkdir()
+    (ws / "_ledger" / "processed_ledger.yaml").write_text(
+        "processed:\n- key: '1111.11111'\n  status: done\n  rescinded_at: '2026-06-11T05:46:27Z'\n",
+        encoding="utf-8",
+    )
+    rec = {r["idbase"]: r for r in collect(ws)}["1111.11111"]
+    assert rec["ledger"] == "done" and rec["ledger_diverged"] is True
+
+
 def test_render_card_surfaces_ledger_divergence() -> None:
     recs = [
         {

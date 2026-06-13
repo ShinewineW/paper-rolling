@@ -50,6 +50,16 @@ force_include:
   title: Cosmos3OmnimodalWorldModelsForPhysicalAI
 - arxiv_id: '2606.03159'
   title: OmniDreamsRealTimeGenerativeWorldModel
+- arxiv_id: '2606.12987'
+  title: DiffusionTransformerWorldActionModelForAVScenePrediction
+- arxiv_id: '2604.09059'
+  title: LearningVisionLanguageActionWorldModelsForAutonomousDriving
+- arxiv_id: '2603.27287'
+  title: UniWorldVLAInterleavedWorldModelingAndPlanningForAD
+- arxiv_id: '2605.31476'
+  title: IDOLInverseDynamicsGuidedFuturePredictionForE2EAD
+- arxiv_id: '2605.10426'
+  title: CoWorldVLAMultiExpertWorldModelForAutonomousDriving
 is_ad_domain: true
 n_per_tick: 5
 topic: world models for autonomous driving and embodied AI

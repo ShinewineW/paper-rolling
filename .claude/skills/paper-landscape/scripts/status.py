@@ -180,14 +180,18 @@ def collect(workspace: Path) -> list[dict]:
                 }
             )
     for r in recs:  # enrich with the engine's own recorded status (latest ledger row)
-        led_status = (led.get(r["idbase"]) or {}).get("status")
+        led_row = led.get(r["idbase"]) or {}
+        led_status = led_row.get("status")
         r["ledger"] = led_status
-        # Ledger↔product divergence (Codex R1): a published+compliant product whose latest
-        # ledger row is NOT 'done' is a silent inconsistency — the next /loop tick would
-        # both reprocess it (it is absent from skip_set) AND consistency_check would prune
-        # its vault dirs (ADR-0011 preserves the ARA, but person_vault is rebuilt). Surface
-        # it so an "all green" status never hides a paper the engine is about to redo.
-        r["ledger_diverged"] = r["state"] == "compliant" and led_status != "done"
+        # Ledger↔product divergence (Codex R1): a published+compliant product is
+        # "ledger-synced" ONLY if its latest ledger row is a LIVE `done` row. A non-`done`
+        # status OR a `done` row that was rescinded (invalidated for reprocess) both leave
+        # the key OUT of skip_set — so the next /loop tick reprocesses it AND
+        # consistency_check may prune its vault dirs (ADR-0011 keeps the ARA, but
+        # person_vault is rebuilt). Surface it so an "all green" status never hides a paper
+        # the engine is about to redo. (Rescinded-done was the 2026-06-11 blind spot.)
+        synced = led_status == "done" and not led_row.get("rescinded_at")
+        r["ledger_diverged"] = r["state"] == "compliant" and not synced
     return recs
 
 
