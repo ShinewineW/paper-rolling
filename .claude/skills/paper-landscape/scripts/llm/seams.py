@@ -486,11 +486,15 @@ def web_search(query: str) -> list[str]:
         return []
     try:
         _log(f"web_search: querying for repo of {query[:60]!r}")
+        # tier=STRONG: this is a JUDGMENT task (official vs faithful-reimpl vs unrelated),
+        # not a cheap extraction — route to the provider's strong model (claude-sonnet-4-6
+        # on claude-code), not the fast one (haiku made loose calls). effort=high for the
+        # reasoning; a generous timeout since it WebSearches + reads + reasons.
         raw = provider.complete(
             _websearch_prompt(query),
-            tier="fast",
-            effort="medium",
-            timeout=300.0,
+            tier="strong",
+            effort="high",
+            timeout=420.0,
             tools=("WebSearch",),
         )
     except Exception as exc:  # noqa: BLE001 — enrichment tier never aborts a tick
