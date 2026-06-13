@@ -1,0 +1,6 @@
+# Environment
+- **Python**: 论文未说明 Python 版本。
+- **Framework**: PyTorch 原生训练与推理路径；training loop 风格参考 TorchTitan；Cosmos3-Edge LLM 使用 Megatron codebase；Reasoner serving 支持 vLLM 与 TensorRT-LLM；Generator serving 支持 vLLM-Omni。
+- **Hardware**: 训练吞吐在 NVIDIA GB200 systems 上报告；Generator 预训练与中训练文本描述中 Nano 使用 1024 NVIDIA GB200 GPUs，Super 使用 2048 NVIDIA GB200 GPUs；Table 8 caption 又写 Nano 与 Super runs took 2048 and 4096 GPUs，原文存在不一致；attention backend 在 Hopper-class GPUs H100、H200 使用 FlashAttention-3，在 Blackwell-class GPUs GB200 使用 NATTEN；policy server deployment 使用 2 NVIDIA RTX Pro 6000 GPUs。
+- **Key dependencies**: PyTorch, torch.compile, CUDA graphs, AOTInductor, TorchTitan, Megatron, FusedAdamW, Hybrid Sharded Data Parallelism, Context Parallelism, Ulysses, FlashAttention-3, NATTEN, vLLM, TensorRT-LLM, vLLM-Omni, Lance, LanceDB, IVF_PQ, cuML KMeans, ffmpeg cropdetect, TransNetV2, Wan2.2 VAE, SAMv2, Video Depth Anything, SAM-Audio, SyncNet, FireRedASR2S, Qwen3-ASR, Franky, Weights & Biases, Gloo, NCCL, Slurm, Databricks, Spark clusters
+- **Random seeds**: 论文未给出统一随机种子；data loader 使用 globally seeded selector keyed on iteration index 以保证 stream selection 可复现；checkpoint 恢复 rank-aware RNG state；synthetic datasets 中部分 simulation run 由 seed 控制随机变量。

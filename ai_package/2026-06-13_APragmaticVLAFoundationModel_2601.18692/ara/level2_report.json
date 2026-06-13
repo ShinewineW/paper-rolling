@@ -1,0 +1,113 @@
+{
+  "artifact": "ai",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.83,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Type-aware mapping is excellent: causal claims (C2) use ablations (w/ vs w/o depth), generalization claims (C1, C3) use heterogeneous platforms (GM-100, RoboTwin), and improvement claims use strong, recent baselines.",
+        "Evidence directly supports the substance of each claim without relying on irrelevant or tangential experiments."
+      ],
+      "weaknesses": [
+        "Descriptive claims (C4, C5) rely on figure references rather than structured data tables, which slightly limits automated evidence verification."
+      ],
+      "suggestions": [
+        "Transcribe key quantitative data points from Figures 4 and 5 into structured evidence tables to ensure complete machine-readability and type-appropriate evidence for descriptive claims."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly specific, actionable, and scope-matched.",
+        "Criteria explicitly define the exact conditions (e.g., same hardware, same data, same protocol, same batch settings) required to invalidate the claims, making them independently testable."
+      ],
+      "weaknesses": [
+        "None significant; all criteria are non-trivial and meaningful."
+      ],
+      "suggestions": [
+        "For descriptive scaling and throughput claims (C4, C5), consider adding quantitative thresholds for 'stagnation' or 'deviation from theoretical trend' to make falsification even more precise."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Excellent scope calibration: claims are carefully bounded (e.g., C2 specifies '若干平台', C4/C5 explicitly state they are directional based on figures).",
+        "Concepts include explicit boundary conditions (e.g., LingBot-VLA explicitly excludes single-arm/mobile robots and unconstrained environments from its current scope).",
+        "Assumptions are clearly stated in the problem specification."
+      ],
+      "weaknesses": [
+        "None; the authors successfully avoid pervasive over-claiming."
+      ],
+      "suggestions": [
+        "Maintain this level of precision when extending the model to unconstrained environments or mobile manipulation in future work."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "Clear and coherent arc from observations to gaps to insights. The dual focus on real-world scaling/eval and training infrastructure perfectly maps to the identified gaps (G1, G2).",
+        "Every identified gap is systematically addressed by corresponding claims and experiments."
+      ],
+      "weaknesses": [
+        "Experiment E5 (data efficiency) is slightly disconnected from the explicit gaps listed in problem.md."
+      ],
+      "suggestions": [
+        "Explicitly link the 'data efficiency' experiment (E5) back to a specific gap or observation in problem.md (e.g., as a sub-gap of G1) to make the argument arc 100% closed."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "Rich exploration tree featuring genuine decisions with listed alternatives, and a meaningful pivot (P1) reflecting the shift to training infrastructure.",
+        "Intellectual honesty is demonstrated by explicitly marking dead-end X1 as 'inferred' rather than falsely claiming it was explicitly stated in the paper."
+      ],
+      "weaknesses": [
+        "Dead-end X1 is inferred rather than explicitly discussed in the paper text, which slightly reduces the explicit traceability of the exploration process."
+      ],
+      "suggestions": [
+        "Add a brief discussion in the paper's methodology or limitations section about why single-platform evaluation was rejected as a dead-end to make X1 fully explicit."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Strong and recent baselines (pi0.5, GR00T N1.6, WALL-OSS) ensure adequate comparative rigor.",
+        "Comprehensive ablation for depth distillation and clear metric-claim alignment (SR and PS for task completion and progress)."
+      ],
+      "weaknesses": [
+        "Lack of statistical reporting (error bars, confidence intervals, variance across seeds/trials) in the real-world evaluation tables (Table 1, Table 2). Real-world robotics has high variance, making point estimates less rigorous."
+      ],
+      "suggestions": [
+        "Include standard deviations, confidence intervals, or explicitly state the number of trials per task and the statistical significance tests used to compare against baselines in real-world evaluations."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "major",
+      "observation": "Real-world evaluation tables (Table 1, Table 2) report only point estimates for Success Rate and Progress Score without error bars, confidence intervals, or variance across trials. Given the high variance inherent in physical robot experiments, statistical dispersion metrics are necessary to validate the significance of the improvements."
+    },
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "minor",
+      "observation": "Dead-end X1 (single-platform evaluation insufficiency) is marked as 'inferred' rather than explicitly discussed in the paper text. While honestly labeled, explicit discussion in the methodology or limitations section would strengthen the traceability of the research process."
+    },
+    {
+      "dimension": "D4_argument_coherence",
+      "severity": "suggestion",
+      "observation": "Experiment E5 (data efficiency of post-training) is well-designed and supports C1/C4, but lacks a direct, explicit link to a specific gap or observation in problem.md, leaving a slight disconnect in the otherwise tight argument arc."
+    },
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "suggestion",
+      "observation": "Descriptive claims (C4, C5) rely heavily on figure references (Fig 4, 5) without transcribed structured data tables in the evidence layer. Transcribing key data points from these figures into structured tables would improve machine-readable evidence verification."
+    }
+  ]
+}

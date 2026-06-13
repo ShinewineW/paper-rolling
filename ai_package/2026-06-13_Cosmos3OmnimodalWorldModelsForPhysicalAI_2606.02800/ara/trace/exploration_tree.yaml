@@ -1,0 +1,297 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 能否用单一 omnimodal world model 同时承担理解、生成、模拟和动作预测
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Fig 1
+  description: 研究起点是 Physical AI 现有 VLM、video generator、world model、VLA 或 WAM 分离，论文提出用
+    Cosmos 3 在一个框架内联合 language、image、video、audio、action。
+  children:
+  - id: D1
+    type: decision
+    title: 采用 AR 与 diffusion 共存的统一 token 格式
+    support_level: explicit
+    source_refs:
+    - Sec 2.2.1
+    choice: 把 AR subsequence 放在 diffusion subsequence 前，并在 DM 内先放 clean conditioning
+      tokens 再放 noisy target tokens。
+    alternatives:
+    - 为理解和生成分别训练独立模型
+    - 把所有 token 混入同一种自回归序列
+    - 为每个任务设计独立 packing 格式
+  - id: E1
+    type: experiment
+    title: 跨理解和生成基准评估统一模型覆盖面
+    support_level: explicit
+    source_refs:
+    - Sec 6
+    - Table 1
+    result: 结果方向显示 Cosmos 3 在多个理解和生成能力上达到有竞争力或领先的表现，支持统一架构具有广覆盖能力。
+- id: Q2
+  type: question
+  title: 怎样在同一 transformer 中保留语言理解能力并学习扩散生成
+  support_level: explicit
+  source_refs:
+  - Sec 2.3
+  - Fig 5
+  description: 核心结构问题是 AR 语言理解需要 causal attention，而 diffusion generation 需要双向上下文和独立生成容量。
+  children:
+  - id: D2
+    type: decision
+    title: 选择 Mixture-of-Transformers dual-tower layer
+    support_level: explicit
+    source_refs:
+    - Sec 2.3.1
+    choice: 每层使用 reasoner tower 与 generator tower 两套路由参数，并都从 pre-trained VLM 初始化。
+    alternatives:
+    - 完全共享一套 transformer 参数
+    - 训练两个完全分离的模型
+    - 只在顶层增加小型生成头
+  - id: E2
+    type: experiment
+    title: 验证 two-way flat attention 的吞吐收益
+    support_level: explicit
+    source_refs:
+    - Sec 5.2.2
+    result: 相对 FlexAttention-based baseline，two-way flat attention 改善训练吞吐，同时保留 AR
+      causal 与 DM bidirectional mask。
+    also_depends_on:
+    - D2
+- id: Q3
+  type: question
+  title: 多模态 token 如何在物理时间轴上对齐
+  support_level: explicit
+  source_refs:
+  - Sec 2.4
+  description: 视频、音频和 action 的采样率不同，如果只用离散 token index，物理时间间隔无法一致表达。
+  children:
+  - id: D3
+    type: decision
+    title: 引入 absolute temporal modulation
+    support_level: explicit
+    source_refs:
+    - Sec 2.4.2
+    choice: 用 TPS_base 除以当前 TPS 得到 temporal increment，把不同 FPS、audio hop 和 action sampling
+      rate 映射到共享物理时间轴。
+    alternatives:
+    - 只使用原始 3D MRoPE token index
+    - 把 FPS 仅写入文本 prompt
+    - 为每种模态单独训练位置编码
+  - id: E3
+    type: experiment
+    title: 评估 FPS control 方案
+    support_level: explicit
+    source_refs:
+    - Appendix E.2
+    result: 评估方向用于比较 text control、MRoPE FPS modulation 及组合方案，目标是让生成动态更符合指定 FPS 与源时长。
+    also_depends_on:
+    - D3
+- id: DE1
+  type: dead_end
+  title: 直接让 diffusion temporal index 紧贴 AR 末 token
+  support_level: explicit
+  source_refs:
+  - Sec 2.4.1
+  hypothesis: 如果 diffusion tokens 从最后一个 AR token 的 temporal offset 直接开始，位置连续性可能足以表达文本到视觉的过渡。
+  failure_mode: 论文报告这种做法会在初始视频帧产生 over-saturation 和 checkerboard artifacts，在 Super
+    model 中尤其明显。
+  lesson: 需要在 AR 与 diffusion subsequence 之间插入固定 temporal gap，给文本到视觉转换更清晰的位置空间缓冲。
+- id: Q4
+  type: question
+  title: 如何训练 Generator 同时覆盖图像、视频、音频、action 与 transfer
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Fig 8
+  description: Generator 需要从通用视觉和音频生成扩展到 action-conditioned world modeling 与 control-conditioned
+    transfer。
+  children:
+  - id: D4
+    type: decision
+    title: 采用 progressive multimodal curriculum
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    - Sec 4.2
+    choice: 先做 image、video、audio pre-training，再在 mid-training 加入 action 与 transfer，最后为
+      T2I、I2V 和 policy 分别 post-train。
+    alternatives:
+    - 从一开始混合所有任务训练
+    - 只训练基础模型不做 post-training
+    - 为每个模态单独训练不同架构
+  - id: E4
+    type: experiment
+    title: 中训练加入 action 与 transfer 后做下游 action 评估
+    support_level: explicit
+    source_refs:
+    - Sec 6.2.5
+    result: 结果方向显示 MT-init 相比 PT-init 在多个 action adaptation 场景中带来更强或更快的适配。
+    also_depends_on:
+    - D4
+- id: Q5
+  type: question
+  title: 多分辨率视频训练如何兼顾质量和吞吐
+  support_level: explicit
+  source_refs:
+  - Sec 4.2.1
+  - Fig 10
+  description: 训练数据包含不同分辨率、宽高比和帧数，固定 padding 会浪费计算并削弱高分辨率样本比例控制。
+  children:
+  - id: D5
+    type: decision
+    title: 使用 fixed token budget sequence packing
+    support_level: explicit
+    source_refs:
+    - Sec 4.2.1
+    - Sec 5.2.1
+    choice: 以 74,000 tokens 作为 fixed context budget，并用 token-budgeted packed sequences
+      代替固定样本数 batch。
+    alternatives:
+    - 固定 batch 内样本数
+    - 按最大形状 padding 所有样本
+    - 为每种分辨率完全分开训练
+  - id: E5
+    type: experiment
+    title: rank-synchronous stream selection 与 look-ahead packing 的吞吐评估
+    support_level: explicit
+    source_refs:
+    - Sec 5.2.1
+    result: 结果方向显示同步 stream selection 和 look-ahead packing 都提高训练吞吐并减少跨 rank 不均衡。
+    also_depends_on:
+    - D5
+- id: Q6
+  type: question
+  title: action 是否可以作为跨 embodiment 的统一因果接口
+  support_level: explicit
+  source_refs:
+  - Sec 2.1.3
+  - Sec 3.2.3
+  description: 不同机器人、车辆、相机和 egocentric human motion 使用不同控制空间，研究目标是把它们映射成共享 latent
+    action space。
+  children:
+  - id: D6
+    type: decision
+    title: 使用 domain-aware action projections 与 shared MoT backbone
+    support_level: explicit
+    source_refs:
+    - Sec 2.1.3
+    choice: 每个 domain 使用独立 input/output projection，action latent 进入共享 MoT backbone。
+    alternatives:
+    - 把所有 action 直接拼成同一固定向量
+    - 为每个 embodiment 训练单独模型
+    - 只用文本描述动作而不使用 action tokens
+  - id: E6
+    type: experiment
+    title: action domain synergy study
+    support_level: explicit
+    source_refs:
+    - Sec 6.2.5
+    - Fig 27
+    - Fig 28
+    result: 结果方向显示某些 ego-motion、robot manipulation 和 egocentric motion 域之间存在正迁移，也暴露了小数据域和大域混训的稀释风险。
+    also_depends_on:
+    - D6
+- id: Q7
+  type: question
+  title: 是否需要把 FD、ID 和 policy 分开训练
+  support_level: explicit
+  source_refs:
+  - Sec 2.2.2
+  - Appendix E.4
+  description: action generation 同时包含 forward dynamics、inverse dynamics 和 joint video-action
+    prediction，问题是这些模式共享训练是否有益。
+  children:
+  - id: D7
+    type: decision
+    title: 联合训练 action modes
+    support_level: explicit
+    source_refs:
+    - Sec 4.2.2
+    - Appendix E.4
+    choice: mid-training 中 Action stream 同时包含 forward dynamics、inverse dynamics、policy，并在
+      loss 中对 action 做额外 scale。
+    alternatives:
+    - 每个 action mode 训练一个 checkpoint
+    - 只训练 policy 不训练视频后果
+    - 只训练 FD 或 ID 作为辅助任务
+  - id: E7
+    type: experiment
+    title: PushT action-mode synergy ablation
+    support_level: explicit
+    source_refs:
+    - Appendix E.4
+    result: 结果方向用于比较单模式 checkpoint 与 joint FD/ID/policy checkpoint，验证不同 action objectives
+      是否共享有用结构。
+    also_depends_on:
+    - D7
+- id: P1
+  type: pivot
+  title: 从通用生成模型转向 Physical AI 专门化
+  support_level: explicit
+  source_refs:
+  - Sec 3.2
+  - Sec 4.2.2
+  from: 大规模 image、video、audio pre-training 建立通用生成先验。
+  to: mid-training 引入 synthetic Physical AI data、action data 和 transfer data，随后 post-training
+    出 T2I、I2V 与 DROID policy 专家模型。
+  trigger: 通用预训练语料在 robotics、autonomous driving、warehouse 和长时物理交互等 rare Physical AI
+    scenarios 上覆盖不足。
+- id: DE2
+  type: dead_end
+  title: naive heterogeneous masking 使用 general-purpose FlexAttention
+  support_level: explicit
+  source_refs:
+  - Sec 5.2.2
+  hypothesis: 直接用 general-purpose operator 表达 AR causal 与 DM bidirectional mask，可以简化实现并得到正确结果。
+  failure_mode: 论文指出 masking structure 对 kernel 不透明，padding-equivalent work 仍在 skipped
+    attention blocks 内执行，导致 tensor-core utilization 不足和 memory-bandwidth pressure
+    增加。
+  lesson: 需要把计算拆成两个 variable-length SDPA kernel invocations，并显式暴露 cross-pathway masking
+    structure。
+- id: DE3
+  type: dead_end
+  title: ring attention 作为 context parallelism 方案
+  support_level: explicit
+  source_refs:
+  - Sec 5.2.3
+  hypothesis: 用 ring attention 实现 CP 可以支持长上下文训练。
+  failure_mode: 论文认为 ring attention 需要先物化 interleaved Reasoner 与 Generator tokens
+    的单一 packed sequence，阻碍两条 pathway 独立 sharding，并使 per-sample mask 构造复杂化。
+  lesson: 在 Cosmos 3 的双路径和 packed sequence 设置中，Ulysses all-to-all CP 更适配。
+- id: Q8
+  type: question
+  title: 如何让推理同时覆盖研究可改性和生产吞吐
+  support_level: explicit
+  source_refs:
+  - Sec 5.3
+  description: Reasoner 和 Generator 推理既需要原生 PyTorch 作为 faithful specification，也需要
+    production-grade serving runtimes 支撑高吞吐或低延迟部署。
+  children:
+  - id: D8
+    type: decision
+    title: 保留 Plain PyTorch 并接入 vLLM、TensorRT-LLM、vLLM-Omni
+    support_level: explicit
+    source_refs:
+    - Sec 5.3
+    - Sec 5.3.1
+    - Sec 5.3.2
+    - Sec 5.3.3
+    choice: 用 native PyTorch 作为参考实现和新特性落点，同时用 vLLM、TensorRT-LLM 服务 Reasoner，用 vLLM-Omni
+      服务 Generator。
+    alternatives:
+    - 只维护 PyTorch 推理路径
+    - 只依赖专用 serving runtime
+    - 为 Reasoner 与 Generator 构建完全不同的产品接口
+  - id: E8
+    type: experiment
+    title: 推理 batching、CUDA graphs 和 serving backend 评估
+    support_level: explicit
+    source_refs:
+    - Sec 5.3.1
+    - Table 9
+    result: 结果方向显示 batching、torch compile、CUDA graphs、reasoner caching 与并行策略可提升不同硬件和任务下的推理效率。
+    also_depends_on:
+    - D8

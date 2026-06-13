@@ -1,0 +1,123 @@
+{
+  "artifact": "ai",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 5,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Type-aware evidence mapping is flawless. Causal claims (C3, C4) are backed by controlled ablations (e.g., MT-init vs PT-init, component removal).",
+        "Improvement claims (C2) use strong, contemporary baselines across both open-source (FLUX.2, Wan2.2) and closed-source (Sora 2, Veo-3.1) models.",
+        "Descriptive and generalization claims (C1) are supported by a comprehensive capability overview table (Table 1) spanning diverse Physical AI domains."
+      ],
+      "weaknesses": [
+        "None significant; the alignment between claim types and experimental designs is exceptionally strong."
+      ],
+      "suggestions": [
+        "Ensure that for descriptive claims (C1), the sampling distribution and potential selection biases of the evaluation sets are explicitly detailed in the evidence documentation."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly actionable and explicitly control for confounding variables.",
+        "C3 explicitly controls for initialization, training steps, and data volume when evaluating the causal impact of mid-training.",
+        "C2 clearly defines the operational conditions (prompts, sampling configs, evaluation protocols) required to invalidate the improvement claims."
+      ],
+      "weaknesses": [
+        "None. The criteria are non-trivial and independently testable."
+      ],
+      "suggestions": [
+        "For C5 (efficiency), explicitly state the hardware variance bounds or minimum threshold of speedup that would constitute a falsification of the infrastructure claims."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Exceptional boundary condition definitions in `concepts.md`. The distinction between a single unified weight vs. a unified architecture with post-trained variants is explicitly clarified, preventing over-claiming.",
+        "Assumptions regarding modality projections, AR causal integrity, and action space alignment are clearly isolated and stated.",
+        "Claims accurately reflect the evidence without extrapolating beyond the tested embodiments or modalities."
+      ],
+      "weaknesses": [
+        "None. The scope is precisely calibrated."
+      ],
+      "suggestions": [
+        "Consider adding a specific boundary condition regarding the physical fidelity limits of the generated videos (e.g., where the world model fails to simulate complex fluid dynamics or long-horizon physics violations)."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "The narrative arc from Observations (O1-O3) to Gaps (G1-G2), leading to the MoT dual-tower insight, is perfectly mirrored in the solution architecture.",
+        "Every identified gap is directly addressed by a specific architectural choice (e.g., action tokens for G1, temporal modulation for G2) and subsequently validated by targeted experiments.",
+        "The transition from the cognitive layer to the physical layer and evidence base is seamless and logically tight."
+      ],
+      "weaknesses": [
+        "None. The argument structure is highly coherent."
+      ],
+      "suggestions": [
+        "Explicitly link the 'understanding' gap (G2) to the specific metrics in the Reasoner ablation (Table 28) to close the loop on how physical dynamics understanding is quantitatively measured."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "The exploration tree is remarkably rich and authentic, featuring 8 questions, 8 decisions, and 8 experiments.",
+        "The dead-ends (DE1, DE2, DE3) provide deep, non-trivial insights into both algorithmic (temporal gap for diffusion) and systems-level (FlexAttention masking, Ring vs. Ulysses CP) challenges.",
+        "Decision rationales include concrete alternatives that were considered and rejected, demonstrating a genuine research process rather than post-hoc justification."
+      ],
+      "weaknesses": [
+        "None. The exploration graph is a textbook example of research transparency."
+      ],
+      "suggestions": [
+        "Include a brief note on the computational cost or time wasted during the dead-end explorations (e.g., DE2, DE3) to further emphasize the empirical reality and scale of the research process."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 5,
+      "strengths": [
+        "Baseline selection is exhaustive, covering SOTA models across diverse domains (T2I, T2V, Robotics, Autonomous Driving).",
+        "Ablations are comprehensive, systematically covering data (SDG, Audio), architecture (Understanding tower), and training curriculum (FPS control, joint action modes).",
+        "Metrics are highly aligned with domain standards (UniGenBench, PAIBench, RBench, HUE, RRE, RTE, PSNR, Success Rate)."
+      ],
+      "weaknesses": [
+        "Minor markdown formatting issues in some tables (e.g., Table 1, Table 13, Table 19) make column alignment slightly difficult to parse visually, though the underlying data is intact."
+      ],
+      "suggestions": [
+        "Include confidence intervals, standard deviations, or p-values for the key ablation results (e.g., Table 26, Table 31) to strengthen the statistical rigor of the observed improvements."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "minor",
+      "observation": "The inclusion of systems-level dead-ends (DE2, DE3) regarding attention masking and context parallelism provides exceptional transparency into the engineering realities and kernel-level challenges of training large-scale MoT models."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "suggestion",
+      "observation": "While absolute metrics and deltas are reported comprehensively, adding statistical significance tests (e.g., confidence intervals over multiple random seeds) for the ablation studies would further solidify the methodological rigor against random variance."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "suggestion",
+      "observation": "Explicitly defining the failure modes or physical fidelity limits of the world model (e.g., specific long-horizon physics violations or complex multi-body collisions) in the boundary conditions would further calibrate the scope of the 'Physical AI' claims."
+    },
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "minor",
+      "observation": "The evidence mapping is highly type-aware, correctly utilizing controlled ablations for causal claims (C3, C4) and comprehensive, multi-domain leaderboards for improvement and generalization claims (C1, C2)."
+    },
+    {
+      "dimension": "D4_argument_coherence",
+      "severity": "minor",
+      "observation": "The logical progression from the identified gap of 'paradigm separation' (G1) to the unified action token representation, and finally to the joint FD/ID/policy synergy ablation (Table 31), forms a perfectly closed argumentative loop."
+    }
+  ]
+}

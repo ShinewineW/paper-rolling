@@ -1,0 +1,242 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何把 world model 和 action model 放进同一个驾驶系统
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Fig 1
+  description: 论文从现有 VLA planner 不显式预测未来世界、world model 又常缺少动作规划闭环的问题出发，提出需要统一 future
+    world generation 和 motion planning。
+  children:
+  - id: D1
+    type: decision
+    title: 采用 LLM 加多生成专家的统一架构
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    - Fig 2
+    choice: 使用 LLM 处理 language instruction、multi-view images 和 actions，再通过 depth、video、action
+      三个 lightweight generators 产生对应输出。
+    alternatives:
+    - 只做 vision-based 或 VLA 直接规划
+    - 只做 future observation world model
+    - 把规划与生成做成紧耦合单一路径
+  - id: Q2
+    type: question
+    title: 世界表征是否需要显式几何 grounding
+    support_level: explicit
+    source_refs:
+    - Sec 1
+    description: 论文认为驾驶是 4D 物理过程，3D geometry 随时间演化，纯 2D appearance 或 latent rollout
+      可能不足以支持 occlusion、distance 和 free-space reasoning。
+    children:
+    - id: D2
+      type: decision
+      title: 引入 depth 作为 3D scaffold
+      support_level: explicit
+      source_refs:
+      - Sec 1
+      - Sec 3.2.2
+      choice: 显式生成 monocular depth map，并让 depth embeddings 成为 video 与 action 查询可使用的上游几何上下文。
+      alternatives:
+      - 只生成 RGB future video
+      - 只使用 latent representation
+      - 依赖外部规划器或后处理推断几何
+    - id: E1
+      type: experiment
+      title: 验证 depth 对 video generation 的作用
+      support_level: explicit
+      source_refs:
+      - Sec 4.2
+      - Table 5
+      result: depth joint learning 相比 video-only 带来更好的 future video generation accuracy。
+      also_depends_on:
+      - D2
+    - id: E2
+      type: experiment
+      title: 验证 world learning 对 planning 的作用
+      support_level: explicit
+      source_refs:
+      - Sec 4.2
+      - Table 4
+      result: depth、video 以及二者联合的 world learning 都优于 action-only，其中 depth+video+action
+        方向最好。
+      also_depends_on:
+      - D2
+- id: Q3
+  type: question
+  title: 如何让几何、视频和动作在一次前向中有序交互
+  support_level: explicit
+  source_refs:
+  - Sec 3.2.1
+  description: 论文需要让 depth、video 和 action 分支共享上下文，同时避免额外同步或迭代 refinement。
+  children:
+  - id: D3
+    type: decision
+    title: 使用 depth→video→action 的 causal ordering
+    support_level: explicit
+    source_refs:
+    - Sec 3.2.1
+    choice: 固定 depth queries、video queries、action queries 的顺序，使 video queries 可看 depth，action
+      queries 可看 depth 与 video。
+    alternatives:
+    - 各分支彼此独立
+    - 动作先于世界生成
+    - 多轮迭代式跨分支同步
+  - id: E3
+    type: experiment
+    title: 联合 depth 与 video 后观察 planning robustness
+    support_level: explicit
+    source_refs:
+    - Sec 4.2
+    - Fig 4
+    result: 加入 world learning 后轨迹更安全、更接近 human trajectory，depth 与 video 提供互补线索。
+    also_depends_on:
+    - D3
+- id: Q4
+  type: question
+  title: 生成专家应使用什么训练原则
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Sec 3.2.2
+  description: 连续目标的 depth、video 和 action 需要可统一的生成式训练方式。
+  children:
+  - id: D4
+    type: decision
+    title: 采用 conditional flow matching
+    support_level: explicit
+    source_refs:
+    - Sec 3.1
+    choice: 对连续目标学习 time-dependent velocity field，并以 velocity regression objective
+      训练 generative experts。
+    alternatives:
+    - 确定性 regression head
+    - 自回归离散 token 预测
+    - 论文未报告的其他扩散目标
+  - id: E4
+    type: experiment
+    title: 在 Navsim 上联合评估 planning 与 world generation
+    support_level: explicit
+    source_refs:
+    - Sec 4.1
+    - Sec 4.2
+    result: 该统一训练设置在 Navsim planning 与 world generation 任务上均表现强。
+    also_depends_on:
+    - D4
+- id: Q5
+  type: question
+  title: depth generator 应在像素空间还是压缩空间工作
+  support_level: explicit
+  source_refs:
+  - Sec 3.2.2
+  description: 论文指出 depth 的维度低于 RGB video，且边界保真很重要。
+  children:
+  - id: D5
+    type: decision
+    title: depth 使用 pixel-space diffusion transformer
+    support_level: explicit
+    source_refs:
+    - Sec 3.2.2
+    choice: 直接在 pixel-space 生成 depth，并把 noisy depth 与对应 RGB image 拼接输入 denoiser。
+    alternatives:
+    - 为 depth 额外训练 learned codec
+    - 只输出确定性 depth regression
+    - 把 depth 融入视频 latent 后再间接恢复
+  - id: E5
+    type: experiment
+    title: 与 PPD 变体比较 depth accuracy
+    support_level: explicit
+    source_refs:
+    - Sec 4.2
+    - Table 3(b)
+    result: DriveDreamer-Policy 的 depth error 低于 zero-shot PPD 和 fine-tuned PPD 变体。
+    also_depends_on:
+    - D5
+- id: Q6
+  type: question
+  title: video generator 如何保持当前场景一致性
+  support_level: explicit
+  source_refs:
+  - Sec 3.2.2
+  description: future video generation 既需要动作可控，又需要保持当前 appearance、identity 和 camera
+    content。
+  children:
+  - id: D6
+    type: decision
+    title: 使用 Wan-2.1-T2V-1.3B 并加入图像视觉条件
+    support_level: explicit
+    source_refs:
+    - Sec 3.2.2
+    - Sec 3.3
+    choice: 将 Wan-2.1-T2V-1.3B 适配为 image-to-video task，并用 CLIP 提取当前帧视觉条件与 world video
+      embeddings 拼接。
+    alternatives:
+    - 只依赖 text embedding
+    - 只依赖 LLM world video embeddings
+    - 使用无当前帧视觉条件的视频扩散器
+  - id: E6
+    type: experiment
+    title: 与 PWM 比较 video quality
+    support_level: explicit
+    source_refs:
+    - Sec 4.2
+    - Table 3(a)
+    result: 在单视角 front video 的公平比较中，DriveDreamer-Policy 相对 PWM 展现更好的视频质量方向。
+    also_depends_on:
+    - D6
+- id: Q7
+  type: question
+  title: query bottleneck 容量是否限制表现
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  description: 固定 query interface 能控制计算，但需要确认较小 query budget 是否会削弱几何、外观和动作上下文存储。
+  children:
+  - id: E7
+    type: experiment
+    title: 消融 query token 数量
+    support_level: explicit
+    source_refs:
+    - Sec 4.3
+    - Table 6
+    result: 更大的 query budget 通常提升 planning 和 world-generation 表现。
+  - id: D7
+    type: decision
+    title: 使用默认 64 depth、64 video、8 action query
+    support_level: explicit
+    source_refs:
+    - Sec 4.1
+    - Sec 4.3
+    choice: 默认采用 64 depth-query tokens、64 video-query tokens 和 8 action-query tokens。
+    alternatives:
+    - 采用更小的 32 depth、32 video、4 action query 配置
+    - 继续扩大 query budget 但论文未报告
+    also_depends_on:
+    - E7
+- id: X1
+  type: dead_end
+  title: 只依赖 action-only planning 的路线不足
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Table 4
+  - Fig 4
+  hypothesis: 如果 LLM 和 action generator 足够强，只训练动作也能达到稳健规划。
+  failure_mode: action-only 缺少 explicit world modeling，在消融和可视化中相对 depth 或 video world
+    learning 的路线表现更弱，且更容易出现安全边界和机动纠正问题。
+  lesson: 规划需要显式或隐式的未来世界线索；depth 和 video 的 world learning 能给 action prediction 提供互补上下文。
+- id: P1
+  type: pivot
+  title: 从纯视频想象转向几何加视频的联合世界学习
+  support_level: inferred
+  from: 只把 future video 作为 world component 的路线
+  to: 以 depth scaffold 先提供几何，再让 video 与 action 使用该上下文的路线
+  trigger: (分析推断,论文未显式声明) 引言指出现有 WAM 多关注 2D appearance 或 latent representations，消融又显示
+    depth learning 改善 video generation，joint world training 对 planning 最有利。
+  also_depends_on:
+  - Q2
+  - E1
+  - E2

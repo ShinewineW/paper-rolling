@@ -1,0 +1,5 @@
+训练期目标只采用论文显式给出的 Diffusion Forcing 损失,不包含推理期 guidance、Monte Carlo Guidance 或 scheduling matrix 的任何加权项。论文给出的训练损失为: $$
+\underset { \substack { k _ { t } , \mathbf { x } _ { t } , \epsilon _ { t } } } { \mathbb { E } } \sum _ { \substack { k _ { t } \sim p _ { \theta } ( \mathbf { z } _ { t } | \mathbf { z } _ { t - 1 } , \mathbf { x } _ { t } ^ { k _ { t } } , k _ { t } ) } } ^ { T } \bigg [ \| \epsilon _ { t } - \epsilon _ { \theta } \big ( \mathbf { z } _ { t - 1 } , \mathbf { x } _ { t } ^ { k _ { t } } , k _ { t } \big ) \| ^ { 2 } \bigg ] ,\tag{3.1}
+$$ 训练时从训练数据采样 $\mathbf { x } _ { 1 : T }$,并将 $k _ { 1 : T }$ 从 $[ K ] ^ { T }$ 均匀采样,使模型学习在任意逐 token 噪声组合下去噪。推理期另行指定二维 scheduling matrix,从白噪声初始化并逐步去噪；guidance 只在采样阶段加入,其中论文在 Appendix B.3 给出的 cost-to-go 候选能量为: $$
+c ( \mathbf { x } _ { t } ^ { k } ) = \mathbb { E } \left[ \sum _ { t ^ { \prime } > t } \mathbf { r } ^ { \prime } ( \mathbf { x } _ { t ^ { \prime } } ^ { k _ { t ^ { \prime } } } ) \mid \mathbf { x } _ { t } ^ { k } \right] ,\tag{B.1}
+$$

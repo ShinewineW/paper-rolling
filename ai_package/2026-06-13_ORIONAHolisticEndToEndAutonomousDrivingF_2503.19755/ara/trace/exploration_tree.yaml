@@ -1,0 +1,221 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 闭环驾驶中VLM为何难以直接规划
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 2.3
+  description: 论文从semantic reasoning space与纯数值trajectory action space之间的gap出发，提出需要能同时理解场景并生成高质量多模态轨迹的E2E方案。
+  children:
+  - id: D1
+    type: decision
+    title: 选择vision-language instructed action generation
+    support_level: explicit
+    source_refs:
+    - Sec 3
+    - Fig. 2
+    choice: 采用QT-Former、LLM和generative planner串联的ORION，使planning token指导轨迹生成。
+    alternatives:
+    - plain text outputs
+    - dual-system paradigm
+    - special token decode outputs by MLP
+    children:
+    - id: E1
+      type: experiment
+      title: 比较不同VLM轨迹输出范式
+      support_level: explicit
+      source_refs:
+      - Sec 4.5
+      - Fig. 5
+      result: plain text范式最弱，dual-system仅有轻微改善，MLP decoder仍落后于ORION，说明生成式规划范式方向性更优。
+    - id: DE1
+      type: dead_end
+      title: 直接文本输出规划受限
+      support_level: explicit
+      source_refs:
+      - Sec 1
+      - Sec 4.5
+      hypothesis: 让VLM直接输出text-based planning results可以作为闭环驾驶规划接口。
+      failure_mode: VLM不适合数学计算或数值推理，且自回归机制倾向单一结果，难以表达人类规划的不确定性。
+      lesson: 闭环驾驶需要把语义推理结果映射到数值动作空间，而不是只依赖文本轨迹输出。
+- id: Q2
+  type: question
+  title: 如何桥接reasoning space和action space
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  description: 论文将当前轨迹建模为受planning token条件控制的概率分布，并用生成模型在latent space中连接语义推理与轨迹动作。
+  also_depends_on:
+  - D1
+  children:
+  - id: D2
+    type: decision
+    title: 主生成器采用VAE
+    support_level: explicit
+    source_refs:
+    - Sec 3.3
+    choice: 使用VAE把state s和ground-truth trajectory t投影到Gaussian latent variables，并用Kullback-Leibler
+      divergence进行分布匹配。
+    alternatives:
+    - diffusion model
+    - MLP decoder
+    - dual-system接口
+  - id: E2
+    type: experiment
+    title: 替换VAE为diffusion model
+    support_level: explicit
+    source_refs:
+    - Sec 4.5
+    - Table 3
+    result: VAE-based trajectory generator相比diffusion-based表现方向性更优，但diffusion版本仍显示框架具有灵活性。
+    also_depends_on:
+    - D2
+  - id: P1
+    type: pivot
+    title: 从文本规划转向latent生成规划
+    support_level: explicit
+    source_refs:
+    - Sec 1
+    - Sec 3.3
+    from: 直接在语言空间输出规划结果或用接口传递meta-action。
+    to: 通过generative planner在latent distribution中对齐reasoning information和multi-modal
+      action space。
+    trigger: 论文认为文本范式和精心设计接口都会削弱reasoning process与trajectory optimization的协同优化。
+- id: Q3
+  type: question
+  title: 如何利用长期历史信息
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3.1
+  description: 论文指出历史信息会影响当前场景规划，而多帧图像拼接受VLM token长度和计算开销限制，因此引入query-based temporal
+    module。
+  children:
+  - id: D3
+    type: decision
+    title: 引入QT-Former和Memory Bank
+    support_level: explicit
+    source_refs:
+    - Sec 3.1
+    - Fig. 3
+    choice: 用scene queries、perception queries和history queries配合Memory Bank提取多视角当前信息与历史信息。
+    alternatives:
+    - concatenate multi-frame images
+    - 只存储压缩历史信息的memory bank
+  - id: E3
+    type: experiment
+    title: 消融QT-Former设计
+    support_level: explicit
+    source_refs:
+    - Sec 4.5
+    - Table 4
+    result: 加入traffic state、motion prediction和memory bank后，闭环规划方向性改善，说明QT-Former设计对交互驾驶有贡献。
+    also_depends_on:
+    - D3
+  - id: E4
+    type: experiment
+    title: 消融history queries数量
+    support_level: explicit
+    source_refs:
+    - Sec 4.5
+    - Table 5
+    result: history queries从无到适中数量时方向性提升，继续增加后出现明显退化。
+    also_depends_on:
+    - D3
+  - id: DE2
+    type: dead_end
+    title: 过多history queries削弱当前帧建模
+    support_level: explicit
+    source_refs:
+    - Sec 4.5
+    hypothesis: 增加history queries数量会持续提升历史信息利用能力。
+    failure_mode: 当history queries继续增大时，论文认为它会阻碍VLM捕获当前帧特征，而当前帧特征在驾驶场景中更关键。
+    lesson: 长期记忆需要受控容量，历史信息不能挤占当前场景理解。
+- id: Q4
+  type: question
+  title: 如何获得闭环场景VQA监督
+  support_level: explicit
+  source_refs:
+  - Sec 3.2
+  - Appendix A
+  description: 论文认为闭环模拟环境缺少高质量VQA标注，因此自动扩展Bench2Drive形成Chat-B2D，用于训练LLM理解驾驶场景。
+  children:
+  - id: D4
+    type: decision
+    title: 构建Chat-B2D自动标注流水线
+    support_level: explicit
+    source_refs:
+    - Appendix A.1
+    - Appendix A.2
+    choice: 用critical object selection、description generation和history information生成VQA
+      pairs。
+    alternatives:
+    - 只使用原始Bench2Drive监督
+    - 只训练planning trajectory
+  - id: E5
+    type: experiment
+    title: 比较VQA与planning联合训练
+    support_level: explicit
+    source_refs:
+    - Sec 4.5
+    - Table 6
+    result: 单任务训练不能同时获得推理与规划能力，联合训练在规划和语言指标上方向性更优。
+    also_depends_on:
+    - D4
+- id: Q5
+  type: question
+  title: ORION在不同数据分布上的适用边界
+  support_level: explicit
+  source_refs:
+  - Appendix C.1
+  description: 论文在nuScenes上替换QT-Former为OmniDrive的Q-Former，并移除generative planner中的显式ego
+    status，以便与其他VLM-Based方法公平比较。
+  children:
+  - id: E6
+    type: experiment
+    title: nuScenes开放环对比
+    support_level: explicit
+    source_refs:
+    - Appendix C.1
+    - Table A1
+    result: ORION相对经典非VLM方法表现可比，但相比其他VLM-Based方法并非最优。
+  - id: DE3
+    type: dead_end
+    title: Bench2Drive式VAE对齐不一定迁移到nuScenes
+    support_level: explicit
+    source_refs:
+    - Appendix C.1
+    hypothesis: VAE latent space对齐可以在所有自动驾驶数据集上同样适配。
+    failure_mode: 论文认为nuScenes更接近uni-modal Gaussian distribution，而Bench2Drive更适合VAE处理的multimodal
+      trajectory distribution。
+    lesson: 生成式planner的优势依赖目标数据集的轨迹分布，不能脱离数据分布泛化结论。
+- id: P2
+  type: pivot
+  title: 主评估聚焦Bench2Drive闭环
+  support_level: explicit
+  source_refs:
+  - Appendix C.1
+  - Sec 4.1
+  from: 以nuScenes开放环作为主要证明场景。
+  to: 以Bench2Drive闭环评估作为主实验场景。
+  trigger: 论文指出开放环nuScenes中简单MLP decoder加ego status也能很强，因此主文聚焦Bench2Drive闭环性能。
+- id: Q6
+  type: question
+  title: 实时驾驶部署的主要限制是什么
+  support_level: explicit
+  source_refs:
+  - Sec 5
+  description: 论文限制部分指出ORION虽在Bench2Drive闭环模拟环境表现良好，但scalable VLM计算复杂度限制实时驾驶应用。
+  children:
+  - id: D5
+    type: decision
+    title: 未来降低VLM复杂度
+    support_level: explicit
+    source_refs:
+    - Sec 5
+    choice: 未来考虑model compression和pruning以支持实时自动驾驶。
+    alternatives:
+    - 保持当前scalable VLM复杂度
+    - 仅在离线模拟中使用

@@ -1,0 +1,6 @@
+- 论文的核心训练目标只给出 multi-task loss 与 flow matching 目标，\mathcal { L } _ { d }、\mathcal { L } _ { v }、\mathcal { L } _ { a } 的内部形式未进一步展开。
+- 深度标签来自 off-the-shelf depth foundation model Depth Anything 3，因此几何监督继承该 teacher 的偏差；这是分析推断，论文未显式量化 teacher 偏差。
+- video comparison 中 PWM 只支持 single-view generation，因此论文以 single-view front quality 做公平比较，不能直接推出全多视角生成优劣。
+- 论文称没有 widely adopted Navsim benchmark 报告可直接比较的 depth prediction 结果，因此深度结果主要与 PPD 变体比较。
+- action generator 可独立用于 planning，但显式 depth/video 生成是否在所有实时部署场景中开启取决于延迟预算；论文只说明 modularity and controllable latency，未给出完整部署时延约束。
+- 模型初始化依赖 Qwen3-VL-2B、PPD、Wan-2.1-T2V-1.3B 等 initialized backbones，论文说明未使用额外数据集或额外预训练 beyond initialized backbones，但结果仍与这些初始化能力相关。

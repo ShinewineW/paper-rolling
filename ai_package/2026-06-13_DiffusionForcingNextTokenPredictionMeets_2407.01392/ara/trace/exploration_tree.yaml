@@ -1,0 +1,248 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 能否统一 next-token prediction 与 full-sequence diffusion
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  description: 论文从 next-token prediction 的可变长度生成与 full-sequence diffusion 的 guidance
+    能力之间的互补性出发，提出用 Diffusion Forcing 连接两类模型。
+  children:
+  - id: D1
+    type: decision
+    title: 采用每 token 独立噪声级别
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    - Appendix B.2
+    choice: 训练时为序列中每个 token 采样独立噪声级别，并让模型学习任意噪声组合下的去噪。
+    alternatives: teacher forcing 的 next-token diffusion、所有 token 共享噪声级别的 full-sequence
+      diffusion、位置相关噪声级别的 AR-Diffusion 或 Rolling Diffusion。
+    children:
+    - id: E1
+      type: experiment
+      title: 视频长 rollout 稳定性验证
+      support_level: explicit
+      source_refs:
+      - Sec 4.1
+      - Appendix E.3
+      result: Diffusion Forcing 在视频 rollout 中保持时间一致性并能超过训练 horizon；teacher forcing
+        与 causal full-sequence diffusion baseline 更快发散。
+    - id: E2
+      type: experiment
+      title: 多变量 time series forecasting 验证
+      support_level: explicit
+      source_refs:
+      - Appendix E.1
+      - Table 2
+      result: Diffusion Forcing 在标准 CRPS_sum 设置下整体保持竞争力，说明训练目标可迁移到非核心的 time series
+        任务。
+- id: Q2
+  type: question
+  title: 因果序列建模应使用何种主实现
+  support_level: explicit
+  source_refs:
+  - Sec 3.2
+  - Appendix D.2
+  description: 论文关注 time series data，因此将 DF 实例化为 Causal Diffusion Forcing，让未来 token
+    只依赖过去 noisy tokens。
+  children:
+  - id: D2
+    type: decision
+    title: 主实现选择 RNN 而非 transformer
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    - Appendix D.2
+    choice: 主实验使用 RNN，视频中用 U-net 加 GRU，非视频中用 ResMLP 加 GRU。
+    alternatives: causal transformer 或无 causal mask 但通过未来噪声控制因果性的 transformer 版本。
+  - id: P1
+    type: pivot
+    title: 把 transformer 扩展留作未来方向
+    support_level: explicit
+    source_refs:
+    - Appendix B.1
+    - Sec 5
+    from: 当前 causal implementation based on an RNN。
+    to: 更高分辨率视频或更复杂分布可能需要 large transformer models。
+    trigger: 作者在 limitation 中指出高分辨率视频和复杂分布 likely require large transformer models。
+    also_depends_on:
+    - D2
+- id: Q3
+  type: question
+  title: 如何让长 horizon 生成不累积误差
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  - Appendix B.4
+  description: 论文把生成出来的历史 token 当作带小噪声的观测，而不是完全干净的 ground truth，以匹配训练分布。
+  children:
+  - id: D3
+    type: decision
+    title: 使用 slightly noised latent 稳定 autoregressive rollout
+    support_level: explicit
+    source_refs:
+    - Appendix B.4
+    choice: 每一步保留带小噪声级别的 latent，并用它继续生成下一个 token。
+    alternatives: 把上一步预测 token 当作完全干净历史进行普通 autoregressive rollout。
+  - id: E3
+    type: experiment
+    title: 无 sliding window 的 infinite rollout
+    support_level: explicit
+    source_refs:
+    - Appendix E.3
+    - Figure 8
+    - Figure 10
+    result: 模型可在不重置 RNN latent 的情况下生成超过最大训练长度的视频，且作者报告未看到两类视频数据集上的 blow up。
+    also_depends_on:
+    - D3
+- id: Q4
+  type: question
+  title: 如何在 planning 中利用未来不确定性
+  support_level: explicit
+  source_refs:
+  - Sec 3.4
+  - Appendix B.5
+  description: 论文认为因果 Diffusion Forcing 可以从当前 token rollout 多个未来样本，并用它们估计 guidance
+    梯度。
+  children:
+  - id: D4
+    type: decision
+    title: 引入 Monte Carlo Guidance
+    support_level: explicit
+    source_refs:
+    - Sec 3.4
+    - Appendix B.5
+    choice: 对未来多次采样并平均 guidance gradients，使当前 token 受 expected reward over future
+      outcomes 引导。
+    alternatives: 只用单条未来样本的 guidance；使用 full-sequence diffusion 的同级别同步 denoising。
+  - id: E4
+    type: experiment
+    title: D4RL Maze2D planning 与 MCG 消融
+    support_level: explicit
+    source_refs:
+    - Sec 4.2
+    - Table 1
+    result: 加入 MCG 的 Diffusion Forcing 在 maze planning 中优于去掉 MCG 的版本，并在所评估环境中达到更高平均
+      reward。
+    also_depends_on:
+    - D4
+  - id: F1
+    type: dead_end
+    title: full-sequence diffusion 难以做 Monte Carlo Guidance
+    support_level: explicit
+    source_refs:
+    - Appendix B.5
+    hypothesis: 可像 Diffusion Forcing 一样从当前 token rollout future tokens 来做 Monte Carlo
+      cost-to-go guidance。
+    failure_mode: full-sequence diffusion 需要所有 token 同步 denoise，在固定噪声级别下没有明显随机源来形成
+      Monte Carlo estimate。
+    lesson: MCG 依赖可变 horizon 与因果 rollout；full-sequence diffusion 不自然支持这一采样结构。
+- id: Q5
+  type: question
+  title: full-sequence diffusion 能否通过 replacement trick 获得 flexible horizon
+  support_level: explicit
+  source_refs:
+  - Appendix B.6
+  description: 论文讨论将已生成前缀替换进 full sequence model 的 naive 方法，尝试只更新剩余 token。
+  children:
+  - id: F2
+    type: dead_end
+    title: replacement trick 计算低效且可能不一致
+    support_level: explicit
+    source_refs:
+    - Appendix B.6
+    hypothesis: 把已生成前缀作为替换值固定，仍用 full-sequence diffusion 生成剩余 horizon。
+    failure_mode: 即使只剩一步也要 diffuse whole sequence；conditioning by replacement 被指出
+      mathematically unprincipled 且可能造成 sequence inconsistency，修正方案还需每个采样步额外 backward
+      propagation。
+    lesson: flexible horizon 更适合由 Diffusion Forcing 的因果与可变噪声 schedule 直接提供。
+- id: Q6
+  type: question
+  title: 如何在机器人 imitation learning 中处理记忆和观测扰动
+  support_level: explicit
+  source_refs:
+  - Sec 4.4
+  - Appendix F.3
+  description: 机器人换水果任务需要记住初始配置，且执行时可能出现视觉干扰或 occlusion。
+  children:
+  - id: E5
+    type: experiment
+    title: 长 horizon robot manipulation 与 corrupted observation
+    support_level: explicit
+    source_refs:
+    - Sec 4.4
+    - Appendix E.5
+    result: Diffusion Forcing 在需要记忆的机器人任务中优于无记忆 diffusion policy，并能在观测被扰动时利用 noisy
+      observation 设定维持较好成功率。
+  - id: D5
+    type: decision
+    title: 用 k 大于 0 表示 observation corrupted
+    support_level: explicit
+    source_refs:
+    - Sec 4.4
+    - Figure 16
+    choice: 执行时把受扰动 observation 标为 noisy，让模型更多依赖 prior model 预测动作。
+    alternatives: 把扰动观测当作 ground truth 输入 next-frame diffusion baseline。
+    also_depends_on:
+    - E5
+- id: Q7
+  type: question
+  title: 同一模型能否通过采样方式控制 compositionality
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  - Appendix E.2
+  description: 论文用 2D square plane 的 cross-shaped trajectory 数据展示只改 sampling scheme
+    就能控制 full memory 或 no-memory context。
+  children:
+  - id: E6
+    type: experiment
+    title: controllable sequential compositional generation
+    support_level: explicit
+    source_refs:
+    - Sec 4.3
+    - Figure 7
+    result: full horizon sampling 复现 cross-shaped distribution；no-memory MPC 可拼接子轨迹形成新的
+      V-shaped trajectory。
+  - id: D6
+    type: decision
+    title: 用 memory horizon 控制组合行为
+    support_level: explicit
+    source_refs:
+    - Appendix E.2
+    - Figure 7
+    choice: 需要复现原分布时保留 full memory；需要 compositional behavior 时使用 no-memory context
+      与短计划。
+    alternatives: 为不同组合模式重新训练模型。
+    also_depends_on:
+    - E6
+- id: Q8
+  type: question
+  title: 工程实现如何降低训练与采样成本
+  support_level: explicit
+  source_refs:
+  - Appendix D.6
+  - Appendix D.10
+  description: 论文在训练和采样上使用 mixed precision、DDIM、frame-stacking、line 8 latent 复用等工程选择。
+  children:
+  - id: D7
+    type: decision
+    title: 采用 fp16、DDIM 与 frame-stacking
+    support_level: explicit
+    source_refs:
+    - Appendix D.6
+    - Appendix D.10
+    choice: 所有实验使用 fp16 mixed precision；扩散采样采用 DDIM；视频与 maze planning 使用 frame-stacking。
+    alternatives: 完整扩散步采样、不堆叠相邻帧、每个采样步重新计算 posterior latent。
+  - id: E7
+    type: experiment
+    title: 资源配置覆盖 video 与 non-video 任务
+    support_level: explicit
+    source_refs:
+    - Appendix D.10
+    result: non-video 任务可在单张 2080Ti 11GB 训练，video prediction 需要多张 A100；论文据此区分任务计算成本。
+    also_depends_on:
+    - D7

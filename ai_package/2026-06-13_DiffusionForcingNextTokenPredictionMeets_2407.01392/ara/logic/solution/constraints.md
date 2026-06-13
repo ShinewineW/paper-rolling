@@ -1,0 +1,6 @@
+- 当前 causal implementation is based on an RNN；higherresolution video 或 more complex distributions likely require large transformer models。
+- 论文未研究 Diffusion Forcing 到 internet-scale datasets and tasks 的 scaling behavior。
+- Appendix B.1 的 transformer 与 fractional noise 控制因果性属于超出本文范围的扩展直觉,不是主实验架构。
+- Appendix D.5 明确同噪声等级采样的 corner case 仍可视为 open question,论文实验偏好 resampling。
+- 视频实验受计算限制,论文说明 Minecraft 只用 about 10% of the total subsequences；不要把该子集比例泛化为所有任务的数据用量。
+- Maze planning 的 episode reward 被作者认为不一定是好指标,因为环境可能奖励慢到达或停留在目标附近的行为。

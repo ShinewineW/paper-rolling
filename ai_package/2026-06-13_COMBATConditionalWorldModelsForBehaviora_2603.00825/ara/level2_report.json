@@ -1,0 +1,117 @@
+{
+  "artifact": "ai",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.67,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "证据类型与主张类型完美匹配：C1（改进）使用了严格的基线对比（Pose vs Non-Pose）；C2（描述/因果）使用了随时间变化的采样指标（TAA/ARC across checkpoints）；C3（范围/描述）使用了专门的规则一致性指标（Health/Damage）。",
+        "没有引用无关实验，每个claim都有直接对应的实验设计和数据表格/图表支撑。"
+      ],
+      "weaknesses": [
+        "无明显弱点。"
+      ],
+      "suggestions": [
+        "保持当前高标准的证据映射和类型感知设计。"
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 4,
+      "strengths": [
+        "C1和C2的证伪标准非常具体且可操作，直接指向具体的指标（FD, FVD, LPIPS, TAA, ARC）和对比条件。",
+        "证伪条件与实验设计紧密绑定，具备独立可测试性。"
+      ],
+      "weaknesses": [
+        "C3和C4的证伪标准中包含轻微主观或模糊的表述，例如C4中的“可用视觉质量”和C3中的“不能反映动作后果”，缺乏明确的定量阈值。"
+      ],
+      "suggestions": [
+        "为C4的“可用视觉质量”设定具体的FVD/FID阈值下限或人类评估及格线。",
+        "为C3的“反映动作后果”定义具体的Wasserstein距离或MSE容差范围，使其完全可计算。"
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "主张严格限制在Tekken 3环境和特定的条件设置下（仅Player 1输入），没有过度宣称模型的泛化能力。",
+        "明确承认了蒸馏带来的副作用（损害行为保真），没有隐瞒缺点或过度宣称Player 2策略的最优性（仅描述为“涌现”和“更接近人类模式”）。",
+        "Assumptions部分清晰列出了前提条件（如近期画面历史足以近似决定下一步state）。"
+      ],
+      "weaknesses": [
+        "无明显弱点。"
+      ],
+      "suggestions": [
+        "在讨论部分可以进一步探讨该框架向其他格斗游戏或具有更复杂3D物理引擎的环境迁移时的具体边界条件。"
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "逻辑弧线极其清晰：从Observations（现有世界模型缺乏reactive agent）到Gaps（需要完整监督、传统指标不足、采样慢），再到Insight（通过条件生成隐式学习）和Solution，最后落实到具体的Claims和Evidence。",
+        "每一层都紧密咬合，所有识别出的Gaps（G1, G2, G3）都在后续的Solution和Claims中得到了实质性解决。"
+      ],
+      "weaknesses": [
+        "无明显弱点。"
+      ],
+      "suggestions": [
+        "无。"
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "探索树（exploration_tree.yaml）非常忠实且丰富，包含了真实的死胡同（X1: 完整动作监督，X2: 仅依赖传统视频指标）和关键转折（P1）。",
+        "对于未进行的替代实验（如D4中的纯局部/全局注意力对比），进行了诚实的记录（'论文未报告这些替代实验'），没有进行事后合理化（post-hoc rationalization）。"
+      ],
+      "weaknesses": [
+        "无明显弱点。"
+      ],
+      "suggestions": [
+        "可以在dead-end节点中补充一些初步的失败数据、定性观察或计算成本分析，以进一步增强探索过程的真实感和说服力。"
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "核心贡献（Pose增强）有扎实的消融实验（Table 1）。",
+        "评估指标体系全面，涵盖了视觉（FVD/FID/LPIPS）、行为（TAA/ARC）和规则（Health/Damage）三个层面，metric-claim alignment极佳。",
+        "提供了代码引用（code_ref.md）和硬件说明，具备较好的可复现性基础。"
+      ],
+      "weaknesses": [
+        "缺乏统计显著性报告（如多次运行的均值和标准差/误差线），这对于生成模型（尤其是FVD/FID方差较大）尤为重要。",
+        "部分核心架构选择（如hybrid local-global attention、CausVid DMD）缺乏消融实验对比，仅在exploration tree中诚实记录了未做对比。"
+      ],
+      "suggestions": [
+        "补充主要生成指标（FVD, FD）的误差线或置信区间（至少3次随机种子运行）。",
+        "在补充材料中增加关于注意力机制（local vs global vs hybrid）和蒸馏策略的消融实验结果。"
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "major",
+      "observation": "核心生成指标（FVD, FD）缺乏多次运行的统计方差或误差线报告，且部分关键架构组件（如hybrid attention）缺少消融实验，影响了方法论的全面严谨性。"
+    },
+    {
+      "dimension": "D2_falsifiability",
+      "severity": "minor",
+      "observation": "C3和C4的证伪标准中包含'可用视觉质量'和'反映动作后果'等缺乏明确定量阈值的主观表述，降低了独立测试时的可操作性。"
+    },
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "suggestion",
+      "observation": "探索树中对未进行的替代方案进行了诚实记录，建议在dead-end节点中补充初步的失败数据或定性观察以增强说服力。"
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "suggestion",
+      "observation": "建议在Limitations中进一步量化该框架向非确定性环境或3D物理引擎迁移时的具体性能衰减边界。"
+    }
+  ]
+}

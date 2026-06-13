@@ -1,0 +1,116 @@
+{
+  "artifact": "ai",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.83,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Evidence is perfectly type-matched to claims: improvement claims use strong baseline comparisons (E1, E2), causal claims use component ablations (E3), and generalization claims use heterogeneous conditions (E4) and scaling (E5).",
+        "Every claim explicitly references the exact table and metrics that substantiate it, ensuring high semantic alignment."
+      ],
+      "weaknesses": [
+        "Table 5 (driving maneuvers) suffers from severe Markdown parsing and formatting issues, making the raw evidence hard to read directly without cross-referencing the original paper context."
+      ],
+      "suggestions": [
+        "Reformat or provide a clean CSV/JSON dump for Table 5 to ensure the evidence is machine-readable, unambiguous, and directly verifiable."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly specific, actionable, and directly tied to quantitative thresholds and table rows (e.g., specifying exact metrics like PDMS, L2, and Collision Rate).",
+        "Criteria explicitly define the conditions under which a claim would fail or need revision (e.g., C2 explicitly states it must not surpass DiffusionDrive, matching the nuanced claim)."
+      ],
+      "weaknesses": [
+        "None significant; the criteria are exceptionally well-formulated for an empirical deep learning paper."
+      ],
+      "suggestions": [
+        "Consider adding statistical significance thresholds (e.g., p-values or non-overlapping confidence intervals) to the falsification criteria for claims with marginal improvements."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Explicitly defines 'perception annotation-free' and clarifies the assumption that vision foundation models (Metric3D, Grounded-SAM) are used for priors/pseudo-labels, avoiding overclaiming.",
+        "C2 carefully calibrates the scope by admitting the method still underperforms DiffusionDrive on NavSim, preventing SOTA overclaiming.",
+        "Concepts clearly state boundary conditions (e.g., World4Drive does not output explicit perception results)."
+      ],
+      "weaknesses": [
+        "The reliance on off-the-shelf foundation models introduces implicit scope limitations regarding domain shift (e.g., severe weather where these models fail), which is not explicitly bounded in the claims."
+      ],
+      "suggestions": [
+        "Add a boundary condition or assumption explicitly addressing the out-of-distribution (OOD) failure modes of the upstream foundation models used for pseudo-labeling and depth estimation."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "The logical arc from Observations (cost of perception, single-modal limits) to Gaps, Insight (latent as evaluation medium), and Solution is seamless.",
+        "The architecture description perfectly maps to the conceptual definitions and the experimental validations, with every gap addressed by a specific module."
+      ],
+      "weaknesses": [
+        "None. The narrative is tightly coupled with the empirical evidence and structural design."
+      ],
+      "suggestions": [
+        "Maintain this level of coherence in future work by ensuring any new modules introduced are directly tied back to the core insight of latent-based trajectory evaluation."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "The exploration tree includes a genuine dead-end (X1: intentions without world model fail), backed by specific ablation rows (Table 3, rows 5 vs 6).",
+        "Pivots (P1) and decisions (D1-D4) clearly document the rationale for moving away from single-modal latent models to spatial-semantic enhanced latents."
+      ],
+      "weaknesses": [
+        "None. The inclusion of a concrete, data-backed negative result (X1) elevates the integrity of the exploration graph beyond typical post-hoc rationalizations."
+      ],
+      "suggestions": [
+        "Consider documenting the hyperparameter search space or failed architectural variants (e.g., different attention mechanisms for temporal aggregation) to further enrich the dead-ends."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Comprehensive baseline coverage across both open-loop (nuScenes) and closed-loop (NavSim) benchmarks.",
+        "Thorough ablation studies covering both core components (Table 3) and model scalability (Table 6).",
+        "Metric-claim alignment is strong, using standard and accepted metrics (L2, Collision Rate, PDMS)."
+      ],
+      "weaknesses": [
+        "Lacks statistical reporting (e.g., error bars, variance across multiple random seeds) for the main results, making it difficult to assess the significance of marginal improvements.",
+        "Table 5 exhibits severe formatting and alignment issues in the extracted Markdown, compromising data integrity and readability."
+      ],
+      "suggestions": [
+        "Report mean and standard deviation across at least 3 random seeds for all main tables to establish statistical significance.",
+        "Fix the column alignment and header parsing for Table 5 to ensure the maneuver-specific results are accurately represented."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "major",
+      "observation": "The absence of variance reporting (error bars or multiple seeds) makes it impossible to verify if marginal performance gains (e.g., 0.01m in L2 error or 0.02 in Collision Rate) are statistically significant or just training noise."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "Table 5 (driving maneuvers) has severely corrupted Markdown formatting (e.g., merged headers like 'L2 (m)↓ Left Right' and misaligned data cells), which obscures the actual evidence for claim C4."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "suggestion",
+      "observation": "While the paper clarifies that foundation models (Metric3D, Grounded-SAM) do not count as 'manual perception annotations', it does not explicitly bound the method's performance in domains where these upstream models fail (e.g., extreme OOD weather or sensor degradation)."
+    },
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "minor",
+      "observation": "The evidence for C4 relies partly on Table 5, but the parsing quality of this table in the bundle is poor, requiring the reader to infer the data structure rather than reading it directly."
+    }
+  ]
+}

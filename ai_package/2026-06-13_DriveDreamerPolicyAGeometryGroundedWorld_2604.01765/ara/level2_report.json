@@ -1,0 +1,91 @@
+{
+  "artifact": "ai",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.83,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Every claim is supported by type-appropriate evidence (e.g., causal claims C3 and C4 are supported by targeted ablation studies E3 and E4).",
+        "Improvement claims (C1, C2) are backed by comprehensive baseline comparisons (E1, E2) covering vision-based, VLA, and world-model methods.",
+        "Descriptive claim (C5) regarding query capacity is supported by a dedicated scaling ablation (E5)."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria for all claims are highly specific, actionable, and directly tied to the evaluation protocols and metrics used.",
+        "Criteria explicitly define the conditions under which a claim would be weakened or overturned (e.g., matching training budgets for C3, identical Navsim protocols for C1).",
+        "Scope-matched constraints are included, such as specifying the exact baselines (PWM, PPD) and metrics (LPIPS, FVD, AbsRel) for C2."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Claims are precisely scoped to the Navsim v1/v2 benchmarks and specific baseline categories.",
+        "Assumptions are explicitly documented in problem.md (e.g., reliance on DA3 for depth labels, LLM query embeddings as compact interfaces).",
+        "Boundary conditions in concepts.md clearly delineate what the model is not (e.g., not a full 3D occupancy model, not an iterative MPC planner), preventing overclaiming.",
+        "Evaluation scope is honestly calibrated (e.g., restricting video evaluation to single-view front quality to ensure fair comparison with PWM)."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "The logical arc from Observations (O1-O3) to Gaps (G1-G3) to Insight and Solution is seamless and well-justified.",
+        "Every identified gap is directly addressed by specific architectural decisions and validated by corresponding claims and experiments.",
+        "The transition from the problem diagnosis (lack of geometric grounding in WAMs) to the proposed solution (depth as a 3D scaffold in a causal pathway) is highly coherent."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "The exploration tree is rich and faithful, detailing 7 core questions, 7 decisions with explicit alternatives, and 7 experiments.",
+        "Includes a genuine dead-end (X1: action-only planning) with a clear failure mode and lesson learned, avoiding post-hoc rationalization.",
+        "Documents a logical pivot (P1) from pure video imagination to joint geometry-video world learning, reflecting a realistic research trajectory."
+      ],
+      "weaknesses": [],
+      "suggestions": []
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Baseline adequacy is excellent, covering a wide spectrum of state-of-the-art methods across three distinct paradigms (Vision, VLA, World-Model).",
+        "Ablation coverage is comprehensive, isolating the contributions of world learning, depth learning, and query bottleneck capacity.",
+        "Metric-claim alignment is strict, using standard and appropriate metrics for planning (PDMS/EPDMS), video (FVD/LPIPS), and depth (AbsRel).",
+        "Reproducibility details are well-documented, including hardware, datasets, dependencies, and code references."
+      ],
+      "weaknesses": [
+        "Lack of statistical reporting: The tables report single point estimates without standard deviations, confidence intervals, or results from multiple random seeds, which is necessary to confirm the statistical significance of the marginal improvements."
+      ],
+      "suggestions": [
+        "Report variance (e.g., standard deviation or confidence intervals) across multiple training seeds, especially for the ablation studies (Tables 4, 5, 6) where performance gaps are sometimes marginal.",
+        "Include statistical significance tests (e.g., paired t-tests or bootstrap confidence intervals) to substantiate claims of 'better' performance over strong baselines."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "While the empirical evaluation is extensive and well-structured, the absence of statistical variance reporting (error bars or multi-seed results) makes it difficult to ascertain whether the marginal gains in some sub-metrics and ablations are statistically significant or artifacts of random initialization."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "suggestion",
+      "observation": "The honest restriction of video evaluation to single-view front quality to match PWM's capabilities is excellent scope calibration. Future work could expand this to multi-view generation once baselines support it, to fully validate the multi-view geometry claims."
+    }
+  ]
+}

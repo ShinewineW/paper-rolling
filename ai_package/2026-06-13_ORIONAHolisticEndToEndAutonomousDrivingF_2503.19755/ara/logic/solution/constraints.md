@@ -1,0 +1,5 @@
+- ORION 在 Bench2Drive closed-loop simulation environment 中表现良好，但受 scalable VLM 的 high computational complexity 限制，难以直接满足 real-time driving scenarios。
+- 论文未来方向是通过 model compression 与 pruning 降低 ORION 复杂度，使其能实现 real-time autonomous driving。
+- ORION 在 nuScenes 的 VLM-Based 对比中并非最优；论文将其归因于 VAE latent space 更适合 Bench2Drive 的 multimodal trajectory distributions，而 nuScene dataset 更接近 uni-modal Gaussian distribution。
+- ORION 在 Merging 与 Give Way 上落后于 DriveAdapter；论文解释为 lane-changing 的 decision-making timing 更加多样，导致模型难以捕获正确 causal relationship。
+- 论文的主要闭环验证集中在 CARLA 与 Bench2Drive，真实道路部署、实时延迟和安全认证不在本文实证范围内。

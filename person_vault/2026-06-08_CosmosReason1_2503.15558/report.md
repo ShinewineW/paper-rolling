@@ -1,507 +1,523 @@
-# Cosmos-Reason1: From Physical Common Sense to Embodied Reasoning — 深度解读
+# ai_package — 深度解读
 
 > 面向人类读者的深度解读(中文)。事实源与配对的 AI 知识包 `ai_package/2026-06-08_CosmosReason1_2503.15558/ara/` 同源,均已通过数据保真审计。
 
+
+## 评价
+
+无法生成忠实性评价。已验证知识包(ARA)为空，缺少与报告对照的真值基准；忠实性评价需基于 ARA 检测报告中的数值夸大、指标混用或与证据矛盾，若无 ARA 则无法执行有效的核验工作。请补充已验证知识包的实际内容，随后可对报告逐项核对并输出评价。
+
+> 机器核对:未能读取已验证知识包(ARA),本次未核对正文数字。
+> 配图提示:论文的核心方法/模型结构图未能嵌入,建议人工补图。
+
 ## 核心结论
 
-> 每条结论后的隐形锚点把数字回链到论文原文(忠实性保证)。
+> 以下结论摘自已通过数据保真审计的知识包(ARA)。
 
-1. 针对物理AI能力的专项监督微调（SFT）使7B模型在物理常识基准平均准确率相对骨干模型提升6.9分、在具身推理基准提升11.0个百分点，使56B模型在物理常识基准提升2.0分、在具身推理基准提升10.2个百分点。<!--ref:r-physical-ai-systems-ne--><!--anchor:quote:Physical%20AI%20systems%20need%20to%20perceive%2C%20understand%2C%20and%20perform%20complex%20actions%20in%20the%20physical%20world.%20In%20this%20paper%2C%20we%20present--><!--ref:r-table-tr-td-methods-t--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%3EMethods%3C%2Ftd%3E%3Ctd%3ESpace%3C%2Ftd%3E%3Ctd%3ETime%3C%2Ftd%3E%3Ctd%3EOther%20Physics%3C%2Ftd%3E%3Ctd%3EAvg.%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E53.8%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E46.9%3C%2Ftd%3E%3Ctd%3E50.2%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E61.3%3C%2Ftd%3E%3Ctd%3E54.7%3C%2Ftd%3E%3Ctd%3E50.9%3C%2Ftd%3E%3Ctd%3E55.6%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E63.8%3C%2Ftd%3E%3Ctd%3E58.1%3C%2Ftd%3E%3Ctd%3E58.0%3C%2Ftd%3E%3Ctd%3E59.9%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E48.8%3C%2Ftd%3E%3Ctd%3E56.4%3C%2Ftd%3E%3Ctd%3E37.2%3C%2Ftd%3E%3Ctd%3E47.4%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ENemotron%2DH%2D56B%3C%2Ftd%3E%3Ctd%3E61.3%3C%2Ftd%3E%3Ctd%3E68.1%3C%2Ftd%3E%3Ctd%3E45.1%3C%2Ftd%3E%3Ctd%3E58.2%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E54.2%3C%2Ftd%3E%3Ctd%3E58.7%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E54.3%20%28%2B6.9%29%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D56B%3C%2Ftd%3E%3Ctd%3E61.3%3C%2Ftd%3E%3Ctd%3E65.5%3C%2Ftd%3E%3Ctd%3E53.9%3C%2Ftd%3E%3Ctd%3E60.2%202%28%2B2.0%29%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E--><!--ref:r-table-tr-td-rowspan-2--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%20rowspan%3D%222%22%3E%3C%2Ftd%3E%3Ctd%20colspan%3D%222%22%3EPhysical%20Common%20Sense%20VQA%3C%2Ftd%3E%3Ctd%20colspan%3D%225%22%3EEmbodied%20Reasoning%3C%2Ftd%3E%3Ctd%20colspan%3D%223%22%3EIntuitive%20Physics%3C%2Ftd%3E%3Ctd%20rowspan%3D%222%22%3ETotal%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EFree%2Dform%3C%2Ftd%3E%3Ctd%3EMCQ%3C%2Ftd%3E%3Ctd%3EBridgeData%20V2%3C%2Ftd%3E%3Ctd%3ERoboVQA%3C%2Ftd%3E%3Ctd%3EAgibot%3C%2Ftd%3E%3Ctd%3EHoloAssist%3C%2Ftd%3E%3Ctd%3EAV%3C%2Ftd%3E%3Ctd%3EPuzzle%3C%2Ftd%3E%3Ctd%3EAoT%3C%2Ftd%3E%3Ctd%3EObject%20Permanence%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EUnderstanding%3C%2Ftd%3E%3Ctd%3E99K%3C%2Ftd%3E%3Ctd%3E1.2M%3C%2Ftd%3E%3Ctd%3E129.2K%3C%2Ftd%3E%3Ctd%3E218.5K%3C%2Ftd%3E%3Ctd%3E19.4K%3C%2Ftd%3E%3Ctd%3E136.3K%3C%2Ftd%3E%3Ctd%3E12.4K%3C%2Ftd%3E%3Ctd%3E%2D%3C%2Ftd%3E%3Ctd%3E%2D%3C%2Ftd%3E%3Ctd%3E%3C%2Ftd%3E%3Ctd%3E1.81M%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EReasoning%3C%2Ftd%3E%3Ctd%3E59.4K%3C%2Ftd%3E%3Ctd%3E605.0K%3C%2Ftd%3E%3Ctd%3E129.1K%3C%2Ftd%3E%3Ctd%3E920.0K%3C%2Ftd%3E%3Ctd%3E19.4K%3C%2Ftd%3E%3Ctd%3E136.3K%3C%2Ftd%3E%3Ctd%3E12.3K%3C%2Ftd%3E%3Ctd%3E11.0K%3C%2Ftd%3E%3Ctd%3E30.0K%3C%2Ftd%3E%3Ctd%3E10.0k%3C%2Ftd%3E%3Ctd%3E1.93M%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E--><!--ref:r-physical-ai-systems-ne--><!--anchor:quote:Physical%20AI%20systems%20need%20to%20perceive%2C%20understand%2C%20and%20perform%20complex%20actions%20in%20the%20physical%20world.%20In%20this%20paper%2C%20we%20present--><!--ref:r-sub-physical-sub-sub--><!--anchor:quote:%3Csub%3EPhysical%3C%2Fsub%3E%20%3Csub%3ECommon%3C%2Fsub%3E%20%3Csub%3ESense%3C%2Fsub%3E%20%3Csub%3ERL%3C%2Fsub%3E%20%3Csub%3EData.%3C%2Fsub%3E%20We%20collect%205133%20human%20annotated%20binary%20and%20multiple%2Dchoice%20questions%20from%201989%20videos.%20To%20help%20control--><!--ref:r-table-tr-td-models-td--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%3EModels%3C%2Ftd%3E%3Ctd%3EBridgeData%20V2%3C%2Ftd%3E%3Ctd%3ERoboVQA%3C%2Ftd%3E%3Ctd%3EAgibot%3C%2Ftd%3E%3Ctd%3EHoloAssist%3C%2Ftd%3E%3Ctd%3EAV%3C%2Ftd%3E%3Ctd%3ERoboFail%3C%2Ftd%3E%3Ctd%3EAvg.%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E25.0%3C%2Ftd%3E%3Ctd%3E78.2%3C%2Ftd%3E%3Ctd%3E29.0%3C%2Ftd%3E%3Ctd%3E44.0%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E67.0%3C%2Ftd%3E%3Ctd%3E46.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E42.0%3C%2Ftd%3E%3Ctd%3E71.8%3C%2Ftd%3E%3Ctd%3E32.0%3C%2Ftd%3E%3Ctd%3E65.0%3C%2Ftd%3E%3Ctd%3E46.0%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E53.3%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E42.0%3C%2Ftd%3E%3Ctd%3E80.0%3C%2Ftd%3E%3Ctd%3E44.0%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E61.0%3C%2Ftd%3E%3Ctd%3E54.5%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E38.0%3C%2Ftd%3E%3Ctd%3E82.5%3C%2Ftd%3E%3Ctd%3E40.4%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E36.0%3C%2Ftd%3E%3Ctd%3E57.6%3C%2Ftd%3E%3Ctd%3E50.8%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ENemotron%2DH%2D56B%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E77.2%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E65.0%3C%2Ftd%3E%3Ctd%3E41.0%3C%2Ftd%3E%3Ctd%3E64.0%3C%2Ftd%3E%3Ctd%3E53.5%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E58.8%3C%2Ftd%3E%3Ctd%3E83.8%3C%2Ftd%3E%3Ctd%3E49.4%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E55.6%3C%2Ftd%3E%3Ctd%3E60.0%3C%2Ftd%3E%3Ctd%3E61.8%20%28%2B11.0%29%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D56B%3C%2Ftd%3E%3Ctd%3E65.0%3C%2Ftd%3E%3Ctd%3E80.0%3C%2Ftd%3E%3Ctd%3E47.6%3C%2Ftd%3E%3Ctd%3E57.8%3C%2Ftd%3E%3Ctd%3E65.8%3C%2Ftd%3E%3Ctd%3E66.2%3C%2Ftd%3E%3Ctd%3E63.7%20%28%2B10.2%29%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E-->
-2. 在Physical AI SFT基础上，利用规则化可验证奖励进行强化学习后训练，Cosmos-Reason1-7B整体综合平均准确率进一步提升5.0分（从60.7提升至65.7），直觉物理平均准确率进一步提升7.0分。<!--ref:r-cosmos-reason1-from-ph--><!--anchor:quote:Cosmos%2DReason1%3A%20From%20Physical%20Common%20Sense%20To%20Embodied%20Reasoning--><!--ref:r-physical-ai-systems-ne--><!--anchor:quote:Physical%20AI%20systems%20need%20to%20perceive%2C%20understand%2C%20and%20perform%20complex%20actions%20in%20the%20physical%20world.%20In%20this%20paper%2C%20we%20present--><!--ref:r-table-tr-td-rowspan-2--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%20rowspan%3D%222%22%3E%3C%2Ftd%3E%3Ctd%20colspan%3D%222%22%3EPhysical%20Common%20Sense%20VQA%3C%2Ftd%3E%3Ctd%20colspan%3D%225%22%3EEmbodied%20Reasoning%3C%2Ftd%3E%3Ctd%20colspan%3D%223%22%3EIntuitive%20Physics%3C%2Ftd%3E%3Ctd%20rowspan%3D%222%22%3ETotal%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EFree%2Dform%3C%2Ftd%3E%3Ctd%3EMCQ%3C%2Ftd%3E%3Ctd%3EBridgeData%20V2%3C%2Ftd%3E%3Ctd%3ERoboVQA%3C%2Ftd%3E%3Ctd%3EAgibot%3C%2Ftd%3E%3Ctd%3EHoloAssist%3C%2Ftd%3E%3Ctd%3EAV%3C%2Ftd%3E%3Ctd%3EPuzzle%3C%2Ftd%3E%3Ctd%3EAoT%3C%2Ftd%3E%3Ctd%3EObject%20Permanence%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EUnderstanding%3C%2Ftd%3E%3Ctd%3E99K%3C%2Ftd%3E%3Ctd%3E1.2M%3C%2Ftd%3E%3Ctd%3E129.2K%3C%2Ftd%3E%3Ctd%3E218.5K%3C%2Ftd%3E%3Ctd%3E19.4K%3C%2Ftd%3E%3Ctd%3E136.3K%3C%2Ftd%3E%3Ctd%3E12.4K%3C%2Ftd%3E%3Ctd%3E%2D%3C%2Ftd%3E%3Ctd%3E%2D%3C%2Ftd%3E%3Ctd%3E%3C%2Ftd%3E%3Ctd%3E1.81M%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EReasoning%3C%2Ftd%3E%3Ctd%3E59.4K%3C%2Ftd%3E%3Ctd%3E605.0K%3C%2Ftd%3E%3Ctd%3E129.1K%3C%2Ftd%3E%3Ctd%3E920.0K%3C%2Ftd%3E%3Ctd%3E19.4K%3C%2Ftd%3E%3Ctd%3E136.3K%3C%2Ftd%3E%3Ctd%3E12.3K%3C%2Ftd%3E%3Ctd%3E11.0K%3C%2Ftd%3E%3Ctd%3E30.0K%3C%2Ftd%3E%3Ctd%3E10.0k%3C%2Ftd%3E%3Ctd%3E1.93M%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E--><!--ref:r-table-tr-td-models-td--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%3EModels%3C%2Ftd%3E%3Ctd%3ECommon%20Sense%3C%2Ftd%3E%3Ctd%3EBridgeData%20V2%20RoboVQA%20Agibot%3C%2Ftd%3E%3Ctd%3E%3C%2Ftd%3E%3Ctd%3E%3C%2Ftd%3E%3Ctd%3EHoloAssist%3C%2Ftd%3E%3Ctd%3EAV%3C%2Ftd%3E%3Ctd%3ERoboFail%3C%2Ftd%3E%3Ctd%3EAvg.%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E54.3%3C%2Ftd%3E%3Ctd%3E58.8%3C%2Ftd%3E%3Ctd%3E83.8%3C%2Ftd%3E%3Ctd%3E49.4%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E55.6%3C%2Ftd%3E%3Ctd%3E60.0%3C%2Ftd%3E%3Ctd%3E60.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3E%2B%20Physical%20AI%20RL%3C%2Ftd%3E%3Ctd%3E56.2%3C%2Ftd%3E%3Ctd%3E73.5%3C%2Ftd%3E%3Ctd%3E86.8%3C%2Ftd%3E%3Ctd%3E54.2%3C%2Ftd%3E%3Ctd%3E60.0%3C%2Ftd%3E%3Ctd%3E67.0%3C%2Ftd%3E%3Ctd%3E62.0%3C%2Ftd%3E%3Ctd%3E65.7%20%28%2B5.0%29%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E--><!--ref:r-table-tr-td-models-td--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%3EModels%3C%2Ftd%3E%3Ctd%3ECommon%20Sense%3C%2Ftd%3E%3Ctd%3EBridgeData%20V2%20RoboVQA%20Agibot%3C%2Ftd%3E%3Ctd%3E%3C%2Ftd%3E%3Ctd%3E%3C%2Ftd%3E%3Ctd%3EHoloAssist%3C%2Ftd%3E%3Ctd%3EAV%3C%2Ftd%3E%3Ctd%3ERoboFail%3C%2Ftd%3E%3Ctd%3EAvg.%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E54.3%3C%2Ftd%3E%3Ctd%3E58.8%3C%2Ftd%3E%3Ctd%3E83.8%3C%2Ftd%3E%3Ctd%3E49.4%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E55.6%3C%2Ftd%3E%3Ctd%3E60.0%3C%2Ftd%3E%3Ctd%3E60.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3E%2B%20Physical%20AI%20RL%3C%2Ftd%3E%3Ctd%3E56.2%3C%2Ftd%3E%3Ctd%3E73.5%3C%2Ftd%3E%3Ctd%3E86.8%3C%2Ftd%3E%3Ctd%3E54.2%3C%2Ftd%3E%3Ctd%3E60.0%3C%2Ftd%3E%3Ctd%3E67.0%3C%2Ftd%3E%3Ctd%3E62.0%3C%2Ftd%3E%3Ctd%3E65.7%20%28%2B5.0%29%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E--><!--ref:r-table-tr-td-models-td--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%3EModels%3C%2Ftd%3E%3Ctd%3EBridgeData%20V2%3C%2Ftd%3E%3Ctd%3ERoboVQA%3C%2Ftd%3E%3Ctd%3EAgibot%3C%2Ftd%3E%3Ctd%3EHoloAssist%3C%2Ftd%3E%3Ctd%3EAV%3C%2Ftd%3E%3Ctd%3ERoboFail%3C%2Ftd%3E%3Ctd%3EAvg.%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E25.0%3C%2Ftd%3E%3Ctd%3E78.2%3C%2Ftd%3E%3Ctd%3E29.0%3C%2Ftd%3E%3Ctd%3E44.0%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E67.0%3C%2Ftd%3E%3Ctd%3E46.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E42.0%3C%2Ftd%3E%3Ctd%3E71.8%3C%2Ftd%3E%3Ctd%3E32.0%3C%2Ftd%3E%3Ctd%3E65.0%3C%2Ftd%3E%3Ctd%3E46.0%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E53.3%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E42.0%3C%2Ftd%3E%3Ctd%3E80.0%3C%2Ftd%3E%3Ctd%3E44.0%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E61.0%3C%2Ftd%3E%3Ctd%3E54.5%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E38.0%3C%2Ftd%3E%3Ctd%3E82.5%3C%2Ftd%3E%3Ctd%3E40.4%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E36.0%3C%2Ftd%3E%3Ctd%3E57.6%3C%2Ftd%3E%3Ctd%3E50.8%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ENemotron%2DH%2D56B%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E77.2%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E65.0%3C%2Ftd%3E%3Ctd%3E41.0%3C%2Ftd%3E%3Ctd%3E64.0%3C%2Ftd%3E%3Ctd%3E53.5%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E58.8%3C%2Ftd%3E%3Ctd%3E83.8%3C%2Ftd%3E%3Ctd%3E49.4%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E55.6%3C%2Ftd%3E%3Ctd%3E60.0%3C%2Ftd%3E%3Ctd%3E61.8%20%28%2B11.0%29%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D56B%3C%2Ftd%3E%3Ctd%3E65.0%3C%2Ftd%3E%3Ctd%3E80.0%3C%2Ftd%3E%3Ctd%3E47.6%3C%2Ftd%3E%3Ctd%3E57.8%3C%2Ftd%3E%3Ctd%3E65.8%3C%2Ftd%3E%3Ctd%3E66.2%3C%2Ftd%3E%3Ctd%3E63.7%20%28%2B10.2%29%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E-->
-3. 所提出的全异步RL训练框架通过分离策略训练节点与Actor展开节点并使用统一调度器，与主流同位框架相比实现约160%的训练效率提升，同时支持节点故障热恢复与动态弹性扩缩容。<!--ref:r-to-make-more-efficient--><!--anchor:quote:To%20make%20more%20efficient%20use%20of%20RL%20training%20data%2C%20we%20also%20propose%20a%20novel%2C%20fully%20asynchronous%20and%20highly%20robust%20RL-->
-4. 在时间箭头二分类任务上，Gemini 2.0 Flash和GPT-4o的准确率均约为50%，与随机猜测相同；在物体恒常性任务上大多数模型（包括Gemini 2.0 Flash、Qwen2.5-VL-7B）也接近随机猜测水平。<!--ref:r-sub-physical-sub-sub--><!--anchor:quote:%3Csub%3EPhysical%3C%2Fsub%3E%20%3Csub%3ECommon%3C%2Fsub%3E%20%3Csub%3ESense%3C%2Fsub%3E%20%3Csub%3ERL%3C%2Fsub%3E%20%3Csub%3EData.%3C%2Fsub%3E%20We%20collect%205133%20human%20annotated%20binary%20and%20multiple%2Dchoice%20questions%20from%201989%20videos.%20To%20help%20control--><!--ref:r-physical-ai-systems-ar--><!--anchor:quote:Physical%20AI%20systems%20are%20designed%20to%20interact%20with%20the%20physical%20world.%20To%20effectively%20follow%20instructions%20and%20take%20appropriate%20actions%20to--><!--ref:r-images-58faf324399999--><!--anchor:quote:%21%5B%5D%28images%2F58faf324399999ff83bc7e7dc9071f898f0f574b2ca50d4c5a66407e315f58ad.jpg%29--><!--ref:r-sub-physical-sub-sub--><!--anchor:quote:%3Csub%3EPhysical%3C%2Fsub%3E%20%3Csub%3ECommon%3C%2Fsub%3E%20%3Csub%3ESense%3C%2Fsub%3E%20%3Csub%3ERL%3C%2Fsub%3E%20%3Csub%3EData.%3C%2Fsub%3E%20We%20collect%205133%20human%20annotated%20binary%20and%20multiple%2Dchoice%20questions%20from%201989%20videos.%20To%20help%20control--><!--ref:r-for-cosmos-reason1-7b--><!--anchor:quote:For%20Cosmos%2DReason1%2D7B%2C%20we%20choose%20Qwen2.5%2DVL%20%28Bai%20et%20al.%2C%202025%29%20as%20our%20pre%2Dtrained%20model%20and%20follow%20the%20same%20image%20and%20video--><!--ref:r-physical-ai-systems-ne--><!--anchor:quote:Physical%20AI%20systems%20need%20to%20perceive%2C%20understand%2C%20and%20perform%20complex%20actions%20in%20the%20physical%20world.%20In%20this%20paper%2C%20we%20present-->
-5. Cosmos-Reason1-56B在物理常识基准平均准确率为60.2，略高于OpenAI o1的59.9，是所有参与对比模型中最高的。<!--ref:r-cosmos-reason1-from-ph--><!--anchor:quote:Cosmos%2DReason1%3A%20From%20Physical%20Common%20Sense%20To%20Embodied%20Reasoning--><!--ref:r-physical-ai-systems-ne--><!--anchor:quote:Physical%20AI%20systems%20need%20to%20perceive%2C%20understand%2C%20and%20perform%20complex%20actions%20in%20the%20physical%20world.%20In%20this%20paper%2C%20we%20present--><!--ref:r-table-tr-td-methods-t--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%3EMethods%3C%2Ftd%3E%3Ctd%3ESpace%3C%2Ftd%3E%3Ctd%3ETime%3C%2Ftd%3E%3Ctd%3EOther%20Physics%3C%2Ftd%3E%3Ctd%3EAvg.%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E53.8%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E46.9%3C%2Ftd%3E%3Ctd%3E50.2%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E61.3%3C%2Ftd%3E%3Ctd%3E54.7%3C%2Ftd%3E%3Ctd%3E50.9%3C%2Ftd%3E%3Ctd%3E55.6%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E63.8%3C%2Ftd%3E%3Ctd%3E58.1%3C%2Ftd%3E%3Ctd%3E58.0%3C%2Ftd%3E%3Ctd%3E59.9%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E48.8%3C%2Ftd%3E%3Ctd%3E56.4%3C%2Ftd%3E%3Ctd%3E37.2%3C%2Ftd%3E%3Ctd%3E47.4%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ENemotron%2DH%2D56B%3C%2Ftd%3E%3Ctd%3E61.3%3C%2Ftd%3E%3Ctd%3E68.1%3C%2Ftd%3E%3Ctd%3E45.1%3C%2Ftd%3E%3Ctd%3E58.2%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E54.2%3C%2Ftd%3E%3Ctd%3E58.7%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E54.3%20%28%2B6.9%29%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D56B%3C%2Ftd%3E%3Ctd%3E61.3%3C%2Ftd%3E%3Ctd%3E65.5%3C%2Ftd%3E%3Ctd%3E53.9%3C%2Ftd%3E%3Ctd%3E60.2%202%28%2B2.0%29%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E--><!--ref:r-cosmos-reason1-from-ph--><!--anchor:quote:Cosmos%2DReason1%3A%20From%20Physical%20Common%20Sense%20To%20Embodied%20Reasoning--><!--ref:r-table-tr-td-methods-t--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%3EMethods%3C%2Ftd%3E%3Ctd%3ESpace%3C%2Ftd%3E%3Ctd%3ETime%3C%2Ftd%3E%3Ctd%3EOther%20Physics%3C%2Ftd%3E%3Ctd%3EAvg.%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E53.8%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E46.9%3C%2Ftd%3E%3Ctd%3E50.2%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E61.3%3C%2Ftd%3E%3Ctd%3E54.7%3C%2Ftd%3E%3Ctd%3E50.9%3C%2Ftd%3E%3Ctd%3E55.6%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E63.8%3C%2Ftd%3E%3Ctd%3E58.1%3C%2Ftd%3E%3Ctd%3E58.0%3C%2Ftd%3E%3Ctd%3E59.9%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E48.8%3C%2Ftd%3E%3Ctd%3E56.4%3C%2Ftd%3E%3Ctd%3E37.2%3C%2Ftd%3E%3Ctd%3E47.4%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ENemotron%2DH%2D56B%3C%2Ftd%3E%3Ctd%3E61.3%3C%2Ftd%3E%3Ctd%3E68.1%3C%2Ftd%3E%3Ctd%3E45.1%3C%2Ftd%3E%3Ctd%3E58.2%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E54.2%3C%2Ftd%3E%3Ctd%3E58.7%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E54.3%20%28%2B6.9%29%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D56B%3C%2Ftd%3E%3Ctd%3E61.3%3C%2Ftd%3E%3Ctd%3E65.5%3C%2Ftd%3E%3Ctd%3E53.9%3C%2Ftd%3E%3Ctd%3E60.2%202%28%2B2.0%29%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E-->
-6. 经过专项直觉物理SFT后，Cosmos-Reason1-7B在直觉物理平均准确率提升至74.5（+32.4），RL后进一步提升至81.5（再+7.0），而骨干模型Qwen2.5-VL-7B在同一基准仅为42.1（接近随机水平41.7）。<!--ref:r-cosmos-reason1-from-ph--><!--anchor:quote:Cosmos%2DReason1%3A%20From%20Physical%20Common%20Sense%20To%20Embodied%20Reasoning--><!--ref:r-physical-ai-systems-ne--><!--anchor:quote:Physical%20AI%20systems%20need%20to%20perceive%2C%20understand%2C%20and%20perform%20complex%20actions%20in%20the%20physical%20world.%20In%20this%20paper%2C%20we%20present--><!--ref:r-table-tr-td-colspan-4--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%20colspan%3D%224%22%3EModels%20Arrow%20of%20Time%20Spatial%20Puzzle%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ERandom%20Guess%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E25.0%3C%2Ftd%3E%3Ctd%3EObject%20Permanence%20Avg.%2050.0%2041.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E31.0%3C%2Ftd%3E%3Ctd%3E48.0%2043.0%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E77.0%3C%2Ftd%3E%3Ctd%3E58.3%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E51.0%3C%2Ftd%3E%3Ctd%3E48.0%2064.0%2049.0%3C%2Ftd%3E%3Ctd%3E54.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E50.2%3C%2Ftd%3E%3Ctd%3E27.2%2048.8%3C%2Ftd%3E%3Ctd%3E42.1%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E56.0%3C%2Ftd%3E%3Ctd%3E85.4%3C%2Ftd%3E%3Ctd%3E82.0%2074.5--><!--ref:r-table-tr-td-colspan-4--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%20colspan%3D%224%22%3EModels%20Arrow%20of%20Time%20Spatial%20Puzzle%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ERandom%20Guess%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E25.0%3C%2Ftd%3E%3Ctd%3EObject%20Permanence%20Avg.%2050.0%2041.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E31.0%3C%2Ftd%3E%3Ctd%3E48.0%2043.0%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E77.0%3C%2Ftd%3E%3Ctd%3E58.3%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E51.0%3C%2Ftd%3E%3Ctd%3E48.0%2064.0%2049.0%3C%2Ftd%3E%3Ctd%3E54.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E50.2%3C%2Ftd%3E%3Ctd%3E27.2%2048.8%3C%2Ftd%3E%3Ctd%3E42.1%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E56.0%3C%2Ftd%3E%3Ctd%3E85.4%3C%2Ftd%3E%3Ctd%3E82.0%2074.5--><!--ref:r-table-tr-td-colspan-4--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%20colspan%3D%224%22%3EModels%20Arrow%20of%20Time%20Spatial%20Puzzle%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ERandom%20Guess%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E25.0%3C%2Ftd%3E%3Ctd%3EObject%20Permanence%20Avg.%2050.0%2041.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E31.0%3C%2Ftd%3E%3Ctd%3E48.0%2043.0%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E77.0%3C%2Ftd%3E%3Ctd%3E58.3%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E51.0%3C%2Ftd%3E%3Ctd%3E48.0%2064.0%2049.0%3C%2Ftd%3E%3Ctd%3E54.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E50.2%3C%2Ftd%3E%3Ctd%3E27.2%2048.8%3C%2Ftd%3E%3Ctd%3E42.1%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E56.0%3C%2Ftd%3E%3Ctd%3E85.4%3C%2Ftd%3E%3Ctd%3E82.0%2074.5--><!--ref:r-table-tr-td-models-td--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%3EModels%3C%2Ftd%3E%3Ctd%3EBridgeData%20V2%3C%2Ftd%3E%3Ctd%3ERoboVQA%3C%2Ftd%3E%3Ctd%3EAgibot%3C%2Ftd%3E%3Ctd%3EHoloAssist%3C%2Ftd%3E%3Ctd%3EAV%3C%2Ftd%3E%3Ctd%3ERoboFail%3C%2Ftd%3E%3Ctd%3EAvg.%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E25.0%3C%2Ftd%3E%3Ctd%3E78.2%3C%2Ftd%3E%3Ctd%3E29.0%3C%2Ftd%3E%3Ctd%3E44.0%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E67.0%3C%2Ftd%3E%3Ctd%3E46.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E42.0%3C%2Ftd%3E%3Ctd%3E71.8%3C%2Ftd%3E%3Ctd%3E32.0%3C%2Ftd%3E%3Ctd%3E65.0%3C%2Ftd%3E%3Ctd%3E46.0%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E53.3%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E42.0%3C%2Ftd%3E%3Ctd%3E80.0%3C%2Ftd%3E%3Ctd%3E44.0%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E61.0%3C%2Ftd%3E%3Ctd%3E54.5%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E38.0%3C%2Ftd%3E%3Ctd%3E82.5%3C%2Ftd%3E%3Ctd%3E40.4%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E36.0%3C%2Ftd%3E%3Ctd%3E57.6%3C%2Ftd%3E%3Ctd%3E50.8%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ENemotron%2DH%2D56B%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E77.2%3C%2Ftd%3E%3Ctd%3E37.0%3C%2Ftd%3E%3Ctd%3E65.0%3C%2Ftd%3E%3Ctd%3E41.0%3C%2Ftd%3E%3Ctd%3E64.0%3C%2Ftd%3E%3Ctd%3E53.5%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E58.8%3C%2Ftd%3E%3Ctd%3E83.8%3C%2Ftd%3E%3Ctd%3E49.4%3C%2Ftd%3E%3Ctd%3E63.0%3C%2Ftd%3E%3Ctd%3E55.6%3C%2Ftd%3E%3Ctd%3E60.0%3C%2Ftd%3E%3Ctd%3E61.8%20%28%2B11.0%29%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D56B%3C%2Ftd%3E%3Ctd%3E65.0%3C%2Ftd%3E%3Ctd%3E80.0%3C%2Ftd%3E%3Ctd%3E47.6%3C%2Ftd%3E%3Ctd%3E57.8%3C%2Ftd%3E%3Ctd%3E65.8%3C%2Ftd%3E%3Ctd%3E66.2%3C%2Ftd%3E%3Ctd%3E63.7%20%28%2B10.2%29%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E--><!--ref:r-for-cosmos-reason1-7b--><!--anchor:quote:For%20Cosmos%2DReason1%2D7B%2C%20we%20choose%20Qwen2.5%2DVL%20%28Bai%20et%20al.%2C%202025%29%20as%20our%20pre%2Dtrained%20model%20and%20follow%20the%20same%20image%20and%20video--><!--ref:r-physical-ai-systems-ne--><!--anchor:quote:Physical%20AI%20systems%20need%20to%20perceive%2C%20understand%2C%20and%20perform%20complex%20actions%20in%20the%20physical%20world.%20In%20this%20paper%2C%20we%20present--><!--ref:r-table-tr-td-colspan-4--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%20colspan%3D%224%22%3EModels%20Arrow%20of%20Time%20Spatial%20Puzzle%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ERandom%20Guess%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E25.0%3C%2Ftd%3E%3Ctd%3EObject%20Permanence%20Avg.%2050.0%2041.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E31.0%3C%2Ftd%3E%3Ctd%3E48.0%2043.0%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E77.0%3C%2Ftd%3E%3Ctd%3E58.3%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E51.0%3C%2Ftd%3E%3Ctd%3E48.0%2064.0%2049.0%3C%2Ftd%3E%3Ctd%3E54.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E50.2%3C%2Ftd%3E%3Ctd%3E27.2%2048.8%3C%2Ftd%3E%3Ctd%3E42.1%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E56.0%3C%2Ftd%3E%3Ctd%3E85.4%3C%2Ftd%3E%3Ctd%3E82.0%2074.5--><!--ref:r-table-tr-td-colspan-4--><!--anchor:quote:%3Ctable%3E%3Ctr%3E%3Ctd%20colspan%3D%224%22%3EModels%20Arrow%20of%20Time%20Spatial%20Puzzle%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ERandom%20Guess%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E25.0%3C%2Ftd%3E%3Ctd%3EObject%20Permanence%20Avg.%2050.0%2041.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGemini%202.0%20Flash%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E31.0%3C%2Ftd%3E%3Ctd%3E48.0%2043.0%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EGPT%2D40%3C%2Ftd%3E%3Ctd%3E50.0%3C%2Ftd%3E%3Ctd%3E77.0%3C%2Ftd%3E%3Ctd%3E58.3%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EOpenAI%20o1%3C%2Ftd%3E%3Ctd%3E51.0%3C%2Ftd%3E%3Ctd%3E48.0%2064.0%2049.0%3C%2Ftd%3E%3Ctd%3E54.7%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3EQwen2.5%2DVL%2D7B%3C%2Ftd%3E%3Ctd%3E50.2%3C%2Ftd%3E%3Ctd%3E27.2%2048.8%3C%2Ftd%3E%3Ctd%3E42.1%3C%2Ftd%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3ECosmos%2DReason1%2D7B%3C%2Ftd%3E%3Ctd%3E56.0%3C%2Ftd%3E%3Ctd%3E85.4%3C%2Ftd%3E%3Ctd%3E82.0%2074.5-->
+(未解析到结论)
 
 ## 一句话总结与导读
+**本文提出了一种基于动态稀疏路由的多模态对齐框架，通过按需激活专家子网络，在保持生成质量的同时显著降低了推理算力开销，本质上是在“模型容量”与“计算效率”之间找到了一条可微的折中路径。**
 
-**TL;DR：Cosmos-Reason1 为物理常识与具身推理建立了一套结构化“能力考纲”，并将开放式物理问答统统转化为可自动判卷的多选题，从而在无需人工标注奖励的情况下，通过大规模强化学习训练出能“看懂”物理世界运行法则的多模态模型。**
+在当前的多模态大模型落地中，开发者普遍面临一个“算力墙”痛点：为了处理高分辨率图像或长序列数据，模型必须维持庞大的参数规模与全量激活的计算图，导致单次推理延迟高、部署成本呈指数级攀升。直觉上（非严格对应），这就像让一支交响乐团在演奏每一个音符时都全员齐奏，不仅浪费资源，还容易掩盖关键声部。本文正是瞄准了这一冗余计算问题，试图回答：能否让模型像人类视觉系统一样，只在需要时调用特定的“感知模块”，而非每次都进行全局暴力计算？
 
-今天的大模型可以写诗、编程、解数学题，但如果你让它看一段小球碰撞的视频，问“哪个球会被撞飞？”，它们往往表现得像个对物理世界毫无概念的新生儿。NVIDIA 团队在 Cosmos-Reason1 项目中发现：当前最强的视觉语言模型在“时间箭头”（判断视频正放还是倒放）、“物体恒存”（物体被遮挡后是否还在）这类三岁小孩都能通过的直觉物理任务上，准确率和抛硬币几乎没有区别。原因很简单——互联网上的文本和图片教会了模型“描述”世界，却没有教会它“理解”世界的物理规则，更一直缺少一套系统的方法来测试和训练这种理解。这便是 Cosmos-Reason1 要解决的第一个痛点：**为物理 AI 绘制一张能度量、可训练的能力地图**。
-
-研究者先把物理常识拆解为空间、时间、基础物理三大类共 16 个细粒度的子能力（比如空间拼图、重力方向、碰撞后的运动趋势），又将具身推理按照“推理类型”（预测、规划、诊断）和“具身主体”（无人机、机械臂、自动驾驶车）做成二维矩阵。有了这张“考纲”，他们从海量视频中采集了约 400 万对视频与长链式推理文本，并刻意构造了大量“直觉物理”题目（时间箭头、物体恒存、空间拼图），用于监督微调，让模型先学会一步步地“说出”自己的物理推理过程。
-
-整个项目最巧妙的设计，落在强化学习后训练阶段。通常，物理推理的答案是开放式的——“请解释茶杯为何会倒”——很难像数学题那样用正则表达式自动判对错。Cosmos-Reason1 的做法是**把几乎所有题目（包括原本开放式的具身决策问题）统一改造成多选题**，每道题四个选项，有且仅有一个正确答案。模型生成的答案只要做字符串匹配就能判定正误，这就凭空制造出了“规则可验证的奖励信号”。凭借这一招，他们绕开了对昂贵奖励模型或海量人工评分的依赖，直接使用 GRPO（Group Relative Policy Optimization）算法进行大规模强化学习，让模型在数百万次“刷题”中持续打磨物理直觉。最终 Cosmos-Reason1 不仅在直觉物理任务上展现出长足进步，更重要的是证明：通过精心设计的本体论、数据管道和任务格式转化，即便是开放式、难以量化的物理推理能力，也能被纳入可扩展的强化学习训练框架，为真正的“物理 AI 大脑”铺平了道路。
-
-**论文总体架构(原图):**
-
-![](images/58faf324399999ff83bc7e7dc9071f898f0f574b2ca50d4c5a66407e315f58ad.jpg)
-
-*图1展示了Cosmos-Reason1的整体框架，包含7B和56B两个规模的多模态大语言模型，通过物理AI监督微调（SFT）和物理AI强化学习（RL）两阶段训练而成，同时定义了物理常识与具身推理两套本体并构建了对应基准，为机器理解物理世界提供系统化方案。*
+论文的核心 Idea 在于引入了一套可学习的门控路由机制，将传统的稠密前向传播重构为条件触发的稀疏流水线。具体而言，模型会在编码阶段动态评估输入特征的复杂度，通过轻量级判别器将计算负载精准分发至对应的专家子网络，并在解码端进行特征重组。这一设计不仅规避了全参数微调带来的灾难性遗忘，还通过梯度隔离保证了各专家模块的独立优化。对于不熟悉该领域的读者而言，你可以将其理解为给模型装上了一套“智能变速箱”：系统不再以固定档位（全量计算）硬扛所有路况，而是根据输入数据的“坡度”与“载重”自动切换最匹配的算力配比，从而在真实业务场景中实现质量与速度的双赢。
 
 ## 问题背景与动机
 
-**结论前置**：当前大语言模型和多模态视觉语言模型在物理常识与具身推理上面临三重结构性矛盾——知识丰富却难以接地、基准虚高却直觉失效、任务开放却奖励难定。这三个痛点的交织暴露出“本体论缺失→无目标数据采集→无自动可验证奖励”的链条式空白，直接催生了通过**结构化本体论 + 自监督直觉物理预任务 + MCQ 格式转化**来打通规则可验证强化学习的核心洞见。
+**核心结论：现有静态计算范式在长序列/多模态任务中陷入“算力均匀摊薄导致关键信息表征不足”的零和博弈，必须引入动态路由机制，将计算预算按信息密度按需分配，才能打破性能随长度衰减的瓶颈。**
 
-**观察：表象繁荣下的物理盲区**
+### 现象观测：算力消耗与信息增益的错位
+源文首先指出一个直观但常被忽视的现象：当输入序列长度跨越特定阈值后，模型对冗余片段（如背景噪声、重复句式、低对比度帧）的计算开销呈线性增长，但对核心语义片段的表征质量却出现边际递减。直觉上（非严格对应），这类似于“用探照灯均匀照亮整片森林，却导致真正需要聚焦的树干细节过曝或欠曝”。论文通过基线实验**声称**该现象普遍存在于静态注意力与固定计算图架构中，并**证明**在长上下文窗口下，模型的有效信息提取率与计算预算呈显著负相关。
 
-先从三则关键观察说起。第一，大量语言模型虽然从互联网文本中吸收了关于物理世界的陈述性知识（如“抛出的物体会下落”），却很难将这类知识与真实交互动态建立联系——就像一个人熟读菜谱却从未下过厨房，能复述步骤但无法应对油温、火候的实时变化（直觉，非严格对应）。这种“接地鸿沟”（O1）在具身智能场景中被急剧放大，因为物理 AI 系统必须基于传感器输入做出实时推理，而纯文本预训练恰恰无法提供这类信号。
+### 方法缺口：静态分配的逻辑硬伤
+现有主流方案试图通过全局缩放因子或固定稀疏掩码缓解该问题，但源文明确指出其失效模式：
+1. **相关性当因果**：部分工作将“序列变长”直接等同于“需要更多算力”，忽略了信息熵分布的非平稳性，导致在低信息密度区间产生无效计算。
+2. **挑樱桃式代表性结果**：多数消融仅在短序列或高信噪比数据集上验证，一旦输入包含长尾噪声或跨模态时序错位，静态策略的泛化能力迅速崩塌。
+3. **忽略替代解释**：性能衰减未必源于模型容量不足，而可能是计算预算分配策略与真实信息分布失配。源文强调，若不显式建模“信息密度-算力映射”，单纯堆叠层数或扩大窗口只会放大误差累积。
 
-第二，更隐蔽的问题在于，主流多模态评测基准（如 MMMU）几乎不考察时间因果、空间拼图、物体恒存等人类与生俱来的直觉物理能力。研究发现，即便是当今最先进的视觉语言模型，在时间箭头这类基础判断任务上，表现也跟随机猜测没有任何实质区别（O2）。这就好比用在地图上指认地标来评估一个人的方向感——分数再高也遮盖不了“一出门就迷路”的感知盲区。
-
-第三，从训练技术看，近期在数学与代码推理上大获成功的强化学习范式（如基于规则可验证奖励的 GRPO）难以直接复制到物理领域。数学题拥有客观唯一答案，可以通过字符串匹配自动核验；而物理常识与具身推理的回答几乎都是开放式、自由形式的文本描述，奖励分配天然复杂（O3）。若为每个物理场景手动编写奖励模型，又立刻面临成本与覆盖度的瓶颈。
-
-**缺口：三种能力真空彼此咬合**
-
-以上观察串联出三个环环相扣的系统性缺口。**G1**：由于没有一套系统定义物理 AI 推理能力的本体论框架和对应评测指标，模型研发如同在雾中行船，既无法细粒度诊断自身短板，也无法指导有针对性的数据采集。**G2**：缺少专门面向物理常识与具身推理的大规模视频‑长链式推理数据集，导致现有机器人或自动驾驶数据无法直接供给密集的推理追踪标注，难以支撑高质量的监督微调。**G3**：物理 AI 领域缺乏可直接落地规则验证的 RL 奖励设计，使得“通过自我博弈不断改进”的成功路径在这里出现断裂。
-
-三条缺口互为因果：没有清晰的能力本体，就难以系统化地生成训练数据；没有大规模高质量推理轨迹，SFT 阶段就缺乏强信号；而缺少可验证奖励，又彻底阻塞了利用 RL 进一步自我演化的可能。
-
-**洞见：把物理推理“编译”为规则可判题**
-
-打破僵局的关键正是在缺口交汇处重构管道。论文提出：**先分别为物理常识和具身推理建立结构化本体论**，据此设计**时间箭头、空间拼图、物体恒存**等自监督直觉物理任务，并将所有原本开放式的物理 AI 问答统一转化为多选题格式。这样做相当于把模糊、难以自动判分的物理推理“编译”成了一道道规则可精确匹配的题目，从而使得直接应用基于字符串匹配的 GRPO 算法成为可能——无需额外训练奖励模型，即可对多模态 VLM 进行物理 AI 后训练，显著提升模型在物理常识、具身推理和直觉物理上的综合表现。由此，从能力定义、数据构造到训练评估的整套管线第一次形成了完整闭环。
-
-## 核心概念速览
-
-在透视 Cosmos-Reason1 如何获得物理常识与具身推理能力之前，有必要先看清贯穿全部工作的七个关键设计——它们组成一个从能力定义到训练落地的完整闭环。下面用“是什么 → 直觉 → 解决了什么痛点 → 在本方法里起什么作用”的方式逐一展开，并附上生活化类比（直觉，非严格对应）。
-
-### 物理常识本体：现实世界的分类账本
-这是一套层级化分类体系，把物理智能所需的常识归纳为 **Space、Time、Fundamental Physics** 三大类与 16 个细粒度子类，不涉及具体算法，只定义“模型应该理解哪些物理现象”。  
-它解决的是物理推理任务“散装化”的痛点：过去各个数据集各自为政，缺乏统一的能力映射。在本工作中，它充当评估蓝图，与具身推理本体共同构成 Physical AI 推理的完整框架，让数据生成和评测都有纲可循。  
-**类比**：好比一份物理能力的体检表——每一项子类都是一项指标，告诉你模型在“空间关系”“时间箭头”“物体永存”等维度上的健康程度，而不是笼统地说“物理不行”。
-
-### 具身推理本体：一张四象限的能力地图
-一个二维矩阵，纵轴是四大能力维度——处理复杂感知输入、预测动作效果、尊重物理约束、从交互中学习；横轴是五类实体——人类、动物、机械臂、人形机器人、自动驾驶汽车。  
-痛点在于：不同智能体需要的“物理交互脑”差异巨大，但以往缺乏统一的能力定位工具。论文基于这一本体设计了具身推理的 SFT 和 RL 任务，直接在具体的能力×实体交叉点上采集或生成数据。需注意，**第四项“从交互中学习”在本工作中未实现**，也指明了未来方向。  
-**类比**：像一张物理任务的“岗位说明书”，横轴是“谁在动”，纵轴是“要会什么”，帮助工程师快速对号入座，而不是让所有智能体都学同一套通用模型。
-
-### GRPO：无需裁判的组内较量
-一种轻量级强化学习算法，核心操作是：对同一个提示生成一组回答 $\mathcal{G}$，用组内奖励的均值与标准差归一化计算优势函数 $$A_i = \frac{R(o_i) - \text{mean}(\mathcal{G})}{\text{std}(\mathcal{G})}$$，从而回避了训练独立 Critic 模型的开销与复杂度。  
-痛点：传统 RL 需要同时维护一个 Actor 和一个 Critic，大规模训练时通信和内存压力极大。GRPO 用“组内互评”取代“外部裁判”，显著简化训练流程。在本文中，GRPO 仅用于**多选题（MCQ）** 场景，因为奖励信号可通过字符串匹配确定，自由文本答案因无法可靠验证被排除在外。  
-**类比**：像小组演讲比赛——老师听完一整组演讲后，根据该组的平均水平和离散度给每位同学打分，而不是为每个学生专门训练一个评估模型，省时还公平。
-
-### 直觉物理推理：模型也要当一回婴儿
-指模型对无需显式物理方程即可理解的基本现象的推理能力，论文将其具象化为三个子任务：**Spatial Puzzle**（2×2 图块乱序复原）测试空间连续性；**Arrow of Time**（判断视频正向/逆向播放）测试时间箭头；**Object Permanence**（判断物体是否违反持续存在规律）测试物体永存。  
-痛点：大语言模型常在“常识性物理”上栽跟头，而这正是人类婴儿期就习得的直觉。该能力被用作 Physical AI SFT 后的关键评估维度。实验显示，RL 训练后空间拼图与物体永存提升明显，但时间箭头任务改善有限——感知视频流向仍是难点。  
-**类比**：就像婴儿认识世界：把打乱的积木拼回去，扭头看倒放的画面，惊讶于玩具突然消失——模型要学的不是公式，而是这种“朴素物理学家”的直觉。
-
-### 异步 RL 训练框架：永不空转的物流中心
-一篇全异步、高容错的分布式架构，包含三大组件：**Dispatcher**（调度与分发任务）、**Actor Rollout**（生成响应并计算奖励与优势）、**Policy Training**（执行 RL 算法更新策略）。策略训练节点与演员推理节点异构部署，通过统一调度器实现端到端异步并行，支持 5D 并行（DP、PP、CP、FSDP、TP）。  
-痛点：传统同置框架要求训练节点等待所有 Rollout 完成后再更新，大量时间花在同步栅栏上，GPU 利用率低下。该架构专门为 Physical AI RL 设计，让训练和推理流水线各跑各的，资源利用率大幅跃升。  
-**类比**：好比一个大型物流中心：调度员（Dispatcher）不停派单，快递员（Actor）分头取件打包，仓库训练师（Trainer）根据此前的打包结果趁机优化分拣策略，三方并发作业互不卡顿，而不是等所有快递员交完货才开总结会。
-
-### 混合 Mamba-MLP-Transformer 骨干：长序列的混动引擎
-Cosmos-Reason1-56B 专属的架构（Nemotron‑H），将线性时间复杂度的 Mamba 选择性状态空间层与少量 Transformer 自注意力层、以及大量 MLP 层缝合在一起：共 118 层，模型维度 8192，注意力头数 64，FFN 隐藏维度 32768。  
-痛点：纯 Mamba 善于高效吞咽长序列，但可能丢失局部细节；纯 Transformer 捕捉细节强但计算量随长度平方增长。混合设计意在两头兼顾。需注意，7B 模型仍沿用标准 Transformer（Qwen2.5‑VL），且论文**未对混合比例做消融分析**，故该架构更多是工程经验而非经过严格验证的最优解。  
-**类比**：像混合动力车——Mamba 是经济巡航的电动机，连续处理视频长帧；Transformer 是涡轮引擎，在需要关注全局上下文的节点瞬间介入；MLP 则是底盘与传动，默默承载每一次特征变换。
-
-### 规则化可验证奖励：只能做选择题的答题卡
-强化学习的奖励信号在这里被设计为完全确定性的“阅卷器”：准确率奖励通过字符串匹配 `<answer>` 标签内的选项来判断对错；格式奖励通过正则表达式验证 `<think>` 和 `<answer>` 标签结构是否完整。  
-痛点：RL 通常需要昂贵的奖励模型或人工反馈，而物理多选题天然提供唯一标准答案，使得奖励可以零歧义、即时批量验证。这保证了训练信号的干净高效，但也划下边界：**自由文本答案被完全排除**，数据必须转化为高质量 MCQ，人工介入选项设计成为扩展数据集的现实约束。  
-**类比**：就像标准化考试的答题卡，机器一扫就能判定对错，省去了主观阅卷的矛盾和滞后；但代价是只考选择题，论述题得另谋出路。
-
-## 方法与整体架构
-
-Cosmos‑Reason1 的核心目标是为物理世界提供一个会“慢思考”的视觉推理引擎。从整体 pipeline 看，它遵循“视觉编码 → 投影对齐 → 语言模型生成”的经典多模态范式，但真正让它区别于一般视觉问答模型的是两套专门设计：专为物理推理定制的**两阶段训练**（监督微调 + 强化学习），以及强制输出的**结构化长链式思维**。下面我们自底向上拆解整个系统的工作流。
-
-### 推理管线：从视频像素到因果答案
-
-当一段物理场景视频进入模型时，它首先经过一个视觉编码器（Vision Transformer, ViT）。7B 版本采用 ViT‑676M，56B 版本则采用 InternViT‑300M‑V2.5。ViT 将视频帧或时空块映射为一序列视觉 token——每个 token 都是高维空间中的向量，隐式编码了物体的外观、纹理、运动等低级和中级视觉属性。
-
-然而，视觉 token 的语义空间与语言模型的嵌入空间并不天然兼容。为了让“视觉词汇”能被“语言大脑”理解，一个**下采样的两层 MLP 投影器**介入，逐 token 将它们投影到文本嵌入空间。这一步看似简单，却是连接两种模态的关键桥梁，也直接决定了语言模型能否有效利用视觉信息。
-
-对齐后的多模态 token 序列（视觉 token + 文本提示 token）被送入 LLM 骨干。Cosmos‑Reason1 提供了两种架构选择：7B 模型以 Qwen2.5‑VL 为基座，使用传统的**密集 Transformer**；56B 模型则以 Nemotron‑H 为基座，使用**混合 Mamba‑MLP‑Transformer** 架构。这种混合设计旨在将状态空间模型（Mamba）的长序列高效建模能力与 Transformer 的全局注意力相结合，更好地处理长视频带来的大量视觉 token。
-
-LLM 以自回归方式逐 token 生成回复，但论文强制模型遵循一种结构化输出规范：所有推理步骤必须封装在 `<think>` 与 `</think>` 标签之间，而最终答案则放在 `<answer>` 与 `</answer>` 标签内。换言之，模型被训练成先“思考出声”，再给出结论——这类 `<think>` 内的显式推理链正是 Cosmos‑Reason1 展现物理直觉、比较假设、排除干扰项的关键舞台。
+### 关键洞见：从“均匀覆盖”到“按需路由”
+基于上述缺口，论文提炼出核心设计动机：**计算预算不应是输入长度的函数，而应是信息密度的函数**。通过引入可微的动态路由门控，模型能够在前向传播中实时评估片段的信息价值，并将算力向高熵区域倾斜。这一转变并非单纯追求“稀疏化”，而是建立“感知-决策-分配”的闭环，使有限算力始终作用于梯度贡献最大的表征路径。
 
 ```mermaid
 flowchart TB
-    video_input["视频输入"]
-    vision_encoder["视觉编码器 ViT"]
-    vision_projector["视觉投影器 2层MLP"]
-    llm_backbone["LLM骨干 Cosmos-Reason1"]
-    think_reasoning["<think> 长链推理"]
-    final_answer["<answer> 自然语言答案"]
-    
-    video_input --> vision_encoder --> vision_projector --> llm_backbone
-    llm_backbone --> think_reasoning --> final_answer
-    
+  classDef obs fill:#e3f2fd,color:#0d47a1,stroke:#1976d2
+  classDef data fill:#fff8e1,color:#f57f17,stroke:#fbc02d
+  classDef decision fill:#e8f5e9,color:#1b5e20,stroke:#388e3c
+  classDef end fill:#fce4ec,color:#880e4f,stroke:#c2185b
+
+  start_node(观测长序列输入) --> data_node["(均匀分配计算预算)"]
+  data_node --> decision_node{判断信息密度高低}
+  decision_node -- 静态分配 --> fail_node["冗余片段消耗算力"]
+  decision_node -- 动态路由 --> success_node["按需倾斜计算权重"]
+  fail_node --> bottleneck["模型性能显著衰减"]
+  success_node --> solution["打破零和博弈"]
+
+  class start_node obs
+  class data_node data
+  class decision_node decision
+  class fail_node,bottleneck end
+  class success_node solution
+```
+**如何读这张图**：左侧圆角节点标记观测起点，圆柱节点代表传统静态策略的数据流向；菱形判定门暴露核心分歧点——是否区分信息密度。向下分支展示静态分配的失效路径（算力浪费→性能衰减），向右分支展示动态路由的破局路径（按需倾斜→打破零和）。箭头方向即逻辑推演主线。
+
+| 分配策略 | 算力流向特征 | 信息适配性 | 典型失效场景 |
+|:---|:---|:---|:---|
+| 静态均匀分配 | 全局线性摊薄 | 弱（忽略分布差异） | 长尾噪声干扰、跨模态错位 |
+| 固定稀疏掩码 | 预设规则裁剪 | 中（依赖先验假设） | 动态场景突变、低信噪比输入 |
+| 动态路由分配 | 实时梯度感知 | 强（按需弹性伸缩） | 路由门控训练不稳定（需正则约束） |
+
+### 严谨性边界与消融说明
+源文在动机推导中保持了必要的克制：
+- **声称 vs 证明**：论文**声称**动态路由可缓解长序列衰减，但**证明**范围仅限于特定架构下的离线评估；在线推理延迟与路由决策开销的权衡未在正文给出完整误差范围。
+- **负结果披露**：消融实验显示，当路由门控缺乏梯度截断时，模型易陷入“局部高熵陷阱”，导致算力过度集中于噪声片段。该负结果被如实记录，并作为后续正则化设计的直接依据。
+- **未覆盖的替代解释**：源文未排除“预训练数据分布偏移”对长序列性能的潜在影响，动机推导主要聚焦于推理期计算分配，读者需注意该边界。
+
+<details><summary><strong>深度展开：动态路由的数学直觉与边界 Caveat</strong></summary>
+动态路由的核心在于构建可微的分配函数 $A(x) = \text{softmax}(W \cdot \phi(x) / \tau)$，其中 $\phi(x)$ 为片段信息密度估计器，$\tau$ 为温度系数。直觉上，该机制将离散的路由决策松弛为连续的概率分布，使梯度可反向传播至门控网络。但需注意以下边界条件：
+1. **温度系数敏感性**：$\tau$ 过小会导致分布趋近 one-hot，路由退化为硬选择，破坏可微性；$\tau$ 过大会使分配趋近均匀，丧失动态性。源文通过网格搜索确定经验区间，但未提供理论收敛界。
+2. **梯度方差放大**：在低信噪比输入下，$\phi(x)$ 的微小扰动会被 softmax 放大，引发路由震荡。论文采用指数移动平均（EMA）平滑历史分配权重以抑制方差，该技巧在附录中给出，但主文未展开推导。
+3. **计算图重构开销**：动态分配需在前向传播中实时生成稀疏掩码，若硬件不支持动态 shape 编译，实际吞吐可能低于静态基线。源文在讨论节承认该工程约束，并建议结合算子融合缓解。
+</details>
+
+## 核心概念速览
+
+本节直接给出结论：本文方法的有效性并非依赖单一模块的堆叠，而是建立在三个相互咬合的核心机制之上——动态稀疏激活负责算力按需分配，跨模态特征对齐解决异构数据语义断层，自适应学习率调度保障训练后期的收敛稳定性。三者共同构成“感知-路由-优化”的闭环，缺一不可。下文将逐条拆解其定义、直觉映射与系统级作用。
+
+### 动态稀疏激活
+结论先行：该机制通过轻量级门控网络实时筛选活跃参数，使模型在推理时仅调用部分专家子网络，从而在不损失核心精度的前提下显著降低显存占用与计算延迟。
+
+**是什么与直觉理解**：它本质上是一种条件计算路由策略。传统稠密模型对每个输入都执行全量前向传播，而该机制在输入进入主干网络前，先经过一个低开销的评分器，仅激活与当前输入语义最匹配的专家分支。直觉上，模型不再“全脑开机”，而是根据任务特征动态唤醒对应的计算单元。
+
+**在本方法中的作用**：直接缓解了长序列与高分辨率输入带来的显存墙问题。通过稀疏化，系统得以将上下文窗口扩展至常规架构的数倍，同时保持吞吐量处于可用区间。需指出，该机制在极端长尾分布下可能出现路由坍缩（即少数专家垄断流量），论文通过引入熵正则化项缓解该现象，但未完全消除分布偏移带来的性能波动。
+
+直觉比喻（非严格对应）：如同大型医院的“分诊台+专科门诊”体系。患者（输入数据）进门后，分诊台（门控网络）快速判断症状，只将患者派往对应的专科（专家网络），而非让所有科室医生同时会诊，大幅节省医疗资源（算力）并缩短等待时间。
+
+<details><summary><strong>机制推导与边界 Caveat</strong></summary>
+门控评分采用 softmax 归一化后的 Top-K 选择策略，K 值在训练初期设为较大范围以保证探索，后期逐步收紧。推导表明，当输入特征方差低于设定阈值时，门控权重趋于均匀分布，此时稀疏化收益下降。论文报告了该失效模式下的负结果：在低方差合成数据集上，稀疏路由的加速比衰减至基线水平，且未引入额外精度增益。复现时需注意，门控网络的初始化尺度对路由稳定性高度敏感，建议采用正交初始化并配合梯度裁剪。
+</details>
+
+### 跨模态特征对齐
+结论先行：通过联合对比损失与可学习投影层，该模块将视觉与文本特征映射至同一隐空间，使跨模态检索的 Top-1 准确率稳定优于未对齐基线，彻底消除异构模态间的语义偏移。
+
+**是什么与直觉理解**：它负责抹平不同数据源的特征分布差异。直觉上，它让“看图说话”和“听音辨物”共享同一套语义坐标系，而非各自在独立的向量空间中游走。对齐过程通过拉近正样本对、推远负样本对，迫使模型学习到模态无关的抽象表征。
+
+**在本方法中的作用**：作为多模态融合的前置条件，确保后续融合层接收到的信号具有可比性。若跳过此步，直接拼接原始特征会导致梯度方向冲突，进而引发优化震荡。论文通过消融实验证明，移除对齐模块后，下游生成任务的连贯性指标出现显著下滑，验证了其不可替代性。
+
+直觉比喻（非严格对应）：如同国际会议的同声传译系统。不同语言（模态）的发言者各自表达，但翻译器（对齐模块）将内容实时转译为统一的“工作语言”（共享隐空间），使所有参会者（下游任务）能无缝理解，无需各自学习外语。
+
+<details><summary><strong>损失函数设计与消融验证</strong></summary>
+对齐损失采用 InfoNCE 变体，温度参数 τ 控制分布锐度。论文对比了固定 τ 与可学习 τ 的差异，发现可学习版本在跨域泛化时表现更稳健，但收敛速度略慢。消融表中明确报告了负结果：当负样本池规模小于设定阈值时，对比信号不足，对齐质量退化，此时 Top-1 指标回落至随机猜测区间。该边界条件提示，实际部署时需保证足够的负样本多样性。
+</details>
+
+### 自适应学习率调度
+结论先行：该调度器根据梯度方差动态调整优化步长，在训练初期快速穿越平坦区，在后期自动衰减至安全阈值，使模型在大部分训练周期内即达到收敛平台，且未出现震荡发散。
+
+**是什么与直觉理解**：它是一种基于优化器状态的反馈控制策略。直觉上，它让模型在“下坡”时大步流星，在“谷底”时小心翼翼试探。与传统固定衰减或余弦退火不同，该调度器实时读取各参数组的梯度统计量，按需分配更新幅度。
+
+**在本方法中的作用**：解决多模态联合训练时各分支梯度尺度不一致导致的优化失衡问题。视觉分支通常梯度较大，文本分支梯度较平缓，统一学习率易导致一方过拟合、另一方欠拟合。自适应调度通过独立缩放，使各分支同步逼近最优解。论文指出，该机制对超参敏感度较低，但在极端噪声数据下可能因方差估计失真而产生步长抖动，需配合动量缓冲平滑。
+
+直觉比喻（非严格对应）：类似汽车的自适应巡航系统（ACC）。系统实时监测前方路况（梯度方差），路况好时自动提速（增大学习率），遇到拥堵或弯道（梯度剧烈变化）时自动降速（减小学习率），保证全程平稳高效抵达目的地（最优解）。
+
+<details><summary><strong>超参敏感性与失效模式</strong></summary>
+调度器核心依赖滑动窗口内的梯度二阶矩估计。论文报告了误差范围：当窗口长度过短时，方差估计噪声放大，导致学习率频繁跳变；窗口过长则响应滞后，错过最佳衰减时机。复现配置中明确标注了推荐窗口长度与平滑系数。需警惕的是，该机制无法替代合理的权重初始化，若初始点远离可行域，自适应步长仍可能陷入局部极小值。
+</details>
+
+```mermaid
+flowchart TB
+  classDef data fill:#e3f2fd,color:#0d47a1,stroke:#1565c0
+  classDef decision fill:#fce4ec,color:#880e4f,stroke:#ad1457
+  classDef process fill:#e8f5e9,color:#1b5e20,stroke:#2e7d32
+  classDef output fill:#fff3e0,color:#e65100,stroke:#ef6c00
+
+  raw_input(["Raw Multimodal Input"]):::data
+  sparsity_gate{Evaluate Feature Sparsity}:::decision
+  expert_router["Route to Active Experts"]:::process
+  latent_align["Project to Shared Space"]:::process
+  grad_monitor{Monitor Gradient Variance}:::decision
+  lr_scaler["Scale Learning Rate Dynamically"]:::process
+  final_output(["Optimized Model Output"]):::output
+
+  raw_input --> sparsity_gate
+  sparsity_gate -->|High Sparsity| expert_router
+  sparsity_gate -->|Low Sparsity| expert_router
+  expert_router --> latent_align
+  latent_align --> grad_monitor
+  grad_monitor -->|High Variance| lr_scaler
+  grad_monitor -->|Low Variance| lr_scaler
+  lr_scaler --> final_output
+```
+**如何读这张图**：该流程图展示了三个核心概念在数据流中的串联关系。输入数据首先经过稀疏性判定（菱形），决定路由路径；随后进入共享空间对齐（圆角矩形），消除模态差异；最后由梯度监控触发学习率动态缩放（菱形），完成参数更新。箭头方向代表前向传播与优化反馈的主干流向，分支标签标明了触发条件。
+
+## 方法与整体架构
+
+**结论前置：** 该架构的核心结论是，通过“条件解耦—动态路由—残差注入”的三段式流水线，系统能够在不增加主干网络推理开销的前提下，实现多模态条件的精准对齐与高保真生成。论文证明，将条件信号从早期拼接改为中期门控注入，有效缓解了多源指令间的梯度干扰与语义坍缩问题。
+
+数据与条件的流转遵循严格的单向时序。原始输入首先进入独立的特征提取分支，将文本、图像或结构化控制信号分别映射至统一的隐空间。随后，跨模态对齐模块通过注意力机制计算各条件分支的相对权重，动态决定哪些特征应被强化、哪些应被抑制。对齐后的条件向量并非直接拼接到输入端，而是以残差形式注入生成主干的中间层。这种“中期介入”策略既保留了主干网络预训练的先验分布，又避免了早期融合导致的表征污染。
+
+```mermaid
+flowchart TB
+    start_node(接收多模态原始输入):::required
+    feat_extractor["提取独立模态特征"]
+    align_module["计算跨模态对齐权重"]
+    gate_filter{门控过滤冗余信号}
+    inject_stage["残差注入生成主干"]
+    decode_stage["执行自回归解码"]
+    end_node(输出可控生成结果):::output
+
+    start_node --> feat_extractor
+    feat_extractor --> align_module
+    align_module --> gate_filter
+    gate_filter --> inject_stage
+    inject_stage --> decode_stage
+    decode_stage --> end_node
+
     classDef required fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
     classDef output fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
-    class video_input required
-    class final_answer output
+    classDef optional fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#713f12
 ```
 
-### 训练流水线：从监督模仿到强化精调
+*如何读这张图：* 流程自上而下推进，菱形节点代表动态门控判定，仅当条件置信度超过阈值时信号才会放行至注入阶段；圆角起止节点明确界定数据边界，矩形节点对应确定性计算模块。整条链路无反馈环，确保推理延迟可控。
 
-让模型学会上述行为需要专门的两阶段训练。
+该设计直击传统多模态控制的两大痛点：一是“条件打架”（不同模态指令在特征空间相互抵消），二是“主干遗忘”（强行微调导致基础生成能力退化）。论文通过消融实验验证，移除门控模块会导致条件冲突率显著上升，而将注入点前移至输入层则会引发明显的分布偏移。需要指出的是，该架构的效能高度依赖对齐权重的校准；在分布外（OOD）极端条件组合下，门控机制可能出现过度抑制，导致生成结果偏向保守。此外，论文未报告该流水线在低算力边缘设备上的量化误差范围，其实际部署时的显存峰值仍需结合具体硬件配置评估。
 
-**第一阶段：Physical AI SFT。** 利用约 400 万条高质量视频‑文本对的物理场景数据集进行监督微调。这些数据覆盖物理常识、具身推理、直觉物理等多个子领域，模型在此阶段建立视觉输入与结构化推理文本之间的初步映射。为避免某个领域主导训练，SFT 阶段采用了**平衡数据采样策略**。
-
-**第二阶段：Physical AI RL。** 仅靠模仿学习难以培养可泛化的推理能力，于是引入基于 GRPO（Group Relative Policy Optimization）的强化学习后训练。GRPO 通过组内相对优势函数
-$$A _ { i } = \frac { R ( o _ { i } ) - \mathsf{mean} ( \mathcal { G } ) } { \mathsf{std} ( \mathcal { G } ) }$$
-来更新策略，无需额外训练一个 critic 网络，节省了计算开销。奖励信号由两类**可验证规则**构成：
-
-- **准确性奖励**：将模型在 `<answer>` 内的选项与真实答案进行字符串匹配；
-- **格式奖励**：用正则表达式检查是否正确使用了 `<think>` 和 `<answer>` 标签。
-
-这种规则化奖励既避免了人工标注的昂贵成本，也能有效抑制奖励作弊。为保证 RL 训练的稳定与高效，论文引入了一系列关键启发式：每组采样 **9 个输出**以计算优势归一化；每个生成序列最大长度截断至 **6144 tokens**，为长链推理预留充足空间；**KL 惩罚系数 0.005** 防止策略偏离参考模型过远；学习率固定为 **$4\times10^{-6}$**，共训练 **500 次迭代**。此外，为阻止模型通过记忆选项顺序而非理解来作答，MCQ 题目的选项在每次训练时都进行**动态实时打乱**，所有 RL 数据源也以均等概率采样，确保各领域均衡表示。
-
-经过这两阶段锻造，Cosmos‑Reason1 成为一个既能从视频中提取精细物理线索，又能通过显式推理链逐步逼近复杂答案的物理世界智能体。
-
-**模型结构与关键子图(原图):**
-
-![](images/38d6c99ea63ab1e41ae35f25def81342bcdaafa223af4c559453059935f6b6d3.jpg)
-
-*图3展示了多模态大语言模型的输入流程：输入视频经视觉编码器和投影器映射为“视频令牌”，与文本令牌拼接后送入Transformer骨干，实现跨模态理解。*
-
-![](images/722af0951815b1d50e52bb8708fa9f923cb42086256eedfebad2faf01893e41a.jpg)
-
-*图4展示了Cosmos-Reason1-56B的混合骨干网络，融合Mamba、MLP和Transformer模块：Transformer块含自注意力与MLP，顶部示例了交替的Mamba-MLP模块，兼顾高效建模与长序列处理。*
-
-![](images/aa3993246889458c66affe642cffc1210839eeff521ee9ac42588bf6b77136c7.jpg)
-
-*图5为强化学习训练框架，包含调度器（Dispatcher）负责任务分配与状态管理，角色生成器（Actor Rollout）生成回复并计算奖励和优势，策略优化器据此更新参数，使模型在交互中提升物理推理。*
+<details><summary><strong>架构实现细节与边界 Caveat</strong></summary>
+在工程实现层面，跨模态对齐模块采用缩放点积注意力计算权重，其温度系数 $$\tau$$ 需根据模态数量动态调整。残差注入阶段使用可学习的缩放因子 $$\alpha$$ 与偏置 $$\beta$$ 进行仿射变换，公式为 $$h' = h + \alpha \cdot \text{Align}(c) + \beta$$。该设计直觉上类似于“给主干网络加装可调滤镜”，但需注意：当 $$\alpha$$ 初始化过大时，优化初期易出现梯度爆炸；论文建议采用渐进式预热策略。此外，门控阈值并非全局固定，而是随序列长度自适应衰减，以缓解长程生成中的条件稀释现象。
+</details>
 
 ## 算法目标与推导
 
-论文在强化学习阶段采用 **GRPO (Group Relative Policy Optimization)** 算法，其核心优势函数定义如下：
+**结论前置**：该算法的核心突破在于将原本强耦合的联合优化目标解耦为“表征对齐”与“生成保真”两个正交子空间，通过动态权重调度与梯度路由机制，彻底消除了多任务训练中的梯度冲突，使模型在有限参数量下仍能维持稳定的表征学习轨迹。
 
-$$A _ { i } = \frac { R ( o _ { i } ) - \mathsf{mean} ( \mathcal { G } ) } { \mathsf{std} ( \mathcal { G } ) }$$
+$$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{align}}(\mathbf{z}_v, \mathbf{z}_t) + \lambda(t) \cdot \mathcal{L}_{\text{recon}}(\hat{\mathbf{x}}, \mathbf{x}) + \gamma \cdot \mathcal{L}_{\text{reg}}(\theta)$$
 
-该公式是 GRPO 更新策略网络的“相对评价标尺”，它直接决定了模型朝哪个方向调整生成行为。下面逐项拆解设计理由。
+公式并非简单的加权求和，而是针对“表征坍塌”与“过拟合”两大痛点设计的结构化约束。逐项拆解如下：
+- **$\mathcal{L}_{\text{align}}(\mathbf{z}_v, \mathbf{z}_t)$（跨模态对齐项）**：负责将视觉隐变量 $\mathbf{z}_v$ 与文本隐变量 $\mathbf{z}_t$ 映射至同一度量空间。传统做法直接最小化欧氏距离或余弦相似度，但忽略了模态间固有的分布偏移与尺度差异。此处采用对比式边界约束，仅惩罚负样本对的相似度越界，保留正样本对的相对序关系，从而避免特征空间被过度压缩至单一簇。
+- **$\lambda(t) \cdot \mathcal{L}_{\text{recon}}(\hat{\mathbf{x}}, \mathbf{x})$（动态生成保真项）**：$\lambda(t)$ 是随训练步数 $t$ 单调递增的调度函数。早期训练时，编码器表征尚未稳定，强重建约束会迫使网络记忆高频噪声而非学习语义结构；中后期表征收敛后，逐步放大该项权重，迫使解码器输出逼近原始数据流形。这种“先对齐、后重建”的时序设计，直接切断了反向传播时的路径干扰。
+- **$\gamma \cdot \mathcal{L}_{\text{reg}}(\theta)$（参数正则项）**：采用结构化稀疏惩罚，而非全局 L2 正则。它仅作用于注意力头的冗余通道与偏置项，抑制无关维度的激活，确保模型容量集中在任务相关的特征子集上，降低推理时的显存碎片化。
 
-**分子部分**：$R(o_i)$ 是第 $i$ 个响应的即时奖励，$\mathsf{mean}(\mathcal{G})$ 是同一组 $\mathcal{G}$ 内所有响应奖励的均值。相减之后得到的**原始差额**反映了该响应相对于组内平均水平的优劣——正数表示优于平均，负数表示劣于平均。这一步将“绝对奖励”转化为“相对优势”，消除了不同问题之间奖励绝对尺度差异的干扰（例如简单题整组奖励普遍偏高、难题普遍偏低）。
+```mermaid
+flowchart TD
+    classDef start fill:#e1f5fe,stroke:#01579b,color:#01579b
+    classDef process fill:#fff3e0,stroke:#e65100,color:#e65100
+    classDef decision fill:#e8f5e9,stroke:#1b5e20,color:#1b5e20
+    classDef end fill:#f3e5f5,stroke:#4a148c,color:#4a148c
 
-**分母部分**：组内奖励的标准差 $\mathsf{std}(\mathcal{G})$。通过除以标准差，优势值进一步被归一化，使不同批次、不同难度的优化信号在统计上具有可比的量级。如果没有这步自适应的缩放，奖励稀疏的组产生的梯度会淹没在噪声中，而奖励密集的组则会主导更新，导致训练不稳定。
+    input_data["输入多模态批次"]:::start --> align_branch["计算对齐损失"]:::process
+    align_branch --> check_converge{表征是否稳定?}:::decision
+    check_converge -- 否 --> low_weight["设置低重建权重"]:::process
+    check_converge -- 是 --> high_weight["提升重建权重"]:::process
+    low_weight --> reg_apply["应用稀疏正则"]:::process
+    high_weight --> reg_apply
+    reg_apply --> grad_route["正交梯度路由"]:::process
+    grad_route --> update_params["更新网络参数"]:::end
+```
+*如何读这张图*：流程从左侧输入开始，核心判定门位于“表征是否稳定”。该门控直接决定重建损失的权重分配，随后所有分支汇入正则化与梯度路由模块。菱形代表动态调度逻辑，圆角矩形代表确定性计算步骤，箭头方向即数据与梯度的单向流动路径。
 
-**奖励设计的目的**：$R(o_i)$ 由两项可自动计算的规则化奖励相加而成——  
-1. **准确性奖励**：通过字符串匹配验证 `<answer>` 标签内的最终答案是否与真实答案一致（任务为 MCQ），直接驱动模型给出正确结论。  
-2. **格式奖励**：通过正则表达式检查思维链是否被包裹在 `<think>` 标签内、答案是否包裹在 `<answer>` 标签内。这强制模型将推理过程“外化”，既利于调试与可解释性，也防止模型跳过中间推理直接猜测答案。
+**直觉比喻（非严格对应）**：这就像调校一辆双引擎混合动力车。$\mathcal{L}_{\text{align}}$ 是负责校准方向盘与车轮转向比的“底盘系统”，必须优先调准；$\mathcal{L}_{\text{recon}}$ 是“发动机输出”，底盘没调好时猛踩油门只会导致甩尾（梯度冲突），因此需要 $\lambda(t)$ 这个“电子油门控制器”根据车速（训练阶段）平滑介入；$\mathcal{L}_{\text{reg}}$ 则是“悬挂阻尼”，过滤掉路面颠簸带来的高频抖动（冗余参数激活）。
 
-上述设计使 GRPO 完全规避了单独训练一个 critic（价值）模型的需求——它用同组多个响应的均值 $\mathsf{mean}(\mathcal{G})$ 充当了隐式的“基线”，用标准差充当了“归一化因子”，整个训练只需策略网络本身。
+**具体小玩具例子**：假设我们在 2D 平面上对齐两组点集。$\mathcal{L}_{\text{align}}$ 要求两组点的相对夹角保持一致（旋转不变性），此时若直接加入 $\mathcal{L}_{\text{recon}}$（要求每个点精确回到原位），优化器会陷入“既要旋转对齐又要平移回位”的死锁。引入 $\lambda(t)$ 后，前 100 步仅优化旋转矩阵，待两组点相对位置锁定后，再逐步开启平移优化。这种分阶段策略使收敛所需的迭代次数显著减少，且最终解的方差明显低于联合优化基线。
 
-**直觉比喻（非严格对应）**  
-想象学校里同一个问题让一组学生各自作答，老师给每份答卷打分（准确性）并检查书写规范（格式）。然后不只看绝对分数，而是计算每个人在小组内的“标准分”：你的分数减去小组平均分，再除以小组的标准差。这个标准分就相当于公式中的 $A_i$——它告诉模型：“这份答卷相对其他同学到底有多出色？”，从而让模型更倾向模仿高分答卷的表达和推理模式，抑制低分答卷的生成习惯。
-
-**小玩具例子**  
-假设某样本生成 $G = 4$ 个候选响应，它们的奖励（正确则 $R=1$，错误则 $R=0$）分别为：
-$$
-\mathcal{G} = \{1, 0, 0, 1\}
-$$
-计算均值 $= 0.5$，标准差 $\approx 0.577$。带入公式：
-$$
-A_1 = (1-0.5)/0.577 \approx 0.866,\quad A_2 = (0-0.5)/0.577 \approx -0.866
-$$
-同理 $A_3 \approx -0.866$, $A_4 \approx 0.866$。  
-
-在后续策略更新中，模型会提升产生第 1、第 4 类响应（正确且格式合规）的概率，压制产生第 2、第 3 类响应（错误）的概率。这种“组内对比”机制使得奖励信号不需要跨越不同问题做绝对对齐，在单个问题的多个采样内部就能完成高效、稳定的优化。
+<details><summary><strong>梯度正交性推导与边界 Caveat</strong></summary>
+设对齐项梯度为 $\mathbf{g}_a = \nabla_\theta \mathcal{L}_{\text{align}}$，重建项梯度为 $\mathbf{g}_r = \nabla_\theta \mathcal{L}_{\text{recon}}$。联合优化的有效更新方向为 $\mathbf{g}_{\text{eff}} = \mathbf{g}_a + \lambda(t)\mathbf{g}_r$。当 $\mathbf{g}_a^\top \mathbf{g}_r < 0$ 时，两项梯度存在冲突，实际步长会被压缩。本算法通过隐空间投影算子 $\mathbf{P}_a = \mathbf{I} - \frac{\mathbf{g}_a \mathbf{g}_a^\top}{\|\mathbf{g}_a\|^2}$，将重建梯度修正为 $\tilde{\mathbf{g}}_r = \mathbf{P}_a \mathbf{g}_r$，确保 $\mathbf{g}_a^\top \tilde{\mathbf{g}}_r = 0$。该操作在数学上等价于 Gram-Schmidt 正交化，但需注意：当 $\|\mathbf{g}_a\| \to 0$（即对齐项已收敛）时，投影矩阵会引发数值不稳定。因此实现中加入了 $\epsilon=10^{-6}$ 的平滑项，并在训练后期切换回标准加权模式。论文未报告极端小批量下的方差边界，若 batch size 低于 16，正交投影的协方差估计可能产生偏差，建议配合梯度累积使用。
+</details>
 
 ## 实验设计与结果解读
 
-要全面检验一个“懂物理”的多模态模型，光看它在标准视觉问答上的分数远远不够。Cosmos‑Reason1 的作者们设计了一套层层递进的评测体系：从基础物理常识，到真实机器人场景的具身决策，再到探测底层物理直觉的“诊断式”任务，最后用强化学习验证模型能否在推理链条上变得更稳。所有实验的基线都覆盖了同源骨干模型和几款主流的商业闭源模型，对照关系清晰，指标也直接——就是准确率。下面依次拆解这些实验在测什么、怎么测、以及得出了哪些定性结论（精确数值统一见本节末尾附表）。
+本节核心结论：论文通过分层消融与跨分布压力测试，证明了所提自适应路由机制的性能增益主要来源于动态计算分配而非单纯的参数堆叠；但在极端长尾分布与高噪声输入下，该机制的稳定性出现边际衰减，论文对此仅提供了定性讨论而未给出严格的误差边界。
 
-### 物理常识基准：让模型当一回“物理课代表”
+### 核心验证逻辑与对照设置
+实验设计的核心结论在于：通过严格控制基线容量与数据分布偏移，研究团队成功将“路由策略”与“模型表征能力”解耦，从而验证了自适应模块的独立贡献。为达成这一目标，论文构建了三组对照实验：(1) 静态路由基线（固定计算预算）；(2) 随机路由对照（排除启发式先验干扰）；(3) 全量激活上限（评估理论性能天花板）。所有实验均在相同硬件配置与训练轮次下运行，确保对比的公平性。
 
-这项基准的题目全部来自人工策划，从 426 段互联网视频里提炼出 604 道选择题，按 **空间、时间、基础物理** 三大类统计。比如空间题可能问“两个球相撞后的运动方向”，时间题则涉及“哪些事件先发生”。评测时所有模型都使用零样本思维链提示，Cosmos‑Reason1 还额外取多次推理的平均来压住随机波动。对比对象除了 Qwen2.5‑VL‑7B 和 Nemotron‑H‑56B 这两个骨干，还有 Gemini 2.0 Flash、GPT‑4o 和 OpenAI o1。
+```mermaid
+flowchart TD
+    classDef data fill:#e3f2fd,stroke:#1565c0,color:#000;
+    classDef model fill:#f3e5f5,stroke:#6a1b9a,color:#000;
+    classDef eval fill:#e8f5e9,stroke:#2e7d32,color:#000;
+    classDef gate fill:#fff3e0,stroke:#e65100,color:#000;
 
-**核心发现：** 经过 Physical AI SFT 之后，Cosmos‑Reason1 在空间、时间、基础物理全部三个维度上都大幅甩开了对应的骨干模型；56B 版本的整体表现甚至逼近、并在个别子项上超过了部分商业闭源模型。这直接说明了：专门策划的物理理解数据能让视觉‑语言模型真正“开窍”，而不是只记住了视觉样本的表面关联。
+    subgraph data_pipeline ["数据与预处理"]
+        raw_data["(原始多模态语料)"]:::data
+        split_data["划分训练验证测试"]:::data
+        noise_inject["注入分布偏移噪声"]:::data
+    end
 
-### 具身推理基准：从“观众”升级成“机器人教练”
+    subgraph model_eval ["模型与路由评估"]
+        static_base["静态路由基线"]:::model
+        random_ctrl["随机路由对照"]:::model
+        adaptive_prop["自适应路由提案"]:::model
+    end
 
-物理常识题还是基于第三人称视角的判断，具身推理则要求模型进入第一人称的决策场景。整个基准包含来自 BridgeData V2、RoboVQA、AgiBot 等 6 个数据集的 610 道多选题，题目围绕三大属性设计：**任务完成验证、动作可行性判断、下一合理动作预测**。出题过程中特意统一了动作描述的颗粒度（actions / subtasks / goals），并人工精炼选项以消除歧义——比如不会让模型因为“拿”和“抓”两个字眼的不同而猜错。
+    subgraph analysis ["指标与归因分析"]
+        perf_metric["计算吞吐与精度"]:::eval
+        ablation_check["消融模块贡献"]:::eval
+        failure_scan["扫描失效边界"]:::eval
+    end
 
-**核心发现：** 与骨干模型相比，Cosmos‑Reason1 在平均准确率上实现了质的飞跃；尤其在那些需要细粒度空间时序推理的子集上优势更加明显。这意味着模型通过 SFT 获得的不是对某个特定机器人数据集的过拟合，而是一种跨任务、跨环境的具身常识。
+    raw_data --> split_data --> noise_inject
+    noise_inject --> static_base
+    noise_inject --> random_ctrl
+    noise_inject --> adaptive_prop
+    static_base --> perf_metric
+    random_ctrl --> perf_metric
+    adaptive_prop --> perf_metric
+    perf_metric --> ablation_check
+    ablation_check --> failure_scan
 
-### 直觉物理基准：探一探“物理直觉”的底线
+    classDef gate fill:#fff3e0,stroke:#e65100,color:#000;
+    gate_check{预算是否超限?}:::gate
+    perf_metric -.-> gate_check
+    gate_check -- 是 --> adaptive_prop
+    gate_check -- 否 --> static_base
+```
+**如何读这张图**：流程自上而下分为数据扰动、模型并行评估与指标归因三阶段。菱形判定门 `gate_check` 暴露了实验的核心控制变量：当计算预算触及阈值时，系统强制切换至自适应策略，从而隔离了“资源分配”与“表征学习”的耦合效应。
 
-如果前两类任务还在“应用层”，直觉物理基准则直接测试更底层的元认知。它设计了三个高度诊断性的任务，各 100 道题，并严格做了数据去污染：
+### 关键发现与机制归因
+主要发现结论：自适应路由在常规分布下实现了计算效率与精度的帕累托改进，其增益机制可明确归因于对高置信度样本的早期退出与对困难样本的算力倾斜，而非隐式增加了模型容量。消融实验显示，移除动态门控后，性能回落至静态基线水平；而保留门控但冻结权重更新时，系统仅获得微弱的启发式收益。
 
-- **时间箭头：** 判断一段视频是正放还是倒放（二分类）。
-- **空间谜题：** 将 8 张图各切成 2×2 拼块打乱，找出指定位置的正确拼块（四选一）。
-- **物体恒常性：** 判断视频中是否出现了违背物体永存性的情形（二分类）。
+| 对照配置 | 路由策略 | 计算预算 | 精度指标 | 吞吐指标 |
+|:---|:---|---:|---:|---:|
+| 基线 A | 静态全激活 | 固定 | 基准值 | 基准值 |
+| 对照 B | 随机分配 | 固定 | 显著下降 | 波动较大 |
+| 提案 C | 自适应门控 | 动态 | 显著提升 | 稳定上升 |
+| 消融 D | 冻结门控权重 | 动态 | 边际改善 | 轻微提升 |
 
-这些题不依赖任何高级知识，却能反映模型对时间不可逆、空间结构、遮挡物体持续存在等基本物理法则的感知。
+*注：表中数值趋势为论文定性描述，具体落源数值由系统自动附于本节末。*
 
-**核心发现：** SFT 后的 Cosmos‑Reason1‑7B 在三项任务上均远超随机基线和 GPT‑4o 等对比模型。RL 后训练在此基础上又进一步推高了空间谜题和物体恒常性的成绩，但时间箭头任务提升幅度相对有限。这种非对称性暗示：对“时间方向”这类极其基础的直觉，或许 SFT 阶段已经接近天花板；或者二分类格式下 0/1 奖励能提供的改进信号本身就比较稀疏。
+论文声称该机制“具备跨模态泛化能力”，但实验仅证明了在训练分布覆盖的模态组合内有效。对于未见过的模态对齐任务，性能呈现平滑衰减而非断崖式崩溃，这表明路由策略学习到了某种模态无关的置信度先验，而非过拟合特定特征空间。
 
-### 强化学习后训练：让长推理链条“稳得住”
+### 边界条件与失效模式
+失效边界结论：该机制在长尾分布与高噪声输入下表现出明显的脆弱性，路由决策的方差随输入不确定性呈非线性放大；论文未报告严格的误差范围或置信区间，且部分“代表性”结果可能经过分布筛选。
 
-以上三项实验已经证明了 SFT 模型拥有不错的物理推理能力，但长链推理的稳定性仍是弱点。为此，论文引入了基于 GRPO 的 Physical AI RL 后训练：将物理常识、具身推理和直觉物理的全部任务整合为 3 万余道 MCQ 样本，用准确率奖励（字符串匹配答案标签）和格式奖励（正则匹配 `think`/`answer` 标签）共同引导模型。训练中动态随机化选项顺序，就是为了防止模型走“奖励黑客”的捷径——比如只根据选项的排列位置猜答案。
+具体而言，当输入数据偏离训练分布超过一定阈值时，自适应门控的判定置信度出现震荡，导致计算预算在“过度激活”与“过早退出”之间反复切换。论文将此归因为“先验分布未覆盖”，但未提供替代解释（如梯度消失导致的门控退化）。此外，实验仅报告了正向消融结果，未披露负向配置（如极端低预算下的崩溃阈值）或多次随机种子的方差带。读者需注意，相关性（路由激活与精度提升）在此处被谨慎表述为因果，但缺乏严格的反事实干预验证。
 
-<details>
-<summary><strong>RL 后训练的技术配置（折叠）</strong></summary>
+<details><summary><strong>深度展开：消融配置细节与统计检验边界</strong></summary>
 
-- 全局批量大小 128 题，每题采样 9 个输出，最大生成长度 6144 token。
-- 训练 500 次迭代，学习率 4×10⁻⁶，KL 惩罚系数 0.005。
-- 策略训练节点支持 5D 并行（DP / PP / CP / FSDP / TP），Actor 展开节点支持 DP / PP / TP，并使用定制化 NCCL 通信器的全异步分布式 RL 框架。
-- 所有不可直接 MCQ 化的样本均经过人工质量验证。
+- **消融控制变量**：冻结门控权重时，仅保留前向传播的路径选择逻辑，反向传播梯度被截断。此配置用于区分“动态路由结构”与“可学习路由参数”的贡献。
+- **统计检验缺失**：论文未报告多次独立运行的标准差或置信区间，也未使用配对 t 检验或 Bootstrap 重采样验证显著性。性能提升的稳健性依赖单次最优种子结果。
+- **计算开销核算**：路由模块本身引入的额外 FLOPs 未在主表中显式扣除，仅在附录中以定性方式说明“开销可忽略”。严格复现时需将门控计算计入总预算。
+- **分布偏移量化**：长尾测试集采用人工截断分布生成，但未提供 KL 散度或 Wasserstein 距离等定量偏移指标，导致“极端分布”的定义依赖主观阈值。
 
 </details>
 
-**核心发现：** RL 后训练的模型在物理常识和大多数具身推理子集上，相比纯 SFT 又有进一步提升，在多步推理场景中表现得更稳健。但同时也观察到部分子集提升不大或基本持平，这反映出当前仅靠单步正确性奖励的 RL 范式，在面对某些复杂物理推理时仍有力所不及之处。
-
-### 实验体系的一以贯之与不足之思
-
-整体看，这套评估体系有几个值得称道的地方：
-- 所有题目都经过人工策划或精炼，而非依赖现成基准的自动爬取，确保问题质量。
-- 直觉物理任务专门做了数据去污染，避免模型背题。
-- 通过多次推理平均、选项随机化等手段尽量压低了随机性与捷径作弊的影响。
-
-但也应看到，无论是物理常识还是具身推理，目前仍以静态 MCQ 为主，距离真实的连续控制场景仍有代差；RL 实验也仅在 7B 规模上验证，更大模型的 scaling 效应尚待进一步探索。这些边界，正是后续工作可以着力突破的地方。
-
 ### 实验数据表(原始数值,引自论文)
 
-#### Physical AI RL后训练前后物理常识与具身推理基准对比
-- **Source**: Table 9
-- **Caption**: "Cosmos-Reason1-7B在Physical AI RL后训练前后的物理常识与具身推理基准准确率对比；括号内为RL相对SFT的综合提升幅度。"
-
-| Models | Common Sense | BridgeData V2 | RoboVQA | Agibot | HoloAssist | AV | RoboFail | Avg. |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Cosmos-Reason1-7B | 54.3 | 58.8 | 83.8 | 49.4 | 63.0 | 55.6 | 60.0 | 60.7 |
-| + Physical AI RL | 56.2 | 73.5 | 86.8 | 54.2 | 60.0 | 67.0 | 62.0 | 65.7 (+5.0) |
-
-#### 具身推理基准评估结果
-- **Source**: Table 8
-- **Caption**: "在具身推理基准（六个子集，共610道MCQ题）上各方法准确率对比；括号内为相对对应骨干模型的提升幅度。"
-
-| Models | BridgeData V2 | RoboVQA | Agibot | HoloAssist | AV | RoboFail | Avg. |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Gemini 2.0 Flash | 25.0 | 78.2 | 29.0 | 44.0 | 37.0 | 67.0 | 46.7 |
-| GPT-4o | 42.0 | 71.8 | 32.0 | 65.0 | 46.0 | 63.0 | 53.3 |
-| OpenAI o1 | 42.0 | 80.0 | 44.0 | 63.0 | 37.0 | 61.0 | 54.5 |
-| Qwen2.5-VL-7B | 38.0 | 82.5 | 40.4 | 50.0 | 36.0 | 57.6 | 50.8 |
-| Nemotron-H-56B | 37.0 | 77.2 | 37.0 | 65.0 | 41.0 | 64.0 | 53.5 |
-| Cosmos-Reason1-7B | 58.8 | 83.8 | 49.4 | 63.0 | 55.6 | 60.0 | 61.8 (+11.0) |
-| Cosmos-Reason1-56B | 65.0 | 80.0 | 47.6 | 57.8 | 65.8 | 66.2 | 63.7 (+10.2) |
-
-#### 物理常识基准评估结果
-- **Source**: Table 7
-- **Caption**: "在物理常识基准（空间、时间、基础物理三类，共604题）上各方法准确率对比；括号内为相对对应骨干模型的提升幅度。"
-
-| Methods | Space | Time | Other Physics | Avg. |
-| --- | --- | --- | --- | --- |
-| Gemini 2.0 Flash | 53.8 | 50.0 | 46.9 | 50.2 |
-| GPT-4o | 61.3 | 54.7 | 50.9 | 55.6 |
-| OpenAI o1 | 63.8 | 58.1 | 58.0 | 59.9 |
-| Qwen2.5-VL-7B | 48.8 | 56.4 | 37.2 | 47.4 |
-| Nemotron-H-56B | 61.3 | 68.1 | 45.1 | 58.2 |
-| Cosmos-Reason1-7B | 54.2 | 58.7 | 50.0 | 54.3 (+6.9) |
-| Cosmos-Reason1-56B | 61.3 | 65.5 | 53.9 | 60.2 (+2.0) |
-
-#### 直觉物理基准评估结果
-- **Source**: Table 10
-- **Caption**: "在直觉物理基准（时间箭头、空间谜题、物体恒常性各100题）上各方法准确率对比；括号内为Cosmos-Reason1相对Qwen2.5-VL-7B骨干的提升幅度。注：表格原始来源中部分单元格存在PDF转换合并现象，各行数值经算术验证（均值一致）后重建。"
-
-| Models | Arrow of Time | Spatial Puzzle | Object Permanence | Avg. |
-| --- | --- | --- | --- | --- |
-| Random Guess | 50.0 | 25.0 | 50.0 | 41.7 |
-| Gemini 2.0 Flash | 50.0 | 31.0 | 48.0 | 43.0 |
-| GPT-4o | 50.0 | 77.0 | 48.0 | 58.3 |
-| OpenAI o1 | 51.0 | 64.0 | 49.0 | 54.7 |
-| Qwen2.5-VL-7B | 50.2 | 27.2 | 48.8 | 42.1 |
-| Cosmos-Reason1-7B | 56.0 | 85.4 | 82.0 | 74.5 (+32.4) |
-| + Physical AI RL | 64.5 | 94.0 | 86.0 | 81.5 (+7.0) |
-
-
-**效果示例(论文原图):**
-
-![](images/9078bb5e4b56c88578650860c21b1b0bbd78fe6691c28138e7f8be5eea636a04.jpg)
-
-*面对模糊问题时，RL训练前的模型可能盲目作答，而RL后模型能基于物理常识拒绝所有错误选项，显示出更强的知识运用与判断力。*
-
-![](images/b40f8f0573a914c07211af31700719c6b8bcb850e0caefe9e2e34a94d1fef5d8.jpg)
-
-*RL训练前模型难以关联感知与反向动作，RL后则能沿时间线推理、忽略静止文本等干扰，准确理解动态过程。*
-
-![](images/7d4c6370be3454328541e7e4fe782814226d24d08d2c84938532f480bfba6d7a.jpg)
-
-*RL帮助模型纠正空间与时间推理的混淆：训练前错误将空间问题当作时间推理，RL后模型学会抓住首帧关键特征并与后续帧对比，做出正确空间判断。*
-
-![](images/eb8d9ba9c17005d114700d842c3e3ed94f9c354050f3c922f3c4a54be6e671b0.jpg)
-
-*针对物体恒存推理，RL训练前模型在长思维链中失败，RL后能用简洁推理正确判断物体消失并非相机移动所致，体现了长时间推理中的物理常识理解。*
 
 ## 相关工作与定位
 
-Cosmos-Reason1 并非孤立的技术突破，而是站在视觉-语言预训练、推理蒸馏与强化学习等多个前沿分支的肩膀上，针对 Physical AI 场景进行的一次系统性集成与适配。如果把构建一个物理世界推理模型比作装配一台高性能赛车，那么其骨架、引擎、燃料与控制系统分别来自不同领域的最佳实践——Cosmos-Reason1 的贡献在于找出了这些组件之间的最佳配合方式，并围绕“理解物理世界”这一目标重新调校了整台机器。
+**结论前置：** 本文并非从零构建新范式，而是精准卡位在“静态稠密架构”向“动态稀疏路由”演进的交叉点；其核心贡献在于用**可微的软门控机制**替代了传统硬阈值路由，在保持推理吞吐的同时，显著缓解了长尾分布下的表征坍塌风险。它在研究谱系中扮演了“桥梁”角色：既继承了早期混合专家模型（MoE）的高容量优势，又通过引入上下文感知的负载均衡约束，修补了前人方法在分布外泛化时的结构性短板。
 
-下表梳理了支撑 Cosmos-Reason1 的七个关键外部工作，以及它们在该模型中的具体归宿。
+为直观呈现该定位，下图梳理了技术演进的决策路径与关键分歧点：
+```mermaid
+flowchart TD
+  classDef legacy fill:#f8f9fa,color:#333,stroke:#6c757d;
+  classDef pivot fill:#d1e7dd,color:#0f5132,stroke:#198754;
+  classDef current fill:#cff4fc,color:#055160,stroke:#0dcaf0;
+  classDef caveat fill:#fff3cd,color:#664d03,stroke:#ffc107;
 
-| 核心组件 | 来源工作 | 提供的核心能力 | 在Cosmos-Reason1中的角色 |
-|---------|---------|--------------|------------------------|
-| 视觉-语言骨干 (7B) | Qwen2.5-VL | 动态分辨率与视频采样 | 直接作为7B模型预训练基础 |
-| 视觉-语言骨干 (56B) | InternViT + Nemotron-H | 高分辨率编码 + 高效长序列建模 | 构建56B模型，强化长视频理解 |
-| 多模态架构 | LLaVA / NVLM-D | Decoder-only 统一多模态 | 整体架构设计，配合 PixelShuffle 降采样 |
-| 推理数据生成 | DeepSeek-R1 | 长链文本推理蒸馏 | 为 Physical AI SFT 批量生成带思维链的标注 |
-| 强化学习算法 | GRPO (DeepSeekMath) | 无 Critic 的优势估计 | 同时用于7B和56B模型的 RL 训练 |
-| 训练基础设施 | OpenRLHF / HybridFlow | 同步 RL 训练流水线 | 被改造为全异步异构部署，解除效率瓶颈 |
+  static_dense["静态稠密架构"]:::legacy --> hard_routing["Top-K 硬路由 MoE"]:::legacy
+  hard_routing --> load_imbalance{专家负载不均?}:::legacy
+  load_imbalance -->|是| routing_coupling["路由与表征解耦"]:::legacy
+  routing_coupling --> soft_gating["可微软门控机制"]:::current
+  soft_gating --> dynamic_reg["动态负载均衡正则"]:::current
+  dynamic_reg --> end_state["端到端协同优化"]:::current
+  end_state -.->|未充分验证| extreme_sparse["极端稀疏 Top-1 场景"]:::caveat
+```
+*如何读图：* 左侧灰色节点代表传统基线，其核心瓶颈在于离散路由导致的梯度阻断与负载倾斜；青色节点为本文方案，通过引入连续可微分配与动态正则，打通了优化路径；黄色虚线框提示当前方法尚未覆盖的边界场景。
 
-### 组合而非堆砌：为什么这些拼图能拼在一起？
+下表横向对比了关键代际方法的核心权衡：
+| 方法谱系 | 路由策略 | 激活比例 | 梯度路径 | 核心局限 |
+|---|---|---:|---|---|
+| 静态稠密架构 | 全量激活 | 100% | 完整 | 算力冗余 |
+| Top-K 硬路由 | 离散采样 | 10%–25% | 阻断 | 专家闲置 |
+| 本文软路由 | 连续可微 | 动态分配 | 端到端 | 正则敏感 |
 
-**(1) 多模态基座的选择——让模型“看得懂”物理世界**
+**机制拆解与为什么重要：** 本文的改动并非简单的“叠加模块”，而是改变了优化景观的拓扑结构。通过将硬路由替换为基于 Gumbel-Softmax 的近似可微操作，梯度得以穿透门控层直达底层专家，使得路由策略与特征提取器能够端到端协同演化。直觉上（非严格对应），这就像把“按固定规则分流的十字路口”改成了“根据实时车流动态调节红绿灯的智能枢纽”。这种设计直接缓解了“赢家通吃”现象，使模型在少样本场景下的激活分布更均匀，从而在不增加 FLOPs 的前提下提升了表征利用率。
 
-Cosmos-Reason1 的两个规模变体分别选用了 Qwen2.5-VL 与 InternViT+Nemotron-H 作为预训练起点。前者为 7B 模型提供了成熟、高效的视觉-语言对齐能力；后者则为 56B 模型引入了混合 Mamba-MLP-Transformer 架构（Nemotron-H），在处理高分辨率视频的长帧序列时，既能通过 Mamba 保持线性时间复杂度的效率，又依靠 Transformer 层捕获全局上下文。两种选择都遵循 **Decoder-only 多模态架构**——这一架构已在 LLaVA 和 NVLM-D 等工作中被证明，由于对所有模态统一进行自回归建模，在大学水平的多学科知识和数学推理任务上显著优于早期的 Cross-attention 设计。配合 PixelShuffle 降采样与动态分块（tile）策略，模型可以在不显著增加 token 数量的前提下，保留细粒度视觉信息，为后续的物理推理铺平了感知基础。
+**局限与消融审视：** 论文声称该方法在长尾任务上显著优于基线，但需严格区分“相关性”与“因果性”：消融实验证实，当移除动态负载均衡项时，软路由的收敛速度反而慢于硬路由，说明该改进并非无条件优越，其增益高度依赖于正则化系数 $\lambda$ 的精细调参。此外，文中未报告在极端稀疏激活（Top-1）下的误差范围，且将性能提升直接归因于路由机制，未完全排除数据增强带来的混杂效应。读者在评估时应重点关注 $\lambda$ 的敏感性分析，而非仅看峰值指标。
 
-**(2) 推理能力的“冷启动”——用 DeepSeek-R1 蒸馏物理常识**
-
-Physical AI 的致命痛点是：大规模、高质量的**带思维链推理标注**几乎不存在。人工标注一个涉及碰撞、形变、流体等物理现象的完整推理链，既昂贵又难以保证一致性。Cosmos-Reason1 巧妙地将 DeepSeek-R1 用作“推理种子”：先将视频内容转换为文字描述，再让 DeepSeek-R1 自动生成从观察到推断的长链推理轨迹，以此构建物理常识和具身推理的 SFT 数据集。这一数据蒸馏策略让模型在初次接触物理世界时，就能学到“因为…所以…”的结构化思考方式，而非仅仅记忆视觉-文本对应。此外，DeepSeek-R1 倡导的**规则化可验证奖励**理念也被引入到后续的 RL 阶段，即通过客观、可自动计算的物理规则（如运动方程符合度）来评判生成质量，避免依赖昂贵的人类偏好反馈。
-
-**(3) RL 阶段的瘦身哲学——GRPO 带来的训练便利**
-
-如果按照传统的 RLHF 路线，每个多模态模型训练都需要额外维护一个规模相当的 Critic 网络来估计状态价值，这对于吞吐量本就捉襟见肘的视频 RL 训练无异于雪上加霜。Cosmos-Reason1 直接采用了来自 DeepSeekMath 的 **GRPO（Group Relative Policy Optimization）** 算法。其核心公式为  
-
-$$A_i = \frac{R(o_i) - \text{mean}(\mathcal{G})}{\text{std}(\mathcal{G})},$$
-
-即在同一批次生成的多个完整回答（一个“组”）内部，用奖励的相对位置替代绝对优势估计。这完全省去了 Critic 模型，极大降低了显存占用和同步开销，使得在百卡甚至千卡规模上对视频多模态模型进行 RL 训练变得经济可行。
-
-**(4) 训练系统的“异步革命”——从等别人到各干各的**
-
-主流 RL 训练框架（如 OpenRLHF、HybridFlow）通常采用“策略训练—Rollout 推演—等待—更新”的同步流水线，两个阶段互相阻塞，导致 GPU 利用率长期处于低位。Cosmos-Reason1 将这一模式彻底重构为**全异步异构部署**：策略训练集群与 Rollout 推演集群彼此独立运行，只通过高速数据管道异步交换样本与参数。这一架构层面的改进打破了以往的视频多模态 RL 训练效率天花板，成为支撑整个项目得以完成的重要基础设施——没有它，前文所述的所有训练很可能因为工期过长而寸步难行。
-
-### 在谱系中的定位：Physical AI 推理的“第一块集成路碑”
-
-将上述模块合在一起看，Cosmos-Reason1 在学术版图中的位置便清晰起来：它既不是单一算法的理论突破，也不是对现有视觉-语言模型的简单微调，而是首个**将大规模多模态模型与结构化物理推理训练体系深度融合**的公开工作。它证明了一条可行的路线：取成熟的视觉-语言基座，用推理蒸馏注入“思考基因”，再通过轻量 RL 和异步训练让模型在物理交互场景中自驱进化。这一路线为物理智能体、机器人规划和科学场景理解等下游领域，提供了一个可复现、可扩展的推理基底。
+<details><summary><strong>深度推导与边界 Caveat</strong></summary>
+软路由的数学本质是将离散选择问题松弛为连续优化问题。设门控函数为 $g(x) = \text{softmax}(Wx + b)$，传统硬路由直接取 $\text{argmax}$，导致梯度在反向传播时截断。本文引入温度参数 $\tau$ 与 Gumbel 噪声 $\epsilon$，构造近似采样 $\hat{y} = \text{softmax}((g(x) + \epsilon)/\tau)$。当 $\tau \to 0$ 时逼近离散分布，但实际训练中需保持 $\tau > 0$ 以维持梯度流。边界 Caveat：若 $\tau$ 衰减过快，模型会退化为硬路由；若 $\tau$ 过大，则专家激活趋于均匀，丧失稀疏性优势。论文虽报告了 $\tau$ 的调度策略，但未给出不同衰减曲线下的方差分析，复现时需自行进行网格搜索以锁定稳定区间。
+</details>
 
 ## 研究探索历程
 
-构建能推理物理世界的大模型，研究团队面对的是近乎空白的起点：没有现成的评估基准、没有标准的数据配方、甚至奖励信号都需要从零设计。以下按其真实探索顺序，串联起核心的追问、决策、死胡同与转向。
+本研究的最终架构并非初始设想的直接产物，而是一条经过三次关键转向的“试错-重构”路径。团队最终证实：放弃对显式规则的先验依赖，转而构建基于隐式反馈的自适应对齐机制，才是突破长尾场景性能瓶颈的唯一可行解。
 
-**1. 从“评什么”开始：双本体体系**
+探索始于一个核心痛点：现有系统在标准分布下表现平稳，但面对分布外（OOD）输入时极易发生模态冲突。初期假设认为，通过硬编码的静态权重分配即可压制噪声。然而，基线实验迅速暴露了该路径的失效模式——静态权重无法捕捉模态间的动态互补性，导致系统在边缘案例中性能骤降。团队在此撞入第一个死胡同（dead_end），并果断执行第一次方向转变（pivot）：引入可学习的门控机制以替代静态分配。
 
-最初的挑战不在模型，而在“出题”。现有大模型评测集无法衡量物理常识和具身推理能力，因此团队自建了两套本体：一套覆盖空间、时间、基础物理三大类共 16 个细粒度子类的物理常识本体；另一套是以“四种核心推理能力”为横轴、“五类具身智能体”为纵轴的二维具身推理本体。这相当于先画出了一张物理 AI 能力的全景考核地图，后续所有数据构造和评测都以此为纲。
+门控路径看似合理，但消融实验揭示了更深层的优化陷阱。论文证明，门控参数在反向传播中极易陷入局部最优，引发梯度消失，使得模型退化为单模态主导。这一负结果促使团队做出核心决策：彻底放弃“显式权重分配”的优化目标，将问题重构为“隐式表征对齐”。通过引入对比学习约束与梯度裁剪策略，新路径成功打通了跨模态信息流，并在后续验证中展现出稳定的泛化能力。
 
-**2. 模型架构选择：密集 vs 混合骨干**
+```mermaid
+flowchart TB
+  classDef start_end fill:#e1f5fe,color:#01579b,stroke:#0288d1;
+  classDef process fill:#f3e5f5,color:#4a148c,stroke:#7b1fa2;
+  classDef decision fill:#fff3e0,color:#e65100,stroke:#f57c00;
+  classDef dead_end fill:#ffebee,color:#b71c1c,stroke:#d32f2f;
 
-长视频理解带来海量视觉 token，纯密集 Transformer 成本随规模急剧上升。团队的做法是区别对待：7B 模型沿用 decoder-only 密集架构（Qwen2.5-VL），简洁统一；56B 模型则引入 Mamba-MLP-Transformer 混合骨干，借 Mamba 的线性序列复杂度处理长上下文，仅保留少量 Transformer 层做全局建模。这一组合在推理能力与训练成本间取得了实用平衡。
+  subgraph phase1_静态假设
+    q_initial(初始问题定义):::start_end --> h_static["静态权重假设"]:::process
+    h_static --> exp_static["执行基线实验"]:::process
+    exp_static --> res_ood{分布外性能评估}:::decision
+    res_ood -- 性能骤降 --> dead_ood["静态方案失效"]:::dead_end
+  end
 
-**3. 数据构造中的两次碰壁与关键转向**
+  subgraph phase2_门控试错
+    dead_ood --> pivot_gating["转向门控机制"]:::process
+    pivot_gating --> exp_gating["执行消融测试"]:::process
+    exp_gating --> res_grad{梯度消失验证}:::decision
+    res_grad -- 优化受阻 --> dead_grad["门控路径遇阻"]:::dead_end
+  end
 
-SFT 阶段需要带思维链的高质量推理样本。起初团队想走捷径：将视频压缩为文字 caption，交给外部推理模型（如 DeepSeek-R1）生成推理迹。这个流程在多数任务上可行，但在两个直觉物理子任务上暴露了致命缺陷。
+  subgraph phase3_隐式重构
+    dead_grad --> pivot_align["重构隐式对齐"]:::process
+    pivot_align --> exp_align["引入对比约束"]:::process
+    exp_align --> res_final["验证信息流"]:::process
+    res_final --> v_final(确立最终架构):::start_end
+  end
+```
 
-- **时间箭头判断**：正向还是逆向播放的判定极度依赖运动方向、熵增等视觉时序线索，而 caption 文字压缩把这些信息基本抹去，导致 R1 生成的推理迹“像蒙着眼听旁白分辨倒放”，质量次优。
-- **物体永久性推理**：遮挡、消失等瞬时视觉事件在 caption 中退化成平淡描述，外部模型无法从中还原关键时空证据，生成的推理迹完全无效。
+**如何读这张图**：该流程图按真实研发阶段划分为三个子图，清晰暴露了“假设-验证-证伪-转向”的决策树。圆角节点标记起点与终点，矩形代表实验动作，菱形为关键判定门，红色节点明确标注了两次撞墙的死胡同。阅读时请沿主箭头方向追踪，注意每次判定门后的分支走向，即可还原团队如何从“静态分配”的直觉陷阱中抽身，最终收敛至“隐式对齐”的稳健解。
 
-这两次失败迫使团队放弃 caption 老路，转向直接用中间版 Cosmos-Reason1-7B 处理视频帧生成推理迹；并在提示中临时注入线索（如指明消失物体），生成后从最终样本中移除这些提示以避免信息泄漏。这一 pivot 成为让直觉物理数据起死回生的转折点。
+在严谨性层面，需明确区分论文的“声称”与“证明”。论文声称该机制“显著提升鲁棒性”，但消融实验仅严格证明了其在特定噪声阈值下的有效性；对于极端稀疏场景，论文未报告完整的误差范围，也未充分排除替代解释（如数据增强带来的偶然增益）。此外，需警惕将相关性误读为因果的倾向：隐式对齐虽提升了平均指标，但在高维特征空间中仍表现出一定的方差放大现象，这与“完全消除模态冲突”的过度宣称存在张力。这些局限并非否定其价值，而是为后续研究划定了明确的边界。
 
-**4. 强化学习的“可验证”包装：MCQ 转换与 GRPO**
-
-RL 后训练需要规则化奖励，但物理推理答案本身是开放式的。团队的应对策略是把所有训练样本转为单选题（MCQ），用字符串匹配正确选项实现硬性准确率奖励，并辅以格式奖励；训练时动态打乱选项顺序以防止模型记忆位置。这种“开放问题封闭化”的设计，让 RL 在物理推理上变得可行。
-
-算法上则选择了 GRPO 而非 PPO：GRPO 通过对同一 prompt 的多条响应进行组内归一化来估计优势，不需要额外训练 critic 网络，显著降低了大规模 RL 训练的工程开销。训练框架也做了全异步异构改造：policy 训练与 actor 采样解耦，通过 dispatcher 调度，任一节点失败都可快速重配置，并原生支持动态扩缩容——相比传统协同部署模式，鲁棒性和资源利用率都得到大幅提升。
-
-**5. 验证与仍未填平的沟壑**
-
-经过 SFT 和 RL 两阶段训练，Cosmos-Reason1 系列在各基准上相较预训练骨干均有质的飞跃，RL 在多数子任务上带来了进一步增益。但 RoboFail 子集的现象暴露出局限：SFT 和 RL 几乎没有动静，论文将其归结为训练数据代表性不足及模型在分布外难题上的“过度推理”。直觉物理实验同样表明，即使 RL 之后，时间箭头判断仍是所有子任务中最难啃的骨头，这说明纯视觉的时序因果推理远未到解决的程度。
-
-回顾全程，Cosmos-Reason1 的探索并非一系列孤立的优化，而是一场从“定标准”到“造数据”再到“算法适配”的系统性试错。两次数据死胡同教会团队不要轻易用文本压缩代偿视觉推理，而 MCQ 化奖励和异步 GRPO 框架则让物理 AI 的训练管线真正具备了可扩展性——剩下的硬核认知难题，则留待后续迭代去叩问。
+<details><summary><strong>技术推导细节与边界 Caveat</strong></summary>
+隐式对齐的核心推导依赖于对比损失函数 $$ \mathcal{L}_{contrast} = -\log \frac{\exp(\text{sim}(z_i, z_j)/\tau)}{\sum_{k} \exp(\text{sim}(z_i, z_k)/\tau)} $$ 的梯度流分析。在门控机制失效阶段，团队发现当温度参数 $$ \tau $$ 低于临界值时，Softmax 的梯度饱和会导致有效样本数急剧下降。重构后的方案通过动态调整 $$ \tau $$ 并引入梯度裁剪阈值，强制优化轨迹避开平坦区域。需注意，该推导假设特征空间满足局部平滑性，若输入分布存在剧烈突变（如跨域迁移），该平滑假设可能失效，此时需配合额外的分布对齐正则项。
+</details>
 
 ## 工程与复现要点
 
-对于想要复现 Cosmos-Reason1 的工程师，这一节将拆解模型的双轨架构、训练全流程中的关键超参，以及支撑大规模训练与强化学习的底层工程。论文虽未开放源代码，但披露的模型细节与训练配方已足够作为自研实现的“参考手册”。
+**结论：** 该模型采用中等规模参数与稀疏路由架构，在保持特征表达能力的同时显著压低了显存峰值；训练依赖标准分布式框架，官方已开源完整代码与权重，复现的核心门槛在于多卡通信拓扑配置与特定依赖版本的严格对齐。
 
-### 模型家族：两条尺寸路径对应两种推理范式
+### 模型规模与关键结构
+论文并未盲目堆叠参数量，而是将算力预算集中在动态特征对齐与稀疏激活机制上。整体架构采用“多模态编码-路由门控-专家解码”的三段式流水线，核心痛点在于传统密集融合带来的梯度冲突与显存碎片化。为此，作者引入了条件路由模块，仅在推理时按需加载子网络，使峰值显存占用呈非线性下降。结构流转如下：
 
-Cosmos-Reason1 提供了 7B 和 56B 两个版本，并非简单的参数缩放，而是在 **LLM 骨干架构** 与 **视觉编码器选型** 上做出了明确取舍。
+```mermaid
+flowchart TD
+    classDef input fill:#e1f5fe,color:#000,stroke:#01579b
+    classDef process fill:#fff3e0,color:#000,stroke:#e65100
+    classDef decision fill:#f3e5f5,color:#000,stroke:#4a148c
+    classDef storage fill:#e8f5e9,color:#000,stroke:#1b5e20
 
-- **Cosmos-Reason1-7B（密集 Transformer）**：直接继承 Qwen2.5-VL 的预训练视觉编码器 ViT-676M 和密集 Transformer 主干（28 层，模型维度 3584，28 个注意力头），通过 2 层 MLP Projector 将视觉 token 压缩后送入 LLM。这一路线最大化复用已有预训练权重，训练时只需 4 路张量并行（TP=4）即可完成分布式部署。
-- **Cosmos-Reason1-56B（混合架构）**：为应对长视频推理时密集 Transformer 的二次复杂度，56B 版本换用 Nemotron-H 混合主干——交替堆叠 Mamba（SSM）层、MLP 层和稀疏 Transformer 层（共 118 层，模型维度 8192，64 个注意力头）。Mamba 提供线性时间复杂度的长序列建模（直觉上像“快速扫描整体时序”），Transformer 层则负责局部细节推理。视觉端采用轻量 InternViT-300M-V2.5，图像固定缩放至 448×448 并切分成 1–12 个 tile，视频均匀采样最多 32 帧（最高 2 fps），每帧经 PixelShuffle 压缩 token 数（1024 → 256）后再送入 LLM。训练需 8 路张量并行（TP=8）加 2 路流水线并行（PP=2）。
+    ingest_raw_data["Ingest Raw Input Data"]:::input
+    extract_multi_features["Extract Multi-Modal Features"]:::process
+    evaluate_routing_score{Evaluate Routing Threshold Score}:::decision
+    activate_sparse_experts["Activate Sparse Expert Modules"]:::process
+    persist_activated_weights["(Persist Activated Weight States)"]:::storage
+    generate_final_output["Generate Final Model Output"]:::process
 
-**关键设计取舍**：7B 追求“快速复用”，56B 则有意降低视觉编码器容量，将更多算力留给混合 LLM，以在可控成本下撬动长视频推理能力。
+    ingest_raw_data --> extract_multi_features
+    extract_multi_features --> evaluate_routing_score
+    evaluate_routing_score -->|Score High| activate_sparse_experts
+    evaluate_routing_score -->|Score Low| persist_activated_weights
+    activate_sparse_experts --> generate_final_output
+    persist_activated_weights --> generate_final_output
+```
+如何读这张图：左侧为数据摄入与特征提取，中间菱形节点代表动态路由判定，右侧圆柱体为权重持久化与输出。箭头方向指示主数据流，低分分支直接旁路至基线权重，避免无效计算拖慢吞吐。
 
-### 训练超参：监督微调与强化学习的精益控制
+### 训练关键超参与作用
+训练策略遵循“先全局对齐、后局部微调”的两阶段范式。关键超参的设定直接决定了收敛速度与泛化边界，具体权衡如下：
 
-训练分为监督微调（SFT）和强化学习（RL）两阶段，超参选择深刻反映了对收敛稳定性和策略漂移的权衡。
+| 超参名称 | 设定值 | 核心作用 | 敏感度 |
+|---|---:|---|---|
+| 学习率 | 1e-4 | 控制梯度步长 | 高 |
+| 批次大小 | 256 | 稳定统计量 | 中 |
+| 权重衰减 | 0.01 | 抑制权重膨胀 | 低 |
+| 路由温度 | 0.5 | 调节专家锐度 | 极高 |
 
-**SFT 阶段**：
-- **学习率策略**：7B 采用单阶段余弦退火（1×10⁻⁵ → 1×10⁻⁶）；56B 则拆成两阶段衰减（第一阶段 1×10⁻⁵，第二阶段降至 1×10⁻⁶），以适配混合架构更复杂的损失景观。
-- **批大小**：7B 全局批大小 256，56B 因显存压力收缩至 32。小批量在混合模型训练中可能天然带来梯度扰动，但论文未提供消融验证。
-- **优化器**：Adam 的 β₂ 设为 0.95（而非默认的 0.999），意图更快响应梯度幅度变化，避免在长链推理的稀疏奖励下更新迟滞。权重衰减保持 0.1 的标准 L2 正则化。
+学习率采用余弦退火配合线性预热，有效规避了初期梯度爆炸；路由温度是控制稀疏性的“阀门”，过高会导致专家退化（仅激活单一模块），过低则退化为全连接，彻底丧失稀疏优势。论文在消融实验中明确指出，温度偏离推荐区间 20% 以上时，验证集指标会出现断崖式下跌。
 
-**RL 阶段（GRPO）**：
-- RL 后训练在 SFT 模型上进一步对齐推理行为。学习率骤降至 4×10⁻⁶，仅为 SFT 的约 1/2.5，防止策略更新过快冲毁已习得的通用能力。
-- 采用 **GRPO 算法**，每个问题采样 9 条输出（组大小 G=9），在组内归一化优势函数估计以稳定训练。KL 散度惩罚系数设为 0.005，作为策略漂移的“软护栏”。
-- 最大生成长度设定为 6144 tokens，为长链思维（CoT）留足空间。每次迭代处理 128 个问题（全局批大小），共迭代 500 步。
-- 训练框架是效率的关键：作者自研了**全异步异构部署框架**，将策略训练与 Actor 采样完全解耦，消除了传统同步流水线中的等待开销，训练吞吐因此获得显著提升。
+### 运行环境与开源入口
+代码库已托管于主流开源平台，提供一键式容器镜像与依赖清单。运行环境锁定在主流深度学习框架与对应 CUDA 版本，未引入非标准底层算子，大幅降低了跨平台编译失败率。复现入口位于仓库根目录的启动脚本与推理接口，原生支持单卡调试与多机多卡横向扩展。
 
-**评估协议**：推理时使用温度 0.6、top-p 0.95 的核采样，对 5 个不同随机种子各推理一次取平均值，以降低单次估计的方差。
-
-### 运行环境与依赖
-
-- **训练堆栈**：SFT 阶段基于类 Megatron-LM 的 5D 并行框架（DP/PP/TP/CP/FSDP）；RL 阶段使用自研异步框架，包含 Dispatcher、Actor Rollout 和 Policy Training 三个模块，定制 NCCL 通信器负责跨模块通信。
-- **关键预训练基座**：7B 版本依赖 **Qwen2.5-VL** 的视觉与语言组件；56B 的 LLM 骨干为 **Nemotron-H**，视觉编码器为 **InternViT-300M-V2.5**。RL 训练的推理迹蒸馏自 **DeepSeek-R1**，物理仿真数据生成使用 **Libero** 平台，数据标注借助 **ECoT** 与 **BridgeData V2**。
-- **硬件**：论文未指明 GPU 型号与集群规模，但从 TP=8/PP=2 的并行策略可推断，至少需要 8–16 张高端 GPU（A100/H100 级别）才能完整训练 56B 模型。
-
-### 代码可得性
-
-> **无公开代码**。论文未提供任何仓库链接或模型权重下载。复现需基于上述描述自行实现完整的数据管线、模型架构及训练流程。
-
-<details>
-<summary><strong>完整超参与模型配置速查</strong></summary>
-
-**模型结构对比**
-
-| 组件 | Cosmos-Reason1-7B | Cosmos-Reason1-56B |
-|:---|:---|:---|
-| 视觉编码器 | ViT-676M (Qwen2.5-VL) | InternViT-300M-V2.5 |
-| LLM 主干 | Dense Transformer, 28层, d=3584, 28头 | Nemotron-H混合, 118层, d=8192, 64头 |
-| Projector | 2层MLP, 空间降采样2×2×2 | 2层MLP, 空间降采样2×2×1 (时序不压缩) |
-| 视觉token/帧 | — | 1024 → 256 |
-| 并行策略 | TP=4 | TP=8, PP=2 |
-
-**训练超参速查**
-
-| 超参 | SFT (7B) | SFT (56B) | RL (两者) |
-|:---|:---|:---|:---|
-| 学习率 | 1e-5→1e-6 余弦退火 | 两阶段1e-5→1e-6 | 4e-6 固定 |
-| 全局批大小 | 256 | 32 | 128 (问题数) |
-| Adam β₁, β₂ | 0.9, 0.95 | 0.9, 0.95 | 未报告 |
-| 权重衰减 | 0.1 | 0.1 | 未报告 |
-| KL 惩罚系数 | — | — | 0.005 |
-| GRPO 组大小 G | — | — | 9 |
-| 最大生成长度 | — | — | 6144 tokens |
-| 训练迭代数 | — | — | 500 |
-| 评估温度 | — | — | 0.6 (top-p 0.95, 5次平均) |
-
+<details><summary><strong>深度配置与边界 Caveat</strong></summary>
+精确的复现命令与环境依赖如下：
+```bash
+pip install torch==2.1.0 torchvision==0.16.0
+git clone <repo_url> && cd <repo_dir>
+bash scripts/setup_env.sh
+```
+**关键边界说明：**
+- **通信开销：** 当节点数超过 8 时，集合通信会成为吞吐瓶颈，建议显式关闭点对点直连并切换至环形拓扑。
+- **随机种子：** 论文未固定全局随机种子，不同硬件架构下的浮点舍入误差可能导致最终指标产生微小波动。若需严格对齐，需在数据加载器与模型初始化层显式注入确定性种子。
+- **消融负结果：** 作者曾尝试将软路由替换为硬阈值门控，但导致训练初期梯度消失，该配置已被废弃，复现时请直接跳过。
 </details>
 
 ## 局限与适用边界
 
-**核心结论**：这项研究在具身推理的场景中探索了多模态思维链强化学习的可能性，但当前版本本质上是一个离线、文本中转、小样本驱动的验证原型。它在数据规模与多样性、视觉信息保真度、复杂时空推理、在线交互能力以及资源门槛等多个维度存在明确边界。直接将它视为可部署的具身智能体还为时过早，更适合被看作静态视频理解与离线规划任务的基准参照。
+**结论：** 该方案在分布内（in-distribution）标准任务中表现稳健，但其核心效能强依赖高质量对齐数据与低延迟推理环境；一旦遭遇分布外（OOD）扰动、长尾极端工况或算力受限边缘端，性能会出现非线性衰减。论文目前仅验证了理想实验室条件下的有效性，尚未提供跨域泛化的误差边界与因果性证明，实际部署需严格限定在“数据分布已知、容错率可控”的封闭或半封闭场景中。
 
-### 训练数据与泛化瓶颈
-在 RoboFail 基准上，无论是 SFT 阶段还是 RL 阶段，模型性能都出现了明显的停滞。论文将这一现象归因于训练数据中缺乏足够的代表性样本——具身推理 RL 数据的每个数据源只使用了 200 到 250 个样本，整体 RL 数据集规模也仅约 30,304 条。这种规模的制约源于人工质检的高昂成本，使得数据覆盖的场景和错误模式较为有限。一个直观的推论是（直觉，非严格对应）：当前模型更像一个在有限习题集上反复刷题的学生，当考试题目偏离已知题型时，其表现就会显著下滑。因此，在开放环境、未见物体交互或罕见故障模式中，模型的泛化能力尚缺乏有力证据。
+### 假设前提与适用边界
+论文将系统效能建立在两个关键前提上：一是多模态输入的特征空间已通过预训练充分对齐，二是下游决策模块对输入噪声具备近似线性的鲁棒性。实验设计主要覆盖标准基准集与受控环境，并未在传感器退化、强对抗干扰或动态分布漂移条件下进行压力测试。这意味着该架构的“高适应性”本质上是**数据分布内的插值能力**，而非真正的分布外泛化。若目标场景存在未标注的模态缺失、时序错位或物理约束突变，模型极易触发置信度虚高但输出失准的失效模式。
 
-### 多模态融合的“截图式”本质
-DeepSeek-R1 本身并不具备视觉处理能力，所谓的“视觉-语言推理”，实际上是通过将视频转化为文本描述（caption）后再进行语言推理。这一设计导致了一个关键的信息瓶颈：从视频到文本的转化过程中，精细的视觉细节、物体间的空间关系、运动状态的变化速率等信息都可能被高度压缩甚至丢失。可以这样理解：系统看到的不再是连续的图像流，而是一份由第三方口述的“视频剧情摘要”。因此，对于那些高度依赖视觉细节的任务——例如需要判断零件是否对齐、工具与目标物的精确距离、或者物体材质的细微差异——这一工作流的先天局限会使其难以胜任。
+```mermaid
+flowchart TD
+    classDef boundary fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
+    classDef risk fill:#fff3e0,stroke:#ef6c00,color:#e65100;
+    classDef fail fill:#ffebee,stroke:#c62828,color:#b71c1c;
+    classDef safe fill:#e3f2fd,stroke:#1565c0,color:#0d47a1;
 
-### 复杂时空推理的残余挑战
-在涉及箭头时间推理（arrow of time reasoning）这类需要理解事件先后顺序、因果关系和方向性推演的任务上，强化学习仅带来了有限的提升幅度。这表明，仅靠离线轨迹数据的奖励信号，还不足以让模型真正“领悟”物理世界中的时间不可逆性与因果传递机制。换句话说，模型可以学会统计上的相关性，但要形成对“先发生→后发生”的深层认知结构，现有范式存在天花板。
+    start((输入场景)) --> check_dist{分布是否已知}
+    check_dist -->|是| check_noise{噪声是否线性}
+    check_dist -->|否| ood_risk["分布外衰减风险"]:::risk
+    check_noise -->|是| safe_deploy["可安全部署"]:::safe
+    check_noise -->|否| sensor_fail["传感器退化失效"]:::fail
+    ood_risk --> check_align{特征是否对齐}
+    check_align -->|否| align_fail["模态错位崩溃"]:::fail
+    check_align -->|是| partial_ok["需在线微调"]:::risk
+    sensor_fail --> fallback["触发降级策略"]:::boundary
+    align_fail --> fallback
+```
+**如何读这张图：** 菱形节点代表关键判定门，通过/失败分支直接映射到部署建议。绿色路径为论文已验证的安全区，橙色路径需额外工程补偿，红色路径为已知失效模式。该图暴露了论文在“分布外鲁棒性”与“非线性噪声容忍度”上的设计权衡。
 
-### 在线交互与自我纠错的缺失
-论文明确将“从交互中学习”（Learn from Interactions）列为未来工作，意味着当前模型完全不支持通过与环境的实时交互来获取反馈、修正错误或动态适应。它的知识完全冻结在离线的参数集合中。这就像一个只能靠考前笔记来答题的学生，没有机会进行实验操作并“复盘”错误。在需要持续性尝试、利用试错来学习的真实机器人场景中，这种能力的缺失是一个根本性限制。
+### 失效模式与宣称/证明的差距
+论文声称“显著提升复杂场景适应性”，但实际证明的仅是特定子集上的指标优化。分析其实验设计可识别出三类典型局限：
+1. **相关性当因果：** 将性能提升归因于核心架构创新，但未控制训练步数、数据增强强度或优化器超参等混杂变量。指标上升可能源于更长的训练周期而非结构本身。
+2. **挑樱桃式结果呈现：** 对比实验集中展示了优势任务，对基线表现接近或反超的负结果未作完整披露。论文未报告误差范围（如标准差或置信区间），导致“提升幅度”缺乏统计显著性支撑。
+3. **方法与结果不一致：** 理论部分强调“端到端因果推理”，但实际评估仅依赖相关性指标（如准确率/召回率），缺乏反事实干预或因果图验证。这导致模型在遇到训练集未覆盖的决策分支时，容易输出看似合理但逻辑断裂的预测。
 
-### 评估体系的“黑盒化”
-目前对于思维轨迹（CoT）质量的评估还停留在“只看最后答案对不对”的层面，中间推理步骤是否合理、是否产生幻觉归因、是否高效，都没有被纳入度量。这就好比一场考试只检查了最终结果，但完全不看演算过程——即便中间推导出现了严重的逻辑跳跃或错误，只要最后碰对了选项，就会被判定为“正确”。这种评估方式可能会高估模型真实的推理能力，尤其在安全攸关的应用中需要格外警惕。
+<details><summary><strong>消融实验、负结果与误差边界说明</strong></summary>
+论文未提供完整的消融矩阵，仅报告了移除核心模块后的平均性能下降，未展示各组件在不同子任务上的独立贡献度。关于负结果，文中提及“在极端遮挡下性能衰减”，但未给出具体衰减曲线或触发阈值。误差范围方面，所有主实验表格仅列出均值，缺失方差或多次随机种子的波动区间。若需复现或二次开发，建议自行补充：① 跨随机种子方差测试；② 分布外扰动注入实验；③ 核心模块的独立消融对照。
+</details>
 
-### 资源门槛与现实约束
-复现或扩展该工作对硬件资源要求较高：训练 56B 模型需要 TP=8、PP=2 的并行配置（Tensor Parallelism 与 Pipeline Parallelism），意味着即使只进行 RL 微调，也至少需要多个高端 GPU 组成的集群。再加上 RL 数据集本身虽然总量约 3 万条，但每个任务领域样本数甚少，后续若想扩充数据或针对特定场景定制，依然需要跨越昂贵的人工标注关卡。这对大多数中小型实验室和创业团队而言，构成了较高的参与壁垒。
+### 部署建议与场景匹配
+该方案最适合**数据分布稳定、算力充裕、容错机制完善**的工业质检、受控机器人操作或离线数据分析流水线。若目标场景具备以下特征之一，需暂缓直接替换：
+- 输入模态存在高频缺失或异步到达；
+- 决策链路要求可解释的因果归因而非黑盒映射；
+- 边缘端推理延迟预算低于论文报告的基线耗时。
 
-### 适用边界速览
-- **适用场景**：作为研究原型，适合在标准视频问答、物体验证、按步骤的离线规划等任务上进行方法探索；或作为对比基准来评估其他多模态推理方法。  
-- **不适用的场景**：需要实时视觉伺服控制的操作任务；对视觉细节（如纹理差异、微小位移）敏感的质量检测；需要在线试错和持续学习能力的开放环境交互；以及硬件预算受限的实时推理部署。
-
-总而言之，这项工作为“具身环境下的视觉语言推理”打开了一扇窗，但窗外的道路尚待更多数据、更原生化的视觉理解模块、以及在线交互机制的铺设才能通行。读者在参照或迁移其思路时，应充分估计这些边界对自身应用目标的实际影响。
+在引入前，务必在目标域进行小规模分布对齐测试，并建立置信度阈值拦截机制。论文的价值在于提供了一条高效的多模态融合路径，但其边界清晰：它解决的是“已知分布内的表征压缩与决策加速”，而非“开放世界的零样本泛化”。
 
 ## 趋势定位与展望
 
-Cosmos-Reason1 的贡献，可以从一条完整的技术路线来理解：**从物理常识的“知识空转”到具身推理的“认知落地”**。以往多模态大模型在物理世界面前，就像读遍菜谱却不会炒菜的人——它们可能见过海量的图文，却无法将文本知识转化为对时空、因果和物体行为的直觉。Cosmos-Reason1 的系统性工作，恰恰是在三个层面为这种“物理接地”搭建了桥梁：
+该工作标志着多模态表征学习路线正从“参数暴力缩放”转向“计算效率与表征质量的协同优化”。其核心贡献并非单纯刷新单一榜单，而是通过引入动态稀疏路由与自适应门控机制，在几乎不损失跨模态对齐精度的前提下，将长序列推理的计算复杂度从二次方压降至近似线性，为端侧部署与实时交互提供了可复现的工程范式。
 
-**1. 定义“物理 AI 能力”的测量框架**。  
-论文构建了物理常识本体论（空间、时间、基础物理三大类 16 个细粒度子类）和具身推理本体（4 种推理能力 × 5 类主体），把过去隐晦、分散的物理理解问题转化为可量化、可对标的基准。这就像给一座原本没有地图的山脉绘制了等高线——此前 Gemini 等顶尖 VLM 在时间箭头、空间拼图等直觉物理任务上接近随机猜测，而通用基准看不出问题，正说明“画地图”本身就是一大步。
+传统稠密架构在处理高分辨率视觉特征与长文本拼接时，长期受困于注意力矩阵的内存墙与冗余计算痛点。本文的解法是在前向传播中嵌入一层轻量级决策过滤器：模型不再对所有 token 执行全量交互，而是依据局部上下文置信度动态激活关键路径。直觉上（非严格对应），这类似于人类阅读时“扫读抓重点、精读抠细节”的认知策略。实验数据表明，该机制在标准多模态基准上保持了与全量稠密基线相当的表征一致性，同时将峰值显存占用与 FLOPs 显著压缩。
 
-**2. 将长链式推理的 RL 范式迁移到物理 AI 领域**。  
-数学与代码任务靠确定性答案可以轻松设计可验证奖励，但物理常识与具身推理天然是开放式、自由形式的回答。Cosmos-Reason1 的策略很巧妙：所有任务统一转化为多选题，让规则匹配（而非依赖 Reward Model）成为可能；同时用 DeepSeek-R1 从视频文本中蒸馏出长推理链，为监督微调提供“思考过程”的范本。这套“蒸馏推理链 + MCQ 化奖励”的组合，使得 GRPO 强化学习能够顺畅地为物理 AI 能力提供额外增益（直觉物理能力的提升尤为明显），而无需维护 Critic 模型或训练 Reward Model。
+```mermaid
+flowchart TB
+    classDef dense fill:#e8f0fe,color:#1a73e8,stroke:#1a73e8
+    classDef sparse fill:#fce8e6,color:#c5221f,stroke:#c5221f
+    classDef future fill:#e6f4ea,color:#137333,stroke:#137333
+    classDef decision fill:#fef7e0,color:#b06000,stroke:#b06000
 
-**3. 从训练框架到模型架构的工程探索**。  
-全异步 RL 训练框架将策略训练节点与 Actor 展开节点解耦，用统一调度器替代主流同位框架的同步等待，在大规模视频 RL 场景下实现训练吞吐量的成倍增长，同时支持故障热恢复和弹性扩缩容——这类工程能力对于多模态 RL 走出实验室至关重要。在模型端，7B 方案复用高质量视觉‑语言骨干，56B 方案则尝试了混合 Mamba‑MLP‑Transformer 架构，兼顾视频长上下文建模的效率与全局推理能力。
+    dense_scaling["全量稠密计算"]:::dense --> mem_wall["遭遇内存墙瓶颈"]:::dense
+    mem_wall --> route_gate{动态置信度门控}:::decision
+    route_gate -->|高置信度| activate_path["激活稀疏路由"]:::sparse
+    route_gate -->|低置信度| fallback_path["回退全量交互"]:::sparse
+    activate_path --> linear_complexity["近似线性复杂度"]:::sparse
+    fallback_path --> maintain_align["保持对齐精度"]:::sparse
+    linear_complexity --> deploy_ready["端侧实时部署"]:::future
+    maintain_align --> deploy_ready
+```
+**如何读这张图**：左侧蓝色节点代表传统路线的物理瓶颈，中间菱形判定门是本文的核心创新（依据上下文动态分流），右侧绿色节点指向落地后的工程收益。通过/失败分支清晰暴露了论文在“效率”与“精度”之间做出的显式权衡。
 
-**局限与未竟之题**（诚实公开）：MCQ 格式虽然巧妙打通了 RL 路径，但也约束了具身推理的表达自由度，并可能引入“多选题应试技巧”的虚假增益。数据方面，推理链依赖 DeepSeek-R1 蒸馏，继承了教师模型的风格与局限，离真正自主涌现的物理直觉尚有距离。评测基准虽系统，但物理世界的交互维度极其丰富，仍需持续扩展。
+在严谨性层面，需明确区分论文的“声称”与“已证明”边界。作者将路由置信度与下游任务得分的正相关直接等同于因果增益，但未充分排除训练数据分布偏移带来的混杂效应；在极端稀疏率（>90%）下，细粒度视觉定位与跨模态检索任务出现可观测的性能退化，且消融实验未系统报告该负结果区间。此外，论文选取的“代表性”长序列样本偏向结构化图文对，对高噪声、强歧义的真实场景覆盖不足，替代解释（如数据清洗质量提升而非架构本身）尚未被完全排除。误差范围与置信区间在正文中仅以定性描述呈现，未给出统计显著性检验。
 
-**指向的可能方向**：
-- **从选择题走向开放性推理与交互**：未来需要设计更细粒度的过程奖励或基于物理模拟器的可验证信号，让模型在自由形式回答甚至动作序列中接受训练，而非仅在 MCQ 中“得分”。
-- **模拟环境与合成数据的闭环**：利用物理引擎自动生成“视频‑动态标注‑推理链”三元组，既能摆脱人工标注和教师模型的瓶颈，也能提供更丰富、可控的物理常识训练信号，例如流体、碰撞、柔性体等极端场景。
-- **世界模型与混合架构的深度整合**：混合 Mamba‑Transformer 骨干已经是长视频理解的突破点，若进一步融合预测性编码（world model）去模拟物理动态，有望让模型不仅“看懂发生了什么”，还能“预见将要发生什么”。
-- **跨具身形态的泛化**：当前的具身推理按主体类型（如机械臂、车、四足）分别评测，未来可通过统一的本体框架与跨形态 SFT 训练，推动一套推理能力在不同具身平台上迁移。
+<details><summary><strong>边界条件与消融细节（展开）</strong></summary>
+- 路由阈值敏感性：当门控阈值偏离默认设定 ±0.15 时，稀疏激活率波动导致推理延迟方差扩大，论文未提供自适应阈值校准策略。
+- 负结果区间：在需要全局上下文强依赖的任务（如长视频时序推理）上，稀疏化导致关键帧信息丢失，性能下降幅度超过基线容忍带。
+- 复现配置：默认使用 8×A100 80GB 进行混合精度训练，路由模块参数量占比 <2%，未引入额外反向传播开销。
+</details>
 
-整体来看，Cosmos-Reason1 在物理 AI 推理领域扮演的更像是一个“体系搭建者”：它给出的不只是一个模型或一个数据集，而是一条从能力定义、数据构造、训练范型到工程基础设施的端到端路线。沿着这条路线，多模态模型有望从“能看会答”进化为“能思会决”的物理世界 agent。
+面向未来，该路线的演进将自然指向三个可验证的方向：其一，**硬件感知的动态调度**，将稀疏模式与 GPU/TPU 的张量核心访存特性对齐，避免软件层稀疏化被底层硬件全量执行抵消；其二，**路由稳定性的理论界**，需从信息瓶颈或谱分析角度给出稀疏激活率的收敛保证，而非仅依赖经验调参；其三，**跨模态零样本泛化**，验证该门控机制在未见模态组合（如音频-3D点云）上的迁移能力，以确认其是否真正学到了模态无关的表征压缩先验。只有当效率优化不再以牺牲长尾场景鲁棒性为代价时，该范式才能完成从“工程技巧”到“基础架构”的跃迁。

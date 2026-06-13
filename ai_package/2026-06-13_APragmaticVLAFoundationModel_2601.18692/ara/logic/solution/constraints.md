@@ -1,0 +1,5 @@
+- 论文没有给出推理期采样器的完整伪代码、步数设置或部署控制频率，因此只能从训练目标和动作块建模层面复现核心循环。
+- 论文给出 Flow Matching 与蒸馏损失，但没有显式说明两个损失在总训练目标中的权重关系。
+- 深度蒸馏依赖 LingBot-Depth tokens，论文未展开 LingBot-Depth 本身的训练细节。
+- FSDP、shard groups、FlexAttention 与 torch.compile 的描述是系统级策略，论文未给出可逐行复现的配置文件。
+- 数据标注依赖人工分段与 Qwen3-VL-235B-A22B 指令标注，复现质量会受标注流程与数据分布影响。

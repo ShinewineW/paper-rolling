@@ -1,0 +1,176 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 如何在不依赖人工感知标注的情况下做端到端规划
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  - Sec 3.1
+  description: 研究问题是构建信息充分的 driving world model，使模型通过自监督学习获得 perception annotation-free
+    的端到端规划能力。
+- id: D1
+  type: decision
+  title: 采用 intention-aware physical latent world model
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3.1
+  - Fig 2
+  choice: 将 driving intentions 与 latent world model 结合，用于生成、评估并排序多模态轨迹。
+  alternatives:
+  - 仅从 raw images 构建 single-modal latent feature
+  - 依赖 3D bounding boxes 或 HD maps 等人工感知标注
+  - 使用 perception-based 端到端管线
+  also_depends_on:
+  - Q1
+- id: Q2
+  type: question
+  title: 如何表示多模态驾驶意图
+  support_level: explicit
+  source_refs:
+  - Sec 3.2.1
+  description: 论文从 trajectory vocabulary 的端点聚类得到 intention point，再用 sinusoidal position
+    encoding 和 self-attention 构造 intention-aware multimodal planning query。
+  also_depends_on:
+  - D1
+- id: D2
+  type: decision
+  title: 用 trajectory vocabulary 和 k-means 构造 intention query
+  support_level: explicit
+  source_refs:
+  - Sec 3.2.1
+  choice: 从 trajectory vocabulary 的端点聚类得到每类命令的多个 intention point，再与 ego query 合成规划
+    query。
+  alternatives:
+  - 只使用单一 ego query
+  - 只预测单一规划轨迹
+  - 使用论文未采用的手工意图标签
+  also_depends_on:
+  - Q2
+- id: Q3
+  type: question
+  title: 如何让 latent 表征包含物理空间与语义信息
+  support_level: explicit
+  source_refs:
+  - Sec 3.2.2
+  - Fig 3
+  description: 论文提出 Physical World Latent Encoding，用 context encoder 融合 3D spatial
+    encoding 与 semantic understanding，再用 temporal aggregation 加入时间上下文。
+  also_depends_on:
+  - D1
+- id: D3
+  type: decision
+  title: 引入 Metric3D v2 和 Grounded-SAM 先验
+  support_level: explicit
+  source_refs:
+  - Sec 3.2.2
+  - Sec 4.2
+  choice: 使用 Metric3D v2 提供 metric depth，使用 Grounded-SAM 生成伪语义标签，并把空间语义先验注入 visual
+    feature。
+  alternatives:
+  - 只用相机 backbone 特征作为 world latent
+  - 只加入 depth 先验
+  - 只加入 semantic 先验
+  also_depends_on:
+  - Q3
+- id: E1
+  type: experiment
+  title: 组件有效性消融
+  support_level: explicit
+  source_refs:
+  - Sec 4.4.1
+  - Tab. 3
+  result: 加入 vehicle intention、depth、semantic 与 world model 的组合会改变规划误差与碰撞方向；完整组合在安全性方向上最有利。
+  also_depends_on:
+  - D2
+  - D3
+- id: Q4
+  type: question
+  title: 如何用 latent world model 评估候选轨迹
+  support_level: explicit
+  source_refs:
+  - Sec 3.3.1
+  - Sec 3.3.2
+  - Fig 4
+  description: 模型根据每个 driving intention 预测未来 latent，再比较 predicted latent 与 actual
+    future latent 的距离，训练 selector 的 score。
+  also_depends_on:
+  - D1
+- id: D4
+  type: decision
+  title: 用最小 latent 距离监督 selector
+  support_level: explicit
+  source_refs:
+  - Sec 3.3.2
+  choice: 训练时选择与实际 future latent 距离最小的 modality，并用对应索引训练 ScoreNet；推理时选择最高 score 的
+    trajectory。
+  alternatives:
+  - 直接平均多条轨迹
+  - 只依赖 trajectory regression loss
+  - 不用 world model selector
+  also_depends_on:
+  - Q4
+- id: E2
+  type: experiment
+  title: nuScenes 与 NavSim 主结果验证
+  support_level: explicit
+  source_refs:
+  - Sec 4.3
+  - Tab. 1
+  - Tab. 2
+  result: 在 open-loop nuScenes 与 closed-loop NavSim 上，World4Drive 在 perception annotation-free
+    设置下相对强基线表现更优，并保持与部分 perception-based 方法可比。
+  also_depends_on:
+  - D4
+- id: E3
+  type: experiment
+  title: 不同天气光照与驾驶机动下的鲁棒性分析
+  support_level: explicit
+  source_refs:
+  - Sec 4.4.2
+  - Tab. 4
+  - Tab. 5
+  result: 在多种天气、光照和转向条件下，方法相对 LAW 大多呈现更安全或更稳健的规划方向。
+  also_depends_on:
+  - D3
+  - D4
+- id: E4
+  type: experiment
+  title: backbone 与 hidden dimension 可扩展性
+  support_level: explicit
+  source_refs:
+  - Sec 4.4.3
+  - Tab. 6
+  result: 扩大 image backbone 或 hidden dimension 都能带来规划方向的改善，论文认为两种扩展方式都能注入更多场景信息。
+  also_depends_on:
+  - D3
+- id: X1
+  type: dead_end
+  title: 仅靠 intentions 而不使用 world model 的路线失败
+  support_level: explicit
+  source_refs:
+  - Sec 4.4.1
+  - Tab. 3
+  hypothesis: 只要提供多模态 intentions，模型即可选择更安全的规划。
+  failure_mode: 对比 rows 5 and 6 表明，没有 world modeling 时 intentions alone 会导致规划表现退化。
+  lesson: 多模态意图需要由 world model 评估和排序，不能只把意图作为额外候选轨迹来源。
+  also_depends_on:
+  - E1
+- id: P1
+  type: pivot
+  title: 从单模态 latent 转向空间语义增强 latent
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 2.2
+  - Sec 3.2.2
+  from: LAW 式 single-modal latent world model
+  to: 融合 metric depth、semantic supervision 与 temporal aggregation 的 physical world
+    latent representation
+  trigger: 论文指出 raw images 的 single-modal latent feature 难以捕获 spatial-semantic scene
+    information 与 multi-modal driving intentions。
+  also_depends_on:
+  - Q1
+  - Q3

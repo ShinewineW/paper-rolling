@@ -1,0 +1,5 @@
+- 论文主文依赖 Grounded-SAM 与 Metric3D v2 等 vision foundation models 产生 semantic 与 depth priors，未讨论这些外部模型失效时的鲁棒性边界。<!--ref:157-->
+- semantic 分支只说明保留 high confidence labels，未给出具体阈值或 prompt 集合，复现时需要额外实现选择。<!--ref:74--><!--ref:80-->
+- World Model Selector 训练期需要 actual future latent 做 minimum distance 选择，推理期不能使用未来观测，只能依赖 ScoreNet 分数。<!--ref:125--><!--ref:133-->
+- 主文说明其他 latent distance losses 的 ablation 在 supplementary material，冻结 markdown 中没有展开这些设置。<!--ref:133-->
+- World4Drive 不预测 explicit perception results，定性可视化中 perception results 来自 ground truth annotations 渲染。<!--ref:219-->

@@ -1,0 +1,7 @@
+- 论文的训练损失没有以 $$...$$ 形式给出完整显式公式，只能按文字描述 rectified flow matching、masked MSE 与 next-token prediction。
+- 部分 markdown 转换存在 ?? 占位与格式损坏，例如若干变量名、下标和公式附近文本不可完全恢复。
+- Cosmos3-Edge 在正文中说明 later release，本文主要释放 Cosmos3-Nano 与 Cosmos3-Super，Edge 细节不能当作已发布同等产物。
+- 许多采样超参数属于推理期调优，不能外推为训练目标或训练损失。
+- action tokenization 依赖 domain-specific projection 与训练数据 normalizers，跨新 embodiment 迁移需要重新处理动作维度、坐标约定与归一化。
+- synthetic data 带来长尾物理覆盖，但附录消融显示 sim-to-real gap 与 domain trade-offs，不能假设单一 SDG source 对所有领域都有收益。
+- 大规模训练依赖 HSDP、CP、Joint Data-Loader、CFG parallelism 等基础设施，简化实现只能表达核心循环，不能复现实验吞吐与稳定性。

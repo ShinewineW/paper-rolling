@@ -1,0 +1,6 @@
+- 论文没有给出显式 world model 训练损失公式；只定性说明 DCAE loss 组合、DiT denoising/prediction、distillation 的 DMD loss 与 critic loss。
+- Player 2 actions remain unobserved，行为学习依赖部分观测视频中的隐式相关性。
+- DMD step distillation 虽然加速 inference，但论文明确指出会降低 agent responsiveness 和 attack frequency。
+- 当前评估中的 TAA 与 ARC 聚焦 observable offensive actions，不能覆盖完整 tactical competence、defensive behavior 或 win-rate。
+- 实验环境是 Tekken 3 的 controlled 1v1 fighting game，向真实世界 multi-agent scenarios 的泛化仍是未验证范围。
+- RL finetuning 仅作为 Future Work，用于引导 goal-oriented behaviors，本文未完成该训练范式。

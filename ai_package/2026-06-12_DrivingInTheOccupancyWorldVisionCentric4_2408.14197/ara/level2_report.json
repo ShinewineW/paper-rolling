@@ -1,0 +1,115 @@
+{
+  "artifact": "2026-06-12_DrivingInTheOccupancyWorldVisionCentric4_2408.14197",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.67,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Perfect type-aware mapping: improvement claims (C1, C3) are backed by baseline comparisons (E1, E3), while causal claims (C2, C4, C5) are backed by targeted ablations (E2, E4).",
+        "Every claim explicitly references the exact tables and experiments that substantively test the proposed mechanism, ensuring high semantic relevance."
+      ],
+      "weaknesses": [
+        "Some evidence tables (e.g., Table 2, Table 5) suffer from severe Markdown extraction artifacts (number concatenation like '0.551.202.54'), which obscures the exact numerical evidence, though the semantic relevance remains intact."
+      ],
+      "suggestions": [
+        "Implement a more robust table parsing pipeline (e.g., using OCR or structured PDF parsers) to prevent column merging and number concatenation in evidence extraction."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly specific, actionable, and independently testable.",
+        "Criteria explicitly name the datasets, metrics, and baseline models required to invalidate the claims (e.g., specifying Cam4DOcc and PowerBEV-3D for C1, or UniAD and VAD-Base for C3)."
+      ],
+      "weaknesses": [
+        "None significant; the criteria are exceptionally well-formulated for an empirical deep learning paper."
+      ],
+      "suggestions": [
+        "Consider adding explicit threshold margins for falsification (e.g., 'fails to improve by at least 0.5 mIoU') to account for statistical noise, though current criteria are already strong."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 4,
+      "strengths": [
+        "Claims are tightly bounded to the specific datasets evaluated (nuScenes, Lyft-Level5, nuScenes-Occupancy).",
+        "Concepts explicitly define boundary conditions (e.g., clarifying that the Memory Queue is not the planner, and the model is not a pure video generator)."
+      ],
+      "weaknesses": [
+        "Assumptions and claims lack explicit boundaries regarding sensor configurations (e.g., assuming a standard 6-camera surround-view setup) and domain shifts (e.g., adverse weather, different geographic locations), which are critical for end-to-end planning generalization."
+      ],
+      "suggestions": [
+        "Explicitly state sensor modality and configuration assumptions in the problem specification.",
+        "Add a 'Limitations' or 'Generalization Boundaries' section discussing performance expectations under domain shift or varying camera setups."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "Flawless logical arc: Observations (lack of world knowledge) -> Gaps (image-based rewards lack 3D geometry, pure history lacks counterfactuals) -> Insight (occupancy as safety constraints) -> Solution (Drive-OccWorld architecture).",
+        "Every identified gap is directly addressed by a specific architectural component (e.g., G3 addressed by Semantic/Motion-Conditional Normalization)."
+      ],
+      "weaknesses": [
+        "None. The narrative and structural coherence are exemplary."
+      ],
+      "suggestions": [
+        "Maintain this level of structural mapping in future work; it serves as a gold standard for argument coherence."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "Exploration tree is rich and faithful, featuring genuine dead-ends rather than post-hoc rationalizations.",
+        "Dead-end X2 (GT ego action leakage during planning training) is a highly insightful, domain-specific negative result that demonstrates deep methodological integrity and understanding of end-to-end planning pitfalls."
+      ],
+      "weaknesses": [
+        "None. The inclusion of pivots (P1) and concrete failure modes (X1, X2) provides a transparent view of the research process."
+      ],
+      "suggestions": [
+        "Consider documenting the computational cost or time wasted on the dead-ends (e.g., X1) to further enrich the exploration narrative."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Exceptional baseline coverage, comparing against both forecasting SOTAs (Cam4DOcc, PowerBEV) and planning SOTAs (UniAD, VAD, Drive-WM).",
+        "Comprehensive ablation coverage spanning architectural choices, loss functions, and inference latency (Table 9)."
+      ],
+      "weaknesses": [
+        "Lacks statistical reporting (e.g., variance, confidence intervals, or multi-seed runs), which is common in this subfield but limits strict statistical rigor.",
+        "Severe formatting artifacts in extracted Tables 2 and 5 (e.g., '1.29 0.541.15 2.13') hinder exact numerical verification and reproducibility of the evidence bundle."
+      ],
+      "suggestions": [
+        "Report mean and standard deviation across multiple random seeds for key metrics (mIoU, Collision Rate) to ensure statistical significance.",
+        "Fix the Markdown table extraction logic to properly handle column alignment and prevent numerical concatenation."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "minor",
+      "observation": "While the semantic mapping of evidence to claims is perfect, the Markdown extraction for Tables 2 and 5 contains severe concatenation artifacts (e.g., '0.551.202.54'), which obscures the exact numerical values."
+    },
+    {
+      "dimension": "D5_exploration_integrity",
+      "severity": "suggestion",
+      "observation": "The identification of GT ego action leakage (X2) as a dead-end is an outstanding example of genuine negative exploration, highlighting a deep understanding of information leakage in end-to-end autonomous driving."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "minor",
+      "observation": "The assumptions and claims do not explicitly bound the sensor configuration (e.g., 6-view camera setup) or discuss domain shift limitations (e.g., weather, new cities), which are critical for the generalization of vision-centric planning models."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "The evaluation lacks statistical significance reporting (e.g., variance across multiple seeds), relying on single-run point estimates for critical safety metrics like Collision Rate."
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "artifact": "ai",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Strong Accept",
+    "mean_score": 4.83,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 5,
+      "strengths": [
+        "Evidence is perfectly type-matched to claims: causal claims use ablations (MCG), improvement claims use strong baselines, and scoping claims use diverse datasets.",
+        "C4 correctly uses competitive bounds rather than absolute superiority, matching the mixed results in Table 2."
+      ],
+      "weaknesses": [
+        "None significant; evidence directly and substantively supports the calibrated claims."
+      ],
+      "suggestions": [
+        "Maintain this strict type-aware evidence mapping in future work."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Falsification criteria are highly specific, detailing exact datasets, metrics, baselines, and protocols (e.g., matching RNN architecture and stabilization settings for C2).",
+        "Criteria are independently testable and non-trivial."
+      ],
+      "weaknesses": [
+        "None."
+      ],
+      "suggestions": [
+        "Consider explicitly stating the statistical threshold (e.g., p-value or non-overlapping confidence intervals) required to declare a baseline 'equivalent' in C1 and C3."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 5,
+      "strengths": [
+        "Exceptional calibration: C2 explicitly restricts itself to qualitative visual evidence, avoiding overclaiming on video stability.",
+        "C4 correctly frames time-series performance as 'competitive' rather than 'state-of-the-art', acknowledging mixed results in Table 2.",
+        "Assumptions and boundary conditions are explicitly documented in concepts.md and problem.md."
+      ],
+      "weaknesses": [
+        "None."
+      ],
+      "suggestions": [
+        "Continue to explicitly separate core application claims from secondary applicability claims."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 5,
+      "strengths": [
+        "Clear, logical arc from observations (limitations of AR and full-seq diffusion) to gaps, culminating in the insight of independent per-token noise as partial masking.",
+        "Every identified gap is directly addressed by a specific claim and experiment (e.g., G1 -> C1/E1, G2 -> C2/E2)."
+      ],
+      "weaknesses": [
+        "None."
+      ],
+      "suggestions": [
+        "Ensure the transition from the theoretical insight to the specific RNN implementation is as thoroughly justified as the conceptual framework."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "Exploration tree contains genuine dead-ends (F1, F2) with clear technical reasons for failure (e.g., replacement trick causing sequence inconsistency).",
+        "Decisions include explicit alternatives and pivots (e.g., P1 deferring transformers due to compute/resolution limits), showing a realistic research process."
+      ],
+      "weaknesses": [
+        "None."
+      ],
+      "suggestions": [
+        "Include brief notes on hyperparameter search dead-ends to further enrich the exploration tree."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Extensive and appropriate baselines across four diverse domains (e.g., 12 baselines for time series, strong RL baselines for planning).",
+        "Proper statistical reporting (mean and standard deviation over seeds) for planning and time series tasks.",
+        "Meaningful ablation study (MCG removal) to isolate the contribution of the guidance mechanism."
+      ],
+      "weaknesses": [
+        "Video prediction evaluation (C2) relies entirely on qualitative visual inspection, lacking standard quantitative metrics (e.g., FVD, LPIPS, PSNR) for long-horizon stability."
+      ],
+      "suggestions": [
+        "Incorporate quantitative video metrics (like FVD or frame-wise LPIPS) to objectively measure divergence and temporal consistency in long rollouts, even if qualitative results are strong."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "While the video generation claim (C2) is carefully calibrated to be qualitative, the complete absence of quantitative metrics (e.g., FVD, LPIPS) for video rollout stability is a methodological gap compared to modern video generation standards."
+    },
+    {
+      "dimension": "D2_falsifiability",
+      "severity": "suggestion",
+      "observation": "Falsification criteria for C1 and C3 could be strengthened by defining the exact statistical threshold (e.g., overlapping 95% confidence intervals) that would constitute a baseline 'matching' the proposed method's performance."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "minor",
+      "observation": "The bundle excellently avoids overclaiming on time-series (C4) and video (C2), demonstrating high maturity in distinguishing core contributions from secondary applicability tests."
+    }
+  ]
+}

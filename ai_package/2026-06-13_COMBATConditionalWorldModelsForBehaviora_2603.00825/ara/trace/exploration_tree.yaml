@@ -1,0 +1,238 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 能否从部分观测多智能体轨迹中学习对手策略
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  description: 核心问题是只观察 Player 1 的 multi-hot input 和视频状态时，条件视频生成模型是否能隐式捕捉 Player 2
+    policy。
+  children:
+  - id: D1
+    type: decision
+    title: 选择 Tekken 3 作为受控环境
+    support_level: explicit
+    source_refs:
+    - Sec 3.1
+    choice: 使用 Tekken 3，因为它具有近似 bounded temporal dependency、rich action space 和 strategic
+      depth。
+    alternatives: 论文未报告其他环境的实验替代。
+    children:
+    - id: Q2
+      type: question
+      title: 如何表示部分观测训练数据
+      support_level: explicit
+      source_refs:
+      - Sec 3.1
+      - Sec 3.2
+      description: 将数据形式化为 game frame、Player 1 action 和 next frame，其中 Player 2 action
+        remains unobserved。
+      children:
+      - id: D2
+        type: decision
+        title: 只用 Player 1 action 作为条件
+        support_level: explicit
+        source_refs:
+        - Sec 3.1
+        choice: 训练 conditional world model 时不使用 Player 2 action labels，让 Player 2
+          行为作为 temporal consistency 的涌现结果。
+        alternatives: 传统 imitation learning 需要所有智能体的 explicit action supervision；本文不采用该路径。
+      - id: E1
+        type: experiment
+        title: 收集大规模 Tekken 3 gameplay dataset
+        support_level: explicit
+        source_refs:
+        - Sec 3.2
+        result: 数据覆盖多角色、平衡胜负和同步标注，为动作条件建模、姿态表征和行为评估提供基础。
+- id: Q3
+  type: question
+  title: 如何压缩高分辨率状态以便训练世界模型
+  support_level: explicit
+  source_refs:
+  - Sec 3.3.1
+  - Sec 4.1
+  description: 研究需要把原始视觉帧和姿态信息压缩为可由 DiT 处理的 latent representation。
+  children:
+  - id: E2
+    type: experiment
+    title: 训练 DCAE latent encoder
+    support_level: explicit
+    source_refs:
+    - Sec 4.1
+    result: Autoencoder 将 raw frames 压缩到 compact latent space，并通过重建、感知相似性和 KL regularization
+      约束表征。
+  - id: D3
+    type: decision
+    title: 同时训练 RGB-only 与 pose-augmented 版本
+    support_level: explicit
+    source_refs:
+    - Sec 3.3
+    - Sec 4.1
+    choice: 训练一个只用 RGB latents 的模型和一个使用 joint visual-pose latent representation 的模型。
+    alternatives: 只保留 RGB-only 或只保留 pose-augmented 均未作为唯一方案。
+    also_depends_on:
+    - E2
+  - id: E3
+    type: experiment
+    title: 蒸馏轻量 VAE decoder
+    support_level: explicit
+    source_refs:
+    - Sec 4.1
+    result: Decoder distillation 减少 upsampling blocks，使实时渲染更可行，同时维持较高重建质量。
+    also_depends_on:
+    - E2
+- id: Q4
+  type: question
+  title: 如何在长视频上下文中建模短期反应和长期战术
+  support_level: explicit
+  source_refs:
+  - Sec 3.3.2
+  description: DiT 需要处理长序列，同时避免全局注意力在所有层上带来的高计算成本。
+  children:
+  - id: D4
+    type: decision
+    title: 采用 hybrid local-global attention
+    support_level: explicit
+    source_refs:
+    - Sec 3.3.2
+    - Fig 2
+    choice: 多数层使用 frame-causal local sliding window，每第四层使用 global attention 覆盖完整上下文。
+    alternatives: 全局注意力用于所有层或只使用局部注意力，论文未报告这些替代实验。
+  - id: E4
+    type: experiment
+    title: 训练 autoregressive DiT world model
+    support_level: explicit
+    source_refs:
+    - Sec 4.1
+    result: 模型在 latent space 中根据 Player 1 actions 预测 next latent frame，并同时训练 RGB-only
+      与 pose-augmented 两个版本。
+    also_depends_on:
+    - D2
+    - D3
+    - D4
+- id: Q5
+  type: question
+  title: 如何达到 interactive frame rates
+  support_level: explicit
+  source_refs:
+  - Sec 3.4
+  description: 扩散采样迭代过程计算密集，需要加速才能用于实时游戏交互。
+  children:
+  - id: D5
+    type: decision
+    title: 采用 CausVid DMD step distillation
+    support_level: explicit
+    source_refs:
+    - Sec 3.4
+    - Sec 4.1
+    choice: 将 fully trained DiT 蒸馏为 4-step variant，并结合 DMD loss 和 critic loss。
+    alternatives: 保持完整 diffusion sampling 或使用其他蒸馏方法，论文未在本文中报告对比。
+    also_depends_on:
+    - E4
+  - id: D6
+    type: decision
+    title: 加入 static key-value caching
+    support_level: explicit
+    source_refs:
+    - Sec 3.4
+    choice: 复用先前 generation steps 的 attention states，以进一步提升推理速度。
+    alternatives: 不使用 caching 或使用其他 cache 策略，论文未报告。
+    also_depends_on:
+    - E4
+  - id: E5
+    type: experiment
+    title: 评估 distilled models 的实时质量折中
+    support_level: explicit
+    source_refs:
+    - Sec 4.3.3
+    - Sec 5
+    result: 蒸馏模型保留 substantial visual quality，并实现实时交互所需的速度提升。
+    also_depends_on:
+    - D5
+    - D6
+- id: Q6
+  type: question
+  title: 如何评估未显式监督的 emergent behavior
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Sec 4.3
+  description: 传统视觉指标不能直接衡量未监督的对手智能，RL 指标又假设可访问 ground-truth actions 或 rewards。
+  children:
+  - id: D7
+    type: decision
+    title: 组合视觉指标、health 指标和人工可解释指标
+    support_level: explicit
+    source_refs:
+    - Sec 4.2
+    - Sec 4.3
+    choice: 使用 FVD、FID、LPIPS、Damage Distribution Analysis、Health Trajectory Analysis、TAA
+      和 ARC 从不同侧面评估生成结果。
+    alternatives: 只用标准视频指标或只用 RL reward 都不足以覆盖本文问题。
+  - id: E6
+    type: experiment
+    title: 比较 pose 与 non-pose 视觉质量
+    support_level: explicit
+    source_refs:
+    - Sec 4.2.1
+    - Sec 4.3.3
+    result: pose-augmented COMBAT 在视觉质量指标上明显优于 RGB-only variant。
+    also_depends_on:
+    - D3
+    - D7
+  - id: E7
+    type: experiment
+    title: 用 health 数据检查规则和节奏
+    support_level: explicit
+    source_refs:
+    - Sec 4.2.2
+    - Fig 3
+    result: 生成 gameplay 的 damage distribution 和 mean health trajectory 与真实回合趋势相近，说明模型学习到动作后果和
+      match pacing。
+    also_depends_on:
+    - D7
+  - id: E8
+    type: experiment
+    title: 用 TAA 和 ARC 观察 Player 2 行为阶段
+    support_level: explicit
+    source_refs:
+    - Sec 4.3.3
+    result: 训练早期出现 hyperactive 行为，随后 activity frequency 降低并趋向更稳定的人类式 combat patterns，但后期整体一致性会退化。
+    also_depends_on:
+    - D7
+- id: X1
+  type: dead_end
+  title: 完整动作监督路线不符合本文目标
+  support_level: explicit
+  source_refs:
+  - Sec 2.3
+  - Sec 3.1
+  hypothesis: 使用 imitation learning 风格的完整 state-action supervision 可以直接学习所有智能体行为。
+  failure_mode: 该路线需要 Player 2 explicit action supervision，无法检验从 partially observed
+    data 中隐式涌现对手策略这一问题。
+  lesson: 本文将 Player 2 action labels 排除在训练条件之外，把对手行为学习作为 world modeling 的 emergent
+    property。
+- id: P1
+  type: pivot
+  title: 从视觉生成转向行为世界模型
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 2.3
+  from: 传统 world models 主要关注 spatially and temporally consistent world simulations
+    或 visual prediction。
+  to: COMBAT 关注 dynamic reactive agents，并评估 Player 2 对 Player 1 actions 的 plausible
+    combat strategies。
+  trigger: 现实和游戏环境中的不可预测成分来自能观察、计划并影响环境的 reactive agents。
+- id: X2
+  type: dead_end
+  title: 只依赖传统视频指标不足以证明行为智能
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  hypothesis: FVD、FID 和 LPIPS 足以评估模型是否学到对手行为。
+  failure_mode: 这些指标主要评估 visual fidelity 和 temporal coherence，不能直接测量未显式监督的 tactical
+    competence。
+  lesson: 需要引入 health-based metrics 与 human-interpretable offensive action metrics
+    来补充行为评估。

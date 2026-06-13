@@ -1,0 +1,199 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 真实世界VLA是否会随数据规模继续提升
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 5.5.1
+  description: 论文把核心问题设为VLA models在massive real-world robot data上如何scale，并通过预训练数据时长缩放观察下游表现。
+  children:
+  - id: E1
+    type: experiment
+    title: 预训练数据规模缩放实验
+    support_level: explicit
+    source_refs:
+    - Sec 5.5.1
+    - Fig 5
+    result: progress rate和success rate随预训练数据时长增加呈持续上升趋势，且三个具身平台的趋势大体一致。
+  - id: D1
+    type: decision
+    title: 把真实世界多具身数据作为主要扩展方向
+    support_level: explicit
+    source_refs:
+    - Sec 1
+    - Sec 3.1
+    - Sec 5.5.1
+    choice: 扩大dual-arm robot真实世界预训练数据，并覆盖多种robot embodiments。
+    alternatives: 仅依赖小规模任务数据、仅使用仿真数据、或只在单一robot platform上训练。
+- id: Q2
+  type: question
+  title: 如何在多模态语义条件下生成连续机器人动作
+  support_level: explicit
+  source_refs:
+  - Sec 4.1
+  description: 论文需要把多视角图像、任务指令和机器人状态转化为可执行的action chunk。
+  children:
+  - id: D2
+    type: decision
+    title: 采用Qwen2.5-VL加action expert的MoT结构
+    support_level: explicit
+    source_refs:
+    - Sec 4.1
+    choice: 使用预训练VLM提供语义表征，并用action expert处理状态和action chunks，通过shared self-attention统一建模。
+    alternatives: 单一路径transformer、没有预训练VLM的动作模型、或把所有模态完全混合处理。
+  - id: E2
+    type: experiment
+    title: 条件Flow Matching动作建模
+    support_level: explicit
+    source_refs:
+    - Sec 4.1
+    result: 该建模方式用于连续动作生成，论文将其描述为有助于流畅和精细的机器人控制。
+- id: Q3
+  type: question
+  title: 如何避免观测表示泄漏未来动作信息
+  support_level: explicit
+  source_refs:
+  - Sec 4.1
+  description: 联合序列包含观测条件和未来动作chunk，训练时需要控制注意力可见性。
+  children:
+  - id: D3
+    type: decision
+    title: 使用blockwise causal attention
+    support_level: explicit
+    source_refs:
+    - Sec 4.1
+    choice: 把图像文本、状态、动作划为功能块，块间因果、块内双向。
+    alternatives: 全双向attention、全token级因果attention、或不区分功能块的普通mask。
+- id: Q4
+  type: question
+  title: VLA是否需要显式空间信息
+  support_level: explicit
+  source_refs:
+  - Sec 2.1
+  - Sec 4.1
+  - Sec 5.2
+  - Sec 5.3
+  description: 论文指出传统VLA在几何推理和深度感知上有挑战，并引入深度对齐以增强空间感知。
+  children:
+  - id: D4
+    type: decision
+    title: 加入learnable query到LingBot-Depth token的蒸馏
+    support_level: explicit
+    source_refs:
+    - Sec 4.1
+    choice: 用三视角learnable queries对齐LingBot-Depth tokens，并通过projection layer做维度对齐。
+    alternatives: 不使用depth-based spatial information，或仅依赖VLM图像表征。
+  - id: E3
+    type: experiment
+    title: w/o depth与w/ depth变体比较
+    support_level: explicit
+    source_refs:
+    - Sec 5.2
+    - Sec 5.3
+    result: 加入depth-based spatial information后，真实世界平均结果和RoboTwin多任务设置整体更优。
+    also_depends_on:
+    - D4
+- id: Q5
+  type: question
+  title: 大规模VLA训练如何提高吞吐
+  support_level: explicit
+  source_refs:
+  - Sec 4.2
+  - Sec 5.4
+  description: 论文认为高频action data需要高效pipeline，并从分布式训练和算子优化两方面设计代码库。
+  children:
+  - id: D5
+    type: decision
+    title: 采用FSDP与action expert shard groups
+    support_level: explicit
+    source_refs:
+    - Sec 4.2
+    choice: 用FSDP分片optimizer states、model parameters和gradients，并为action expert modules构建专用shard
+      groups。
+    alternatives: 普通DDP、默认ZeRO配置、或对所有模块采用同样粒度的分片。
+  - id: D6
+    type: decision
+    title: 采用混合精度和算子优化
+    support_level: explicit
+    source_refs:
+    - Sec 4.2
+    choice: reductions使用torch.float32，storage and communication使用torch.bfloat16，并结合FlexAttention与torch.compile。
+    alternatives: 全float32训练、不使用FlexAttention、或不做operator fusion。
+  - id: E4
+    type: experiment
+    title: 与StarVLA、Dexbotic和OpenPI做吞吐比较
+    support_level: explicit
+    source_refs:
+    - Sec 5.4
+    - Fig 4
+    result: 论文报告自有代码库在两种模型设置中训练速度最快，并且扩展效率接近理论线性趋势。
+    also_depends_on:
+    - D5
+    - D6
+- id: Q6
+  type: question
+  title: 如何保证真实世界评测公平
+  support_level: explicit
+  source_refs:
+  - Sec 5.1.1
+  - Sec 5.1.2
+  - Sec 5.1.3
+  description: 论文通过统一后训练数据、同一硬件任务配对、随机测试顺序和固定评测协议减少混杂因素。
+  children:
+  - id: D7
+    type: decision
+    title: 固定后训练管线和机器任务配对
+    support_level: explicit
+    source_refs:
+    - Sec 5.1.3
+    choice: 所有模型从公开pre-trained checkpoints微调，使用same post-training pipeline、verified
+      dataset和一致超参，并在同一hardware-task pair上顺序测试。
+    alternatives: 不同模型使用各自训练数据、不同机器人单元评测、或不随机化测试顺序。
+  - id: E5
+    type: experiment
+    title: GM-100真实世界基准评测
+    support_level: explicit
+    source_refs:
+    - Sec 5.1
+    - Sec 5.2
+    - Tab 1
+    result: LingBot-VLA两个变体与强基线在多平台真实世界任务中比较，w/ depth平均表现最高。
+    also_depends_on:
+    - D7
+- id: X1
+  type: dead_end
+  title: 只用有限任务或单平台评测不足以说明广泛泛化
+  support_level: inferred
+  hypothesis: 若只在少量任务或单一robot platform上比较，可能无法判断VLA在真实世界多样性下的泛化能力。
+  failure_mode: 结果容易被任务选择、硬件差异或平台相似性主导，难以支持跨具身结论。
+  lesson: 需要跨多个commercial platforms、覆盖GM-100任务并记录统一协议；这是分析推断,论文未显式声明。
+- id: P1
+  type: pivot
+  title: 从能力评测转向训练基础设施优化
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 2.3
+  - Sec 4.2
+  - Sec 5.4
+  from: 只证明模型在真实机器人任务上有效
+  to: 同时构建高吞吐VLA训练代码库并比较不同框架
+  trigger: 论文指出社区缺少能够在海量数据上高效开展scaling evaluations的优化训练代码库。
+- id: Q7
+  type: question
+  title: 少量后训练数据能否超过强基线满量后训练
+  support_level: explicit
+  source_refs:
+  - Sec 5.5.2
+  description: 论文在Agibot G1平台选取GM-100代表任务，考察LingBot-VLA的数据效率。
+  children:
+  - id: E6
+    type: experiment
+    title: 数据高效后训练分析
+    support_level: explicit
+    source_refs:
+    - Sec 5.5.2
+    - Fig 6
+    result: 在有限示范预算下，LingBot-VLA相对π_0.5表现更优，并且数据增加时优势扩大。
