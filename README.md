@@ -244,8 +244,10 @@ ruff" is the validation gate.
 The composition is CODE; the runtime injects the seams. Three infrastructure
 adapters are supplied to `run_campaign(...)` — **`discover`** (the discovery
 callable, built over the query-expansion `llm` + the source clients), **`http`**,
-and **`run_cli`** — plus the **seven LLM-backed seams** (all routed via
-`config/llm.yaml` from `scripts/llm.seams.build_seams()`). Each LLM seam
+and **`run_cli`** — plus the **seven LLM-backed seams** (+ the optional `web_search`
+T4 code-repo-discovery seam), all routed via `config/llm.yaml` from
+`scripts/llm.seams.build_seams()`, which also pins each seam's `tier`/`effort`/`timeout`
+(the master config owns every model choice, not the code). Each LLM seam
 **MUST** be an **independent Agent-tool invocation** (a fresh sub-agent per call)
 so audit votes stay uncorrelated with the generator. `SKILL.md` → "Wiring the
 model seams" documents the exact input/output shape of each:

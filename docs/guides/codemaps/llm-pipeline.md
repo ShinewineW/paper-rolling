@@ -1,8 +1,8 @@
 # LLM Pipeline & Provider Layer 代码地图
 
 > **范围**: `scripts/llm/` + `config/llm.yaml` + `config/audit.yaml`
-> **最后更新**: 2026-06-13
-> **关键特性**: Vendor-neutral 提供商路由、**无兜底**(provider 失败 → `EngineAbort` loudly,绝不静默回落主订阅)、Per-seam 独立调用、每 seam 必须显式路由、faithfulness_judge 改为 fail-soft 诊断 (ADR-0012)
+> **最后更新**: 2026-06-14
+> **关键特性**: Vendor-neutral 提供商路由、**无兜底**(provider 失败 → `EngineAbort` loudly,绝不静默回落主订阅;唯一例外是 OPTIONAL `web_search` T4 富集层,fail-soft)、Per-seam 独立调用、每必需 seam 必须显式路由、**每 seam 的 tier/effort/timeout 都在 config**、faithfulness_judge fail-soft 诊断 (ADR-0012)、code_ref 四层级联(T1/T2a/T2b/T4)全开
 
 <!-- Generated: 2026-06-08 | Files scanned: 9 | Token estimate: ~3500 -->
 
@@ -124,17 +124,20 @@ class StrictProvider:
 ```python
 class LLMConfig:
     providers: dict[str, LLMProvider]  # name → provider instance
-    routing: dict[str, str]            # seam → provider name（每 seam 必有,load 时强校验）
+    routing: dict[str, str]            # seam → provider name（必需 seam 强校验；可选 seam 路由了才有）
     modes: dict[str, str]              # seam → inline | grounded | agent_team
+    call_params: dict[str, dict]       # seam → {tier?, effort?, timeout?}（master config 拥有的 LLM 调用旋钮）
 
-    def resolve(seam: str) → StrictProvider
-        # 查表 routing[seam]，返回 StrictProvider(provider)（无 fallback）
+    def resolve(seam: str) → StrictProvider          # routing[seam] → StrictProvider（无 fallback）
+    def resolve_optional(seam: str) → StrictProvider | None  # 可选 seam：未路由 → None（如 web_search 关闭）
+    def resolved_call(seam, *, tier, effort, timeout) → (tier, effort, timeout)
+        # config 的 call_params 覆盖；否则用传入的代码缺省 → 模型档/effort/超时改一行 config,不改代码
 
 def load_llm_config(workspace_root: Path) → LLMConfig
     # 读 config/llm.yaml（必需；不存在 → ValueError 硬报错,无默认）
-    # 解析 providers 块 + seams 块；每个 seam 必须显式路由,否则 ValueError
-    # 实例化所有 provider（从 .env 读 token）
-    # 返回 LLMConfig
+    # 解析 providers + seams；每个必需 seam 必须显式路由（否则 ValueError）；可选 seam(OPTIONAL_SEAMS)缺省即关
+    # 每 seam 条目可带 tier/effort/timeout（校验 tier∈{strong,fast}、timeout>0）→ call_params
+    # 实例化所有 provider（从 .env 读 token）；返回 LLMConfig
 ```
 
 **Config 格式** （`config/llm.yaml`）：
@@ -154,21 +157,24 @@ providers:
     fast_model: deepseek-v4-flash
     send_reasoning_effort: false       # 可选，默认 false
 
-seams:
-  analyzer: { provider: claude-code, mode: grounded }
-  skeptic: opencode
-  rigor: opencode
-  entailment: opencode
-  expand: opencode
-  writer: opencode
-  faithfulness: opencode   # branch1 评价 (c) 诊断 — ADR-0012 (every seam MUST be routed; fail-soft, returns str)
+seams:                                   # 每条可只写 provider 字符串,或 {provider, mode, tier, effort, timeout}
+  analyzer: { provider: claude-code, mode: grounded, tier: strong }
+  skeptic: { provider: opencode, tier: fast }
+  rigor: { provider: opencode, tier: strong }
+  entailment: { provider: opencode, tier: fast }
+  expand: { provider: opencode, tier: fast }
+  writer: { provider: opencode, tier: strong }   # tier 作用于报告 SECTIONS；配图筛选固定 fast(模块内)
+  faithfulness: { provider: opencode, tier: fast }  # branch1 评价 (c) 诊断 — ADR-0012；fail-soft 返回 str
+  # OPTIONAL — 路由了才开：T4 长尾码链发现(repo_resolve),子 agent 联网搜+自研判,fail-soft 返 []
+  web_search: { provider: claude-code, tier: strong, effort: high, timeout: 420 }
 ```
 
 **特性**：
-- `config/llm.yaml` 必需；缺文件 / 任一 seam 未路由 / provider 未定义 → `ValueError` 硬报错（无默认回落）
+- `config/llm.yaml` 必需；缺文件 / 任一**必需** seam 未路由 / provider 未定义 → `ValueError` 硬报错（无默认回落）。**可选 seam**(`OPTIONAL_SEAMS`,目前 `web_search`)缺省即关、非硬错。
+- **每 seam 的 LLM 调用旋钮(tier/effort/timeout)都在 config**(`resolved_call`:config 覆盖、代码仅缺省)——换模型档不用改代码。analyzer/writer 经各自 seam 把 tier 传入其模块(writer 配图筛选固定 fast)。
+- **无兜底有一个 OPTIONAL 例外**:`web_search`(T4 富集层)fail-soft,失败→`[]`,绝不拖垮 tick(仍显式路由,非静默默认)。
 - `grounded` 模式要求 grounded-capable 本地 agent（claude_code 或 codex_cli,或全 grounded 成员的 round_robin 池;本地 Read/Grep 能力校验,与额度无关）
 - Per-seam override via `_SEAM_OVERRIDE` dict（测试用）
-- Future: seam 值可能变成 provider 列表（多模型 A/B，暂未活跃）
 
 ### `scripts/llm/seams.py` — Seam factory & routing
 

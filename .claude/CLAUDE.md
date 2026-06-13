@@ -71,10 +71,14 @@ and **injects the seams**. Everything LLM-backed or I/O-backed lives outside the
 pure core:
 
 - **3 infrastructure adapters** the driver supplies: `discover`, `http`, `run_cli`.
-- **6 LLM-backed seams**, all routed through `config/llm.yaml` via
+- **7 LLM-backed seams + 1 optional**, all routed through `config/llm.yaml` via
   `scripts/llm/seams.py::build_seams()`: `resolve_analysis` (analyzer),
   `skeptic_votes` (G2), `rigor_scores` (G3), `entailment_judge` (G3),
-  `expand_llm` (discovery), `write_report` (human-chain writer, optional).
+  `expand_llm` (discovery), `write_report` (human-chain writer),
+  `faithfulness_judge` (branch1 「评价」 note, ADR-0012 rev — advisory/fail-soft), plus the
+  OPTIONAL `web_search` (T4 code-repo discovery in `repo_resolve` — routed → on, unrouted →
+  off). Each seam entry pins not just the provider but its LLM-call knobs — `tier`
+  (strong|fast), `effort`, `timeout` — so every model choice lives in the config, not code.
 
 Each LLM seam **MUST** be an **independent Agent-tool invocation** (a fresh
 sub-agent per call) so audit votes stay statistically uncorrelated with the
@@ -106,8 +110,11 @@ skeptic); **G3** = seal (anchor + equation fidelity + entailment + 6-dim rigor).
 
 ## LLM provider routing
 
-`config/llm.yaml` routes each of the 6 seams to a provider. Four provider types
-(none vendor-bound): `claude_code` (headless `claude -p`) and `codex_cli` (headless
+`config/llm.yaml` routes each seam to a provider **and pins its LLM-call knobs**
+(`tier` strong|fast → the provider's strong_model|fast_model, plus `effort`, `timeout`) —
+the master config owns every model choice, so changing a seam's model never needs a code
+edit (`LLMConfig.resolved_call` returns the config value, else the seam's code default).
+Four provider types
 `codex exec`, no-sandbox) are **local agents**; `openai_compatible` is any
 OpenAI-compat API by `{base_url, models, api_key_env}`; `round_robin` is a composite
 that alternates calls across `members` (e.g. claude-code + codex). Every seam is
@@ -121,8 +128,10 @@ semaphore) — a generous backend runs wide, a token-expensive one narrow; a
 `round_robin` total = sum of member caps (claude 5 + codex 5 = 10-wide). `grounded`
 mode requires a **grounded-capable** provider (a local agent, or a pool whose every
 member is one) — enforced by `grounded_capable`, not by a name/base_url heuristic.
-The active config routes the analyzer to `analyzer-pool` (round_robin claude-code +
-codex, grounded) and the other 5 seams to `openai_compatible`, keys from `.env`.
+The active config routes the analyzer to a grounded local agent (`codex` this round; the
+`analyzer-pool` round_robin claude-code+codex is the re-enable target), the G2/G3/writer
+seams to an `openai_compatible` API, and `faithfulness` + the optional `web_search` (T4 judge,
+tier=strong → Sonnet 4.6) to `claude-code`; all keys from `.env`.
 
 ## Non-obvious invariants (will bite you otherwise)
 
@@ -132,10 +141,13 @@ codex, grounded) and the other 5 seams to `openai_compatible`, keys from `.env`.
   exemption) was auto-revoked by Hugging Face the moment it hit public git history
   — it now lives only in `.env` (unset `HF_TOKEN` → anonymous HF). Reintroducing a
   hardcoded token is a regression; this is the standing project convention.
-- **No silent fallback to the Claude Code subscription** (cost guard). The 6 LLM
+- **No silent fallback to the Claude Code subscription** (cost guard). The required LLM
   seams have **no default provider and no fallback**: a missing/failing/misconfigured
   provider aborts loudly (`EngineAbort`), surfacing the key/config problem instead
-  of quietly degrading to `claude -p`. Reintroducing any default-to-`claude -p` or
+  of quietly degrading to `claude -p`. (The OPTIONAL `web_search` T4 seam is the one
+  deliberate exception — it is fail-SOFT, returning `[]` on failure, since an enrichment
+  tier must never abort a tick; it is still explicitly routed, never a silent default.)
+  Reintroducing any default-to-`claude -p` or
   auto-fallback is a **cost regression** — it silently drains the paid main account
   — not a resilience feature. Standing convention.
 - **Vault-key authority is `scripts/output/naming.py` ONLY.** Do not add ad-hoc
