@@ -43,7 +43,10 @@ from scripts.output.pwc_lookup import official_repo as _pwc_official_repo
 
 # github.com/<owner>/<repo> (also git@github.com:owner/repo). Captures owner/repo
 # and stops at the next '/', so .../tree/main and .../blob/... keep just owner/repo.
-_GH = re.compile(r"github\.com[/:]([A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+)")
+# `[ \t]?` after the owner slash tolerates the single-space soft-wrap artifact pandoc/
+# LaTeXML inject into long URLs (observed: "github.com/dlcv-team/ latent-world-models-av"
+# in a converted MD) — _to_repo_url strips that whitespace back out.
+_GH = re.compile(r"github\.com[/:]([A-Za-z0-9_.\-]+/[ \t]?[A-Za-z0-9_.\-]+)")
 _ARXIV_VERSION = re.compile(r"v\d+$")
 
 # Author-declared closed-source cues. HIGH-PRECISION on purpose: the bug being
@@ -68,9 +71,11 @@ _CLOSED = re.compile(
 # arxiv id/title — the clone-verification signal the "search" tier relies on.
 _DECLARED_OPEN = re.compile(
     r"(?i)\b(?:our\s+)?(?:codes?|source\s+code|implementation)\b"
-    r"[^.\n]{0,40}?\b(?:is|are|will\s+be|will|can\s+be|to\s+be)\b"
+    # 0,80 (not 40) tolerates the common multi-artifact list between the noun and the verb:
+    # "Source code, trained checkpoints and evaluation artifacts ARE available at <url>".
+    r"[^.\n]{0,80}?\b(?:is|are|will\s+be|will|can\s+be|to\s+be)\b"
     r"[^.\n]{0,30}?\b(?:available|released|accessed|accessible|found|public|open[-\s]?sourced)\b"
-    r"[^.\n]{0,30}?(github\.com[/:][A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+)"
+    r"[^.\n]{0,30}?(github\.com[/:][A-Za-z0-9_.\-]+/[ \t]?[A-Za-z0-9_.\-]+)"
 )
 
 
@@ -99,7 +104,8 @@ def _to_repo_url(raw: str | None) -> str | None:
         return None
     # The char class allows '.'/'-' (real in repo names like cosmos-predict2.5),
     # so a trailing sentence period/bracket gets captured — strip such punctuation.
-    slug = m.group(1).rstrip("/").rstrip(".,;:)]}'\"")
+    # re.sub removes the soft-wrap whitespace _GH tolerated inside owner/ repo.
+    slug = re.sub(r"\s+", "", m.group(1)).rstrip("/").rstrip(".,;:)]}'\"")
     if slug.endswith(".git"):
         slug = slug[:-4]
     return f"https://github.com/{slug}"

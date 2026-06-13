@@ -1,3 +1,8 @@
 # Code Reference
 
-**No public repository found** — searched the paper text, the Papers-with-Code official-repo index, Hugging Face, and a web search; nothing was found or passed verification. This is NOT a closed-source determination.
+- **Repository**: https://github.com/dlcv-team/latent-world-models-av
+- **Pinned commit**: `993605f650af16e021cc863775d2fa311816623a`
+- **Source**: paper-declared (official-flagged)
+- **Reproduce**: re-clone at the pinned commit; this workspace keeps no runnable copy.
+
+- **Innovation → code location**: not mechanically resolved at this commit (symbols not located in source); see the repo at the pinned SHA.

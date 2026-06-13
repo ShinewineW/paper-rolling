@@ -116,6 +116,22 @@ def test_cited_baseline_or_bare_code_colon_link_not_promoted(tmp_path: Path) -> 
     assert cands and all(c.trust == "search" and c.source == "paper-text" for c in cands)
 
 
+def test_soft_wrapped_url_with_space_is_recovered(tmp_path: Path) -> None:
+    # pandoc/LaTeXML soft-wraps long URLs with a space ("github.com/dlcv-team/ latent-...");
+    # the resolver must recover the real owner/repo, not drop the link (observed false-negative
+    # on 2606.12987 in the WAM pipeline test — its repo was declared but space-broken).
+    md = tmp_path / "p.md"
+    md.write_text(
+        "Source code and checkpoints are available at "
+        "https://github.com/dlcv-team/ latent-world-models-av.\n",
+        encoding="utf-8",
+    )
+    cands = resolve_repo_candidates("2606.12987", md, {}, pwc_lookup=lambda _i: None)
+    assert cands[0] == RepoCandidate(
+        "https://github.com/dlcv-team/latent-world-models-av", "paper-declared", "official"
+    )
+
+
 def test_t2b_t4_off_by_default(tmp_path: Path) -> None:
     # No hf_lookup / web_search injected → only T1/T2a/discovery, no network tiers.
     cands = resolve_repo_candidates(
