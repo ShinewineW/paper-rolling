@@ -140,16 +140,123 @@ def collect(workspace: Path) -> list[dict]:
     return recs
 
 
+def _dw(s: str) -> int:
+    """Display width: CJK / fullwidth code points occupy 2 terminal columns, so box
+    borders line up when labels mix Chinese and ASCII. Box-drawing glyphs are width-1."""
+    w = 0
+    for ch in s:
+        o = ord(ch)
+        w += (
+            2
+            if (
+                0x1100 <= o <= 0x115F
+                or 0x2E80 <= o <= 0xA4CF
+                or 0xAC00 <= o <= 0xD7A3
+                or 0xF900 <= o <= 0xFAFF
+                or 0xFE30 <= o <= 0xFE4F
+                or 0xFF00 <= o <= 0xFF60
+                or 0xFFE0 <= o <= 0xFFE6
+                or 0x20000 <= o <= 0x3FFFD
+            )
+            else 1
+        )
+    return w
+
+
+def _short(key: str) -> str:
+    """Human-ish short name from a vault/scene key: drop the date prefix + id, keep
+    the title slug; fall back to the bare id when there is no title (bare-id scenes)."""
+    s = re.sub(r"^\d{4}-\d{2}-\d{2}_", "", key)
+    s = _ARXIV.sub("", s).strip("_")
+    return s[:22] if s else key
+
+
+_GLYPH = {"compliant": "#", "done-stale": ":", "failed": "x", "ingested": ".", "orphan": "!"}
+_ZH = {
+    "compliant": "合规",
+    "done-stale": "待处理",
+    "failed": "失败",
+    "ingested": "待入库",
+    "orphan": "孤儿",
+}
+
+
+def render_card(recs: list[dict], *, width: int = 60) -> str:
+    """ASCII status card — the canonical at-a-glance progress view (stacked bar +
+    bucket legend + actionable detail). Deterministic; safe to render any time."""
+    order = ["compliant", "done-stale", "failed", "ingested", "orphan"]
+    counts = {s: sum(1 for r in recs if r["state"] == s) for s in order}
+    total = len(recs) or 1
+
+    def row(content: str) -> str:  # pad content to the inner width, account for CJK
+        pad = max(0, width - _dw(content))
+        return "│" + content + " " * pad + "│"
+
+    bar_w = width - 6
+    bar = ""
+    for s in order:
+        bar += _GLYPH[s] * round(counts[s] / total * bar_w)
+    bar = (bar + "." * bar_w)[:bar_w]  # pad/clip to exact width
+
+    head_l = "  paper-rolling · 语料合规态"
+    head_r = f"{len(recs)} 篇  "
+    head = head_l + " " * max(1, width - _dw(head_l) - _dw(head_r)) + head_r
+
+    legend = "   " + "   ".join(f"{_GLYPH[s]} {_ZH[s]} {counts[s]}" for s in order if counts[s])
+
+    lines = [
+        "╭" + "─" * width + "╮",
+        row(head),
+        "├" + "─" * width + "┤",
+        row("  [" + bar + "]"),
+        row(legend),
+        "├" + "─" * width + "┤",
+    ]
+
+    # actionable detail
+    stale = [r for r in recs if r["state"] == "done-stale"]
+    if stale:
+        uns = sum(1 for r in stale if r["detail"] == "unsealed-ARA")
+        rep = len(stale) - uns
+        bits = []
+        if rep:
+            bits.append(f"旧报告重发 {rep}")
+        if uns:
+            bits.append(f"ARA 未密封 {uns}")
+        lines.append(row("  待处理   " + " · ".join(bits)))
+    failed = [_short(r["key"]) for r in recs if r["state"] == "failed"]
+    if failed:
+        label, indent = "  失败     ", " " * _dw("  失败     ")
+        cur = label
+        for nm in failed:
+            sep = "" if cur in (label, indent) else " · "
+            if _dw(cur + sep + nm) > width - 1:
+                lines.append(row(cur))
+                cur = indent + nm
+            else:
+                cur += sep + nm
+        lines.append(row(cur))
+    if not stale and not failed:
+        lines.append(row("  全部合规 ✓"))
+    lines.append("╰" + "─" * width + "╯")
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="paper-rolling corpus status (read-only)")
     ap.add_argument("--workspace", default=".")
     ap.add_argument("--json", action="store_true", help="machine-readable JSON")
+    ap.add_argument("--card", action="store_true", help="ASCII status card (at-a-glance)")
     args = ap.parse_args(argv)
     recs = collect(Path(args.workspace))
 
     order = ["compliant", "done-stale", "failed", "ingested", "orphan"]
     counts = {s: sum(1 for r in recs if r["state"] == s) for s in order}
     counts = {s: n for s, n in counts.items() if n}
+
+    if args.card:
+        print(render_card(recs))
+        return 0
 
     if args.json:
         print(

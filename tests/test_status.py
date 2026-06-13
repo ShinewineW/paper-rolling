@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.status import _idbase, collect
+from scripts.status import _dw, _idbase, collect, render_card
 
 
 def test_idbase_extracts_arxiv_id_regardless_of_naming_order() -> None:
@@ -58,3 +58,33 @@ def test_collect_classifies_each_state(tmp_path: Path) -> None:
     )
     assert recs["4444.44444"]["state"] == "failed"
     assert recs["5555.55555"]["state"] == "ingested"
+
+
+def test_render_card_lines_are_width_aligned_and_carry_counts() -> None:
+    recs = [
+        {"idbase": "1.1", "key": "2026-01-01_A_1.1", "state": "compliant", "detail": ""},
+        {
+            "idbase": "2.2",
+            "key": "2026-01-01_B_2.2",
+            "state": "done-stale",
+            "detail": "stale-report",
+        },
+        {
+            "idbase": "3.3",
+            "key": "2026-01-01_C_3.3",
+            "state": "done-stale",
+            "detail": "unsealed-ARA",
+        },
+        {"idbase": "4.4", "key": "2026-01-01_OrionPaper_4.4", "state": "failed", "detail": ""},
+    ]
+    card = render_card(recs)
+    widths = {_dw(ln) for ln in card.splitlines()}
+    assert len(widths) == 1  # every line (incl. CJK + box borders) is the SAME display width
+    assert "合规 1" in card and "失败 1" in card  # legend counts
+    assert "OrionPaper" in card  # failed short-name surfaced
+    assert card.startswith("╭") and card.rstrip().endswith("╯")
+
+
+def test_render_card_all_compliant_shows_clear_line() -> None:
+    recs = [{"idbase": "1.1", "key": "k_1.1", "state": "compliant", "detail": ""}]
+    assert "全部合规" in render_card(recs)
