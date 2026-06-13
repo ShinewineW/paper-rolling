@@ -86,5 +86,39 @@ def test_render_card_lines_are_width_aligned_and_carry_counts() -> None:
 
 
 def test_render_card_all_compliant_shows_clear_line() -> None:
-    recs = [{"idbase": "1.1", "key": "k_1.1", "state": "compliant", "detail": ""}]
+    recs = [{"idbase": "1.1", "key": "k_1.1", "state": "compliant", "detail": "", "sealed": True}]
     assert "全部合规" in render_card(recs)
+
+
+def test_collect_flags_corrupt_report_not_compliant(tmp_path: Path) -> None:
+    """Regression lock (2026-06-13): a report that PASSES the structural check (## 评价
+    present, no retired anchors) over a SEALED ARA but whose body is an ARA-not-loaded
+    failure (wrong-paper hallucination) must be 'corrupt-report', NEVER 'compliant'."""
+    ws = tmp_path
+    pv = ws / "person_vault" / "2026-06-13_X_9999.99999"
+    pv.mkdir(parents=True)
+    (pv / "report.md").write_text(
+        "# ai_package — 深度解读\n\n## 评价\n\n"
+        "无法生成忠实性评价：**已验证知识包(ARA)未提供**。\n\n"
+        "> 机器核对:未能读取已验证知识包(ARA),本次未核对正文数字。\n\n"
+        "## 核心结论\n\n(未解析到结论)\n",
+        encoding="utf-8",
+    )
+    _seal(ws / "ai_package" / "2026-06-13_X_9999.99999", passes=True)
+
+    recs = {r["idbase"]: r for r in collect(ws)}
+    assert recs["9999.99999"]["state"] == "corrupt-report"  # NOT "compliant" (the blind spot)
+    assert "ARA-not-loaded" in recs["9999.99999"]["detail"]
+
+
+def test_render_card_surfaces_corrupt_and_funnel() -> None:
+    recs = [
+        {"idbase": "1.1", "key": "k_1.1", "state": "compliant", "detail": "", "sealed": True},
+        {"idbase": "2.2", "key": "k_2.2", "state": "corrupt-report", "detail": "x", "sealed": True},
+    ]
+    card = render_card(recs)
+    widths = {_dw(ln) for ln in card.splitlines()}
+    assert len(widths) == 1  # still width-aligned with the funnel + corrupt lines
+    assert "内容损坏" in card  # the corrupt bucket is surfaced
+    assert "进度" in card and "ARA密封 2" in card  # funnel reflects pipeline depth
+    assert "全部合规" not in card  # a corrupt report must NOT read as all-clear

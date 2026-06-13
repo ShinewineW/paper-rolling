@@ -9,12 +9,20 @@ only READS. Built for humans and external observers (CI, a dashboard):
     PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.status --json
 
 Per-paper state (keyed by idbase = arXiv id), most-to-least done:
-  compliant   — promoted AND report opens with 「## 评价」, carries no <!--ref/anchor-->,
-                and the ARA is sealed (level2_report.json passes_seal2). The bar.
-  done-stale  — promoted (both vaults) but NOT compliant: a pre-ADR-0012-rev report
-                (no 评价 / has retired anchors) or an unsealed ARA (no level2_report).
-  failed      — a preserved _failed/ scene (quarantined; ARA may be complete).
-  ingested    — corpus MD exists but no product yet (not processed).
+  compliant      — promoted AND report opens with 「## 评价」, carries no <!--ref/anchor-->,
+                   and the ARA is sealed (level2_report.json passes_seal2). The bar.
+  corrupt-report — promoted but the report body is an ARA-not-loaded FAILURE (wrong-paper
+                   hallucination): carries the engine's ARA-not-loaded markers or the
+                   fallback `# ai_package` H1. Strictly worse than done-stale and NEVER
+                   counted compliant — a bare "评价-present" check false-passed exactly
+                   these (the 2026-06-13 regression). Re-emit required.
+  done-stale     — promoted (both vaults) but NOT compliant: a pre-ADR-0012-rev report
+                   (no 评价 / has retired anchors) or an unsealed ARA (no level2_report).
+  failed         — a preserved _failed/ scene (quarantined; ARA may be complete).
+  ingested       — corpus MD exists but no product yet (not processed).
+
+Each paired record also carries `sealed` (ARA passes_seal2) so external tooling and the
+card can show finer pipeline progress (ARA-sealed vs report-compliant), not just a binary.
 """
 
 from __future__ import annotations
@@ -59,6 +67,28 @@ def _report_compliant(report_md: Path) -> bool:
     return "## 评价" in t and "<!--ref:" not in t and "<!--anchor:" not in t
 
 
+# Engine-deterministic ARA-not-loaded fingerprints (copied verbatim from
+# branch1_gate.py / branch1_llm.py so the substring match is exact). A report carrying
+# any of these — or the fallback "# ai_package" H1 — is a wrong-paper hallucination,
+# NOT a compliant product; the bare 评价-present check missed exactly these.
+_ARA_NOT_LOADED = (
+    "未能读取已验证知识包(ARA)",
+    "已验证知识包(ARA)未提供",
+    "已验证知识包(ARA)为空",
+    "(未解析到结论)",
+)
+
+
+def _report_corrupt(report_md: Path) -> bool:
+    """True if the report is an ARA-not-loaded failure body (wrong-paper hallucination)."""
+    if not report_md.exists():
+        return False
+    t = report_md.read_text(encoding="utf-8")
+    if any(m in t for m in _ARA_NOT_LOADED):
+        return True
+    return t.lstrip().startswith("# ai_package")  # title fell back to the parent dir name
+
+
 def _ara_sealed(ai_dir: Path) -> bool:
     l2 = ai_dir / "ara" / "level2_report.json"
     if not l2.exists():
@@ -99,15 +129,29 @@ def collect(workspace: Path) -> list[dict]:
     recs: list[dict] = []
     for ib in sorted(set(pv) | set(ai) | set(failed) | set(corpus)):
         if ib in pv and ib in ai:
+            report_md = pv[ib] / "report.md"
             sealed = _ara_sealed(ai[ib])
-            compliant = _report_compliant(pv[ib] / "report.md") and sealed
-            state = "compliant" if compliant else "done-stale"
-            detail = (
-                ""
-                if compliant
-                else ("unsealed-ARA" if not sealed else "stale-report(no 评价/anchors)")
+            if _report_corrupt(report_md):
+                # Strictly worse than done-stale and NEVER compliant: a wrong-paper
+                # hallucination body (the 2026-06-13 blind spot). Must be re-emitted.
+                state, detail = "corrupt-report", "ARA-not-loaded body (wrong-paper hallucination)"
+            else:
+                compliant = _report_compliant(report_md) and sealed
+                state = "compliant" if compliant else "done-stale"
+                detail = (
+                    ""
+                    if compliant
+                    else ("unsealed-ARA" if not sealed else "stale-report(no 评价/anchors)")
+                )
+            recs.append(
+                {
+                    "idbase": ib,
+                    "key": pv[ib].name,
+                    "state": state,
+                    "detail": detail,
+                    "sealed": sealed,
+                }
             )
-            recs.append({"idbase": ib, "key": pv[ib].name, "state": state, "detail": detail})
         elif ib in failed:
             recs.append(
                 {
@@ -171,20 +215,31 @@ def _short(key: str) -> str:
     return s[:22] if s else key
 
 
-_GLYPH = {"compliant": "#", "done-stale": ":", "failed": "x", "ingested": ".", "orphan": "!"}
+_GLYPH = {
+    "compliant": "#",
+    "corrupt-report": "X",
+    "done-stale": ":",
+    "failed": "x",
+    "ingested": ".",
+    "orphan": "!",
+}
 _ZH = {
     "compliant": "合规",
+    "corrupt-report": "内容损坏",
     "done-stale": "待处理",
     "failed": "失败",
     "ingested": "待入库",
     "orphan": "孤儿",
 }
+# Pipeline order, most→least done. corrupt-report sits right after compliant: it is a
+# promoted-but-broken product that must surface at the top as needing action.
+_ORDER = ["compliant", "corrupt-report", "done-stale", "failed", "ingested", "orphan"]
 
 
 def render_card(recs: list[dict], *, width: int = 60) -> str:
     """ASCII status card — the canonical at-a-glance progress view (stacked bar +
     bucket legend + actionable detail). Deterministic; safe to render any time."""
-    order = ["compliant", "done-stale", "failed", "ingested", "orphan"]
+    order = _ORDER
     counts = {s: sum(1 for r in recs if r["state"] == s) for s in order}
     total = len(recs) or 1
 
@@ -204,6 +259,11 @@ def render_card(recs: list[dict], *, width: int = 60) -> str:
 
     legend = "   " + "   ".join(f"{_GLYPH[s]} {_ZH[s]} {counts[s]}" for s in order if counts[s])
 
+    # Pipeline funnel — finer than the binary bar: how far the corpus got down the
+    # stages (ARA sealed → report compliant), so progress is visible mid-run.
+    sealed_n = sum(1 for r in recs if r.get("sealed"))
+    funnel = f"  进度     入库 {len(recs)} · ARA密封 {sealed_n} · 报告合规 {counts['compliant']}"
+
     lines = [
         "╭" + "─" * width + "╮",
         row(head),
@@ -211,9 +271,14 @@ def render_card(recs: list[dict], *, width: int = 60) -> str:
         row("  [" + bar + "]"),
         row(legend),
         "├" + "─" * width + "┤",
+        row(funnel),
+        "├" + "─" * width + "┤",
     ]
 
     # actionable detail
+    corrupt = [_short(r["key"]) for r in recs if r["state"] == "corrupt-report"]
+    if corrupt:
+        lines.append(row(f"  ⚠ 内容损坏 {len(corrupt)}  须重发(正文非本论文/ARA 未读入)"))
     stale = [r for r in recs if r["state"] == "done-stale"]
     if stale:
         uns = sum(1 for r in stale if r["detail"] == "unsealed-ARA")
@@ -236,7 +301,7 @@ def render_card(recs: list[dict], *, width: int = 60) -> str:
             else:
                 cur += sep + nm
         lines.append(row(cur))
-    if not stale and not failed:
+    if not stale and not failed and not corrupt:
         lines.append(row("  全部合规 ✓"))
     lines.append("╰" + "─" * width + "╯")
     return "\n".join(lines)
@@ -250,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     recs = collect(Path(args.workspace))
 
-    order = ["compliant", "done-stale", "failed", "ingested", "orphan"]
+    order = _ORDER
     counts = {s: sum(1 for r in recs if r["state"] == s) for s in order}
     counts = {s: n for s, n in counts.items() if n}
 
@@ -270,13 +335,14 @@ def main(argv: list[str] | None = None) -> int:
     for r in sorted(recs, key=lambda r: (order.index(r["state"]), r["idbase"])):
         mark = {
             "compliant": "✅",
+            "corrupt-report": "💥",
             "done-stale": "⚠️ ",
             "failed": "❌",
             "ingested": "·",
             "orphan": "‼️ ",
         }.get(r["state"], "?")
         det = f"  ({r['detail']})" if r["detail"] else ""
-        print(f"  {mark} {r['state']:11} {r['idbase']:14} {r['key'][:46]}{det}")
+        print(f"  {mark} {r['state']:14} {r['idbase']:14} {r['key'][:46]}{det}")
     print("\n" + "  ".join(f"{s}={n}" for s, n in counts.items()))
     return 0
 

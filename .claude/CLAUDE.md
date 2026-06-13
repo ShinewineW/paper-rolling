@@ -57,7 +57,11 @@ renders an ASCII status card — use it for any "show progress" request; `--json
 external tooling / CI. A paper is promoted-AND-compliant only on a content check, not
 because `person_vault/`+`ai_package/` are paired: the ARA must pass the 最终门 level-2
 seal (`passes_seal2`) and `report.md` must be new-form (opens with a 评价 section, no
-retired `<!--ref/anchor-->`).
+retired `<!--ref/anchor-->`) AND free of ARA-not-loaded markers — a report that has the
+评价 header but whose body is a wrong-paper hallucination (engine markers like
+`未能读取已验证知识包(ARA)` / `(未解析到结论)`, or a `# ai_package` fallback H1) is its own
+`corrupt-report` state, NEVER counted compliant (the bare 评价-present check false-passed
+20 such reports on 2026-06-13).
 
 ## Architecture: the seam-injection model (the key mental model)
 
