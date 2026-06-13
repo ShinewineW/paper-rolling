@@ -1,0 +1,198 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 能否只用 video data 训练可交互 world model
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  - Table 1
+  description: 核心问题是把 video-only training data 转化为 frame-level controllability，而不依赖
+    ground-truth action labels 或 text annotations。
+  children:
+  - id: D1
+    type: decision
+    title: 采用 latent action interface
+    support_level: explicit
+    source_refs:
+    - Sec 2.1 LAM
+    - Fig 5
+    choice: 用 fully unsupervised LAM 从相邻帧中学习 discrete latent actions。
+    alternatives: 使用 ground-truth actions、text labels，或只做 video-level controllable
+      generation。
+    children:
+    - id: E1
+      type: experiment
+      title: 从 Internet videos 学 latent actions
+      support_level: explicit
+      source_refs:
+      - Sec 2.1 LAM
+      - Sec 3.2
+      - Fig 17
+      result: latent actions 在不同 prompt frames 上表现出一致且有语义的控制方向。
+    - id: D2
+      type: decision
+      title: 限制 latent action vocabulary
+      support_level: explicit
+      source_refs:
+      - Sec 2.1 LAM
+      - Appendix C.1
+      choice: 主实验使用 8 个 unique codes 作为 latent actions。
+      alternatives: 增加 action codes 以提高表达能力，或减少 codes 以提升可玩性。
+    - id: E2
+      type: experiment
+      title: pixel-input 与 token-input LAM 对比
+      support_level: explicit
+      source_refs:
+      - Sec 3.4
+      - Table 2
+      result: pixel-input 在 controllability 方向上优于 token-input，并且在 Robotics 上也保持更好的生成表现。
+      also_depends_on:
+      - D2
+- id: Q2
+  type: question
+  title: 视频 tokenization 如何兼顾质量与效率
+  support_level: explicit
+  source_refs:
+  - Sec 2 Methodology
+  - Sec 2.1 Video Tokenizer
+  description: 视频包含大量 tokens，直接用普通 transformer 会带来 memory cost 问题，因此需要更高效的时空表示。
+  children:
+  - id: D3
+    type: decision
+    title: 在 tokenizer 中使用 ST-ViViT
+    support_level: explicit
+    source_refs:
+    - Sec 2.1 Video Tokenizer
+    - Sec 3.4
+    choice: 采用 ST-transformer based tokenizer，并让 encoding 包含历史帧信息。
+    alternatives: spatial-only ViT 或 C-ViViT。
+  - id: E3
+    type: experiment
+    title: tokenizer architecture ablation
+    support_level: explicit
+    source_refs:
+    - Sec 3.4
+    - Table 3
+    result: ST-ViViT 在 video fidelity 与 controllability 方向上优于比较对象，同时 memory trade-off
+      更合理。
+    also_depends_on:
+    - D3
+  - id: X1
+    type: dead_end
+    title: C-ViViT 不是更好的默认选择
+    support_level: explicit
+    source_refs:
+    - Sec 3.4
+    - Table 3
+    hypothesis: full space-time attention 可能凭借更强交互提升 tokenizer 与下游 dynamics 表现。
+    failure_mode: 同参数量下 memory consumption 更高，并且论文观察到 overfitting tendency，需要 strong
+      regularization，最终表现更差。
+    lesson: 更强的空间时间全注意力不自动带来更好的 downstream world model；efficient ST-ViViT 更适合作为默认
+      tokenizer。
+    also_depends_on:
+    - E3
+- id: Q3
+  type: question
+  title: dynamics model 是否能随 compute scaling
+  support_level: explicit
+  source_refs:
+  - Sec 3.1
+  - Fig 9
+  description: 论文需要确认 ST-transformer 与 MaskGIT dynamics 在 model size 和 batch size
+    上能否稳定受益。
+  children:
+  - id: E4
+    type: experiment
+    title: model size scaling
+    support_level: explicit
+    source_refs:
+    - Sec 3.1
+    - Appendix C.3
+    - Table 10
+    result: 随着 dynamics model 参数规模增大，final training loss 方向上一致下降。
+  - id: E5
+    type: experiment
+    title: batch size scaling
+    support_level: explicit
+    source_refs:
+    - Sec 3.1
+    - Appendix C.3
+    - Table 11
+    result: 增大 batch size 也带来模型表现方向上的有利增益。
+  - id: D4
+    type: decision
+    title: 训练最终 Genie model
+    support_level: explicit
+    source_refs:
+    - Sec 3.1
+    - Table 12
+    choice: 基于 scaling 结果训练更大的 final Genie dynamics model，并合并 tokenizer 与 action model
+      形成 Genie。
+    alternatives: 停留在 scaling study 的较小 dynamics model，或只扩大模型不扩大 batch。
+    also_depends_on:
+    - E4
+    - E5
+- id: Q4
+  type: question
+  title: learned latent actions 能否迁移到 agent training
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  - Appendix E.1
+  description: 论文进一步检验从 Internet videos 学到的 latent actions 是否能给 unseen RL environment
+    的 imitation 提供标签。
+  children:
+  - id: E6
+    type: experiment
+    title: CoinRun imitation from unseen videos
+    support_level: explicit
+    source_refs:
+    - Sec 3.3
+    - Appendix E.1
+    - Fig 15
+    result: LAM-based policy 在少量 expert labels 适配后达到 oracle 方向上的表现，说明 latent actions
+      对 transfer 有意义。
+  - id: D5
+    type: decision
+    title: 用 expert data 做 latent-to-real mapping
+    support_level: explicit
+    source_refs:
+    - Appendix E.1
+    choice: 在 inference 前用少量 action-labeled expert sequences 建立 latent actions 到 real
+      actions 的 dictionary。
+    alternatives: 使用 agent policy 抽取的数据建立映射。
+    also_depends_on:
+    - E6
+- id: P1
+  type: pivot
+  title: 从 Platformers 扩展到 Robotics
+  support_level: explicit
+  source_refs:
+  - Sec 1
+  - Sec 3.2
+  - Fig 13
+  from: Platformers 2D game videos
+  to: Robotics action-free robot videos
+  trigger: 为了验证方法 generality，论文另外训练 Robotics dataset 上的模型，并观察 consistent latent actions。
+- id: X2
+  type: dead_end
+  title: 长时域交互仍受 16 frames memory 限制
+  support_level: explicit
+  source_refs:
+  - Sec 5 Conclusion
+  hypothesis: 如果短序列可控生成成立，模型或许能自然扩展到长期一致环境。
+  failure_mode: 论文指出当前仍 limited to 16 frames of memory，长时域 consistent environments
+    仍具挑战。
+  lesson: 后续工程需要改进 memory horizon，而不能只依赖当前 autoregressive transformer rollout。
+- id: X3
+  type: dead_end
+  title: 交互帧率尚未达到实用实时性
+  support_level: explicit
+  source_refs:
+  - Sec 5 Conclusion
+  hypothesis: 生成式环境可以直接作为流畅 playable interface。
+  failure_mode: 论文指出 Genie currently operates around 1FPS，需要 future advances 才能达到
+    efficient frame rate。
+  lesson: 系统落地不仅取决于 controllability，还取决于推理效率与交互延迟。

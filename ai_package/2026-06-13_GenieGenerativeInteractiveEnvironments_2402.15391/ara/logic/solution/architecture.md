@@ -1,0 +1,1 @@
+原始视频帧 -> ST-transformer 视频 tokenizer 将帧序列压缩为离散视频 token -> LAM 从像素历史与下一帧中无监督推断离散 latent action -> dynamics model 接收历史视频 token 与 stopgrad latent action 的加性嵌入 -> decoder-only MaskGIT 以自回归方式预测下一帧 token -> tokenizer decoder 将预测 token 解码回图像；推理期从单张提示图像开始，由用户选择离散 latent action，循环执行 token 预测与解码以生成可交互轨迹。

@@ -451,3 +451,11 @@ processed:
   person_vault_path: null
   ai_package_path: null
   processed_at: '2026-06-12T11:54:55Z'
+- key: '2402.15391'
+  md_sha256: null
+  status: done
+  failure_class: null
+  retry_after: null
+  person_vault_path: person_vault/2026-06-13_GenieGenerativeInteractiveEnvironments_2402.15391
+  ai_package_path: ai_package/2026-06-13_GenieGenerativeInteractiveEnvironments_2402.15391
+  processed_at: '2026-06-13T02:00:50Z'
