@@ -5,13 +5,19 @@
 - **Source**: pwc-official (official-flagged)
 - **Reproduce**: re-clone at the pinned commit; this workspace keeps no runnable copy.
 
-## Innovation → code location
+- **Innovation → code location**: not mechanically resolved at this commit (symbols not located in source); see the repo at the pinned SHA.
 
-| Innovation | Location (`file:line`) |
-|---|---|
-| Diffusion Forcing | README.md:1 |
-| Causal Diffusion Forcing | _not found_ |
-| Monte Carlo Guidance | _not found_ |
-| pyramid scheduling | _not found_ |
-| zig-zag sampling scheme | _not found_ |
-| fractional masking | _not found_ |
+## Linked artifacts (Hugging Face)
+
+- **Model**: https://huggingface.co/Skywork/SkyReels-V2-I2V-14B-540P
+- **Model**: https://huggingface.co/Skywork/SkyReels-V2-DF-1.3B-540P
+- **Model**: https://huggingface.co/Skywork/SkyReels-V2-I2V-1.3B-540P
+- **Model**: https://huggingface.co/Skywork/SkyReels-V2-T2V-14B-720P
+- **Space**: https://huggingface.co/spaces/fffiloni/SkyReels-V2
+- **Space**: https://huggingface.co/spaces/14eee109giet/SkyReels-V2
+- **Space**: https://huggingface.co/spaces/Dudu0043/SkyReels-V2
+- **Space**: https://huggingface.co/spaces/svjack/SkyReels-V2
+- **Space**: https://huggingface.co/spaces/Bossmarc747/SkyReels-V2
+- **Space**: https://huggingface.co/spaces/Forstjsjsg/forts-video-gen
+- **Space**: https://huggingface.co/spaces/UchihaAbdul/SkyReels-V2
+- **Space**: https://huggingface.co/spaces/halishrichard17/SkyReels-V2

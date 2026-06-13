@@ -5,8 +5,4 @@
 - **Source**: pwc-official (official-flagged)
 - **Reproduce**: re-clone at the pinned commit; this workspace keeps no runnable copy.
 
-## Innovation → code location
-
-| Innovation | Location (`file:line`) |
-|---|---|
-| 2311.17918 | README.md:7 |
+- **Innovation → code location**: not mechanically resolved at this commit (symbols not located in source); see the repo at the pinned SHA.

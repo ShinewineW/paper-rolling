@@ -5,12 +5,11 @@
 - **Source**: paper-text (verified)
 - **Reproduce**: re-clone at the pinned commit; this workspace keeps no runnable copy.
 
-## Innovation → code location
+- **Innovation → code location**: not mechanically resolved at this commit (symbols not located in source); see the repo at the pinned SHA.
 
-| Innovation | Location (`file:line`) |
-|---|---|
-| 基于 Mixture-of-Transformers 的 VLM 与 action expert 分路径建模并共享 self-attention | _not found_ |
-| 面向连续动作建模的 Flow Matching action expert | _not found_ |
-| 三视角 learnable queries 与 LingBot-Depth tokens 的空间蒸馏 | README.md:95 |
-| action expert modules 专属 shard groups 的 FSDP 训练策略 | _not found_ |
-| 面向稀疏多模态融合的 FlexAttention 与 torch.compile 优化 | _not found_ |
+## Linked artifacts (Hugging Face)
+
+- **Model**: https://huggingface.co/robbyant/lingbot-vla-4b
+- **Model**: https://huggingface.co/robbyant/lingbot-vla-4b-depth
+- **Model**: https://huggingface.co/robbyant/lingbot-vla-4b-posttrain-robotwin
+- **Model**: https://huggingface.co/robbyant/lingbot-vla-4b-depth-posttrain-robotwin
