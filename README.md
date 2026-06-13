@@ -26,12 +26,12 @@ If you are taking this over with no prior context:
   `run_campaign(...)` and supplying the seams (see **Entry points** below).
 - The runtime injects the **seams** — everything LLM-backed or I/O-backed lives
   outside the pure core. These are: three **infrastructure adapters** the driver
-  supplies (`discover`, `http`, `run_cli`), and the **LLM-backed seams** — the
-  five analysis/audit callables (`resolve_analysis`, `skeptic_votes`,
-  `rigor_scores`, `entailment_judge`, `faithfulness_judge`), the optional
-  human-chain `write_report` writer, **plus** the query-expansion `llm` used
-  inside the `discover` callable. Their exact contracts are in `SKILL.md` →
-  "Wiring the model seams".
+  supplies (`discover`, `http`, `run_cli`), and the **seven LLM-backed seams**
+  (`resolve_analysis`, `skeptic_votes`, `rigor_scores`, `entailment_judge`,
+  `expand_llm`, `write_report`, `faithfulness_judge`) **+ the optional `web_search`**
+  T4 code-repo-discovery seam — all routed via `config/llm.yaml`, which pins each
+  seam's provider and its `tier`/`effort`/`timeout`. Their exact contracts are in
+  `SKILL.md` → "Wiring the model seams" (and "The injected seams" below).
 - Tests are the executable spec. Start at `tests/test_spoke.py` (full per-paper
   pipeline with fake seams) and `tests/test_run_campaign.py` (the driver).
 - To **extend** the engine (new source / tier / gate / branch / cross-paper step),
@@ -125,8 +125,8 @@ scripts/          the engine code (packages below)
 | `ara_schema.py` | ARA Seal Level 1 structural validator. |
 | `anchor_lint.py` | Three-layer citation anchor lint (HARD gate) + the anchor-lint CLI. |
 | `figures.py` | Original-figure inventory: extract `(ref, caption)` from the MD; flag the architecture figure; copy selected images (branch1). |
-| `code_ref.py` | code_ref pointer: clone-verify ordered repo candidates → three-state (`found` / `searched-not-found` / `author-declared-closed`), clone-delete hygiene. |
-| `repo_resolve.py` | code_ref repo-resolution cascade: T1 grep MD + T2a offline PwC `is_official` table + T2b HF-live + T4 websearch; `make_repo_resolver()` composes the production resolver. |
+| `code_ref.py` | code_ref pointer: clone-verify ordered repo candidates → state (`found` / `searched-not-found` / `author-declared-closed` / `unreachable`), clone-delete hygiene. `found` cites SOURCE locations only; unresolved innovations are OMITTED (never `_not found_` rows). |
+| `repo_resolve.py` | code_ref repo-resolution cascade (highest-trust-first): T2a offline PwC `is_official` + **T1a paper-declared** (author "our code is at X" → official trust) + T1b paper-text grep + discovery + T2b HF-live (repo + linked HF artifacts) + T4 websearch; `make_repo_resolver()` composes the production resolver. |
 | `pwc_lookup.py` | T2a offline `arxiv_id → official repo` lookup over the shipped gzipped Papers-with-Code `is_official` table. |
 | `check_ara_bundle.py` | ARA bundle regression gate (审计 §6.1): code_ref three-state + evidence tables + review↔tables drift. Importable `check_bundle` + sweep CLI. |
 
@@ -158,7 +158,7 @@ offline `arxiv_id → official repo` lookup (T2a), read with stdlib gzip at runt
 
 | Dir | Contents |
 |-----|----------|
-| `corpus/{ID}/` | source + intermediate: `{ID}.md` + `.md_contract.json` (tracked); `{ID}.pdf`, `images/`, `content_list.json` (gitignored, regenerable) |
+| `corpus/{ID}/` | source + intermediate: `{ID}.md` + `.md_contract.json` + `content_list.json` (tracked — `content_list.json` is a small product G3's equation gate needs, not cheaply regenerable here); `{ID}.pdf`, `images/` (gitignored, regenerable) |
 | `person_vault/{key}/` | human-facing illustrated reports, keyed `{date}_{Name}_{idbase}` |
 | `ai_package/{key}/` | AI-facing ARA knowledge packs, same key (1:1 with person_vault) |
 | `landscapes/{topic}/` | cross-paper synthesis (`INDEX.md` + `report.md`) |
@@ -239,6 +239,43 @@ ruff" is the validation gate.
    PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.bibliography --topic-dir .
    ```
 
+7. **`scripts.status` — the read-only state surface** (`scripts/status.py`). The
+   canonical "where does every paper stand?" view: per-paper compliance, the
+   ARA-sealed → report-compliant funnel, and a ledger↔product divergence warning.
+   Lock-free, no-LLM, safe to run any time (even mid-tick). **Read state from here —
+   never infer it from directory existence.** `--card` renders an at-a-glance ASCII
+   card; `--json` feeds CI / external tooling:
+
+   ```bash
+   PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.status [--card | --json]
+   ```
+
+8. **`scripts.preflight` — the environment gate** (`scripts/preflight.py`). Verifies
+   `pandoc` + `mineru` + runtime deps before a campaign; exits 1 with install hints if
+   any is missing. The skill runs this FIRST as a hard gate:
+
+   ```bash
+   PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.preflight
+   ```
+
+9. **`scripts.revival` — the batch-revival driver** (`scripts/revival.py`). Scans
+   `_failed/`, replays each failed paper at branch granularity (reusing upstream
+   products), and promotes→records→cleans. The SECOND legitimate ledger writer (holds
+   the LS-1 lock, so it is mutually exclusive with a `/loop` tick):
+
+   ```bash
+   PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.revival
+   ```
+
+10. **`scripts.output.check_ara_bundle` — the ARA regression gate** (sweep CLI).
+    Asserts, per published ARA, the code_ref three-state honesty (no `_not found_`
+    rows, no non-source locations, no closed-source mislabel), non-empty evidence
+    tables, and no review↔tables drift. Exits non-zero on any violation:
+
+    ```bash
+    PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.output.check_ara_bundle
+    ```
+
 ## The injected seams
 
 The composition is CODE; the runtime injects the seams. Three infrastructure
@@ -296,9 +333,12 @@ model seams" documents the exact input/output shape of each:
 ## What gets tracked vs ignored (基调-D2)
 
 Git tracks **products** (derived knowledge): converted `corpus/{ID}/{ID}.md`,
-`.md_contract.json`, `person_vault/`, `ai_package/`, `_ledger/`, `landscapes/`, the
+`.md_contract.json`, `content_list.json` (a small but real product — G3's equation
+gate needs it and a MinerU re-run needs a high-RAM pod, so it is NOT cheaply
+regenerable here), `person_vault/`, `ai_package/`, `_ledger/`, `landscapes/`, the
 engine + `config/`. Git **ignores inputs** (regenerable): original `*.pdf`, MinerU
-`images/` dumps, `content_list.json`, `.cache/`, `.env`, the venv.
+`images/` dumps (~1.2 G for 24 papers — would make the repo undistributable),
+`.cache/`, `.env`, the venv.
 
 ## Known limits / gotchas
 
@@ -319,10 +359,26 @@ engine + `config/`. Git **ignores inputs** (regenerable): original `*.pdf`, Mine
 
 ## Current status + validation
 
-- Test suite: **green** (`uv run pytest` passes; the count moves as fixes land).
-- Lint: **clean** (`uv run ruff check .claude/skills/paper-landscape/scripts/` →
-  "All checks passed!"). NB: the gate is engine-scoped, not repo-wide `ruff check .`
-  (docs/handoff/ driver scripts intentionally carry lint noise — see `.claude/CLAUDE.md`).
-- Quality history: the engine passed internal adversarial review and a cross-model
-  (Codex) acceptance audit; the findings from that audit are fixed in the current
-  tree.
+> Validated **2026-06-14** (commit moves as fixes land — re-run the commands below to
+> re-verify; read live per-paper state from `scripts.status`, the authority).
+
+- **Corpus: 27/27 papers compliant** — every paper has a sealed ARA (G3 level-2
+  `passes_seal2`) AND a new-form human report (opens with `## 评价`, no retired
+  anchors, no ARA-not-loaded body), and every code_ref is honest (no fabricated
+  `_not found_` rows / non-source locations). Confirm with
+  `… -m scripts.status --card` (read-only) and `… -m scripts.output.check_ara_bundle`
+  (regression gate → `27 bundle(s), 0 violation(s)`).
+- **Test suite: green** — `uv run pytest` → **606 passed**.
+- **Lint: clean** — `uv run ruff check .claude/skills/paper-landscape/scripts/ tests/`
+  → "All checks passed!". NB: the gate is engine+tests-scoped, NOT repo-wide
+  `ruff check .` (docs/handoff/ driver scripts intentionally carry lint noise — see
+  `.claude/CLAUDE.md`).
+- **Known non-defects** (normal, not gaps): some papers have **no public code repo**
+  (e.g. OmniDreams' only release is FlashDreams, a serving stack, not the model) —
+  `code_ref` honestly says "No public repository found"; not every paper open-sources
+  code. Minor imperfections in a long human report are tolerated **and flagged** in
+  the opening `## 评价` note. Tier-1 (pandoc) equation fidelity is trusted-not-verified
+  by construction (see Known limits).
+- **Quality history**: the engine passed internal adversarial review and repeated
+  cross-model (Codex) acceptance audits; each audit's findings are fixed in the
+  current tree.
