@@ -26,6 +26,7 @@ from scripts.failure_scene import FAILED_REL, write_scene
 from scripts.ingest.contract import corpus_readiness_problems
 from scripts.output.naming import vault_key
 from scripts.output.produce import (
+    EmptyARAInput,
     ProduceGateBlocked,
     StructuralSealFailed,
     promote,
@@ -407,8 +408,15 @@ def _revive_one(
             [f.as_dict() for f in exc.verdict.hard_findings],
             getattr(exc, "staged_dir", staging),
         )
-    # ADR-0012 rev: branch1 no longer raises AnchorGateError (锚点门 retired) — only
-    # branch2's 结构门/数字门 can fail a re-run here; branch1 always publishes.
+    except EmptyARAInput as exc:
+        # ADR-0012 rev: branch1 has no faithfulness gate, but it DOES refuse on an
+        # empty/missing ARA input (a corrupt scene whose use_branch1 ARA is structurally
+        # absent). This is the input-side precondition (G3R0 analogue) that stops branch1
+        # from hallucinating a wrong-paper report — fail the revival as a structural ARA
+        # problem rather than republishing garbage.
+        return _append_failed(
+            "结构门", [{"target": "ara", "observation": str(exc)}], exc.staged_dir
+        )
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 

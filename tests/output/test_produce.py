@@ -292,3 +292,48 @@ def test_engineabort_before_ara_built_still_cleans(tmp_path, monkeypatch):
             g2_gate=lambda _x: None,
         )
     assert getattr(ei.value, "staged_dir", None) is None
+
+
+def test_branch1_refuses_empty_ara_input(tmp_path, monkeypatch):
+    """branch1 PRECONDITION (2026-06-13 regression guard): when its ARA input is
+    empty/missing it must REFUSE (EmptyARAInput), not let the writer hallucinate a
+    wrong-paper report. Stub write_branch2 to emit an EMPTY ara/ and validate_ara_tree
+    to pass — isolating the branch1 guard from Seal-1 (which catches it first on the
+    main path; the guard's real job is protecting the Seal-1-free revival path)."""
+    from scripts.output.produce import EmptyARAInput
+
+    def empty_branch2(stage_ai, candidate, analysis, *, md_path, repo_resolver=None):
+        Path(stage_ai).mkdir(parents=True, exist_ok=True)  # empty: no PAPER.md/claims.md
+
+    monkeypatch.setattr(produce_mod, "write_branch2", empty_branch2)
+    monkeypatch.setattr(produce_mod, "validate_ara_tree", lambda _stage_ai: [])
+
+    md = tmp_path / "x.md"
+    md.write_text("src", encoding="utf-8")
+    candidate = {"title": "T", "arxiv_id": "2509.00009", "doi": None}
+
+    class _Ledger:
+        def intake_date(self):
+            import datetime
+
+            return datetime.date(2026, 6, 13)
+
+        def record_code_ref(self, *a, **k): ...
+
+    def fake_write_report(ara_dir, *, md_path=None, outdir=None):  # noqa: ARG001
+        return {"sections": []}
+
+    with pytest.raises(EmptyARAInput):
+        produce_mod.produce_outputs(
+            md,
+            candidate,
+            _Ledger(),
+            root=tmp_path,
+            resolve_analysis=lambda *a, **k: {"ok": 1},
+            write_report=fake_write_report,
+        )
+    # OT-5: neither vault holds a partial entry; the writer never ran.
+    assert not (tmp_path / "person_vault").exists() or not any(
+        (tmp_path / "person_vault").iterdir()
+    )
+    assert not (tmp_path / "ai_package").exists() or not any((tmp_path / "ai_package").iterdir())

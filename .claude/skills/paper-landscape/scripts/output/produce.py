@@ -24,6 +24,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from scripts.audit.g3_seal import load_ara_bundle
 from scripts.output.ara_schema import validate_ara_tree
 from scripts.output.branch1_llm import write_branch1_llm
 from scripts.output.branch1_report import write_branch1
@@ -71,6 +72,23 @@ class StructuralSealFailed(Exception):
         self.errors = errors
         self.staged_dir = staged_dir
         super().__init__(f"branch2 failed Seal-1: {'; '.join(errors[:5])}")
+
+
+class EmptyARAInput(Exception):
+    """branch1 PRECONDITION failed: the ARA input is empty/missing (load_ara_bundle
+    returns {}). This is NOT a faithfulness gate — ADR-0012 rev keeps branch1 free of
+    any report-quality hard-block — it is a wiring/precondition error, the input-side
+    analogue of G3's G3R0 (missing report.md). Refusing here stops the writer seam from
+    hallucinating a wrong-paper report onto an absent source-of-truth (the 2026-06-13
+    regression: a bad ARA path fed the writer an empty ARA and it fabricated 20 reports).
+
+    Carries the staged dir so the caller can preserve the failure scene (ADR-0011).
+    """
+
+    def __init__(self, ara_dir: Path, *, staged_dir: Path | None = None) -> None:
+        self.ara_dir = ara_dir
+        self.staged_dir = staged_dir
+        super().__init__(f"branch1 refused: empty/missing ARA at {ara_dir}")
 
 
 class SpokeCancelled(Exception):
@@ -180,7 +198,16 @@ def stage_branch1(
     judge degrades the note, it NEVER blocks. The deterministic ``write_branch1``
     fallback (write_report=None) is preserved (audit R4 Finding 2 — test_produce
     monkeypatches it).
+
+    PRECONDITION (not a faithfulness gate): refuse on an empty/missing ARA input. The
+    writer seam would otherwise hallucinate a wrong-paper report onto an absent SoT
+    (the 2026-06-13 bad-path regression). An empty ARA = ``load_ara_bundle()=={}`` —
+    the same {}-signal build_assessment uses; a NORMAL non-empty ARA still publishes
+    with the advisory 「评价」. On the main path Seal-1 already catches this upstream;
+    the guard also protects the revival use_branch1 path, which bypasses Seal-1.
     """
+    if not load_ara_bundle(stage_ai):
+        raise EmptyARAInput(stage_ai, staged_dir=staging)
     stage_person = staging / "person"
     if write_report is not None:
         # audit R5 Finding 1: conditional kwarg keeps older write_report fakes working.
@@ -365,6 +392,9 @@ def produce_outputs(
         # A gate hard-failed: its exception carries `staging` (the failure scene),
         # so do NOT let `finally` delete it. SpokeCancelled + success keep this
         # False, so their staging is still cleaned up (no temp leak).
+        # (EmptyARAInput is unreachable here — Seal-1 in stage_branch2 catches an
+        # empty ARA first; the guard only fires on revival's Seal-1-free path. An
+        # empty ARA is worthless, so letting `finally` clean it is correct.)
         handed_off = True
         raise
     except EngineAbort as exc:

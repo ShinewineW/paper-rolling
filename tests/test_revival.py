@@ -160,6 +160,31 @@ def test_revive_g3r0_branch1_scene_promotes(tmp_path):
     assert last["key"] == lk and last["status"] == "done"
 
 
+def test_revive_branch1_empty_ara_scene_refuses_not_hallucinates(tmp_path):
+    """A use_branch1 scene whose ARA is structurally EMPTY must FAIL (结构门), not let
+    branch1 hallucinate a wrong-paper report (2026-06-13 regression). with_real_ara=False
+    leaves an empty scene/ai/ara; the branch1 precondition guard raises EmptyARAInput,
+    which revival routes to a failed result with the scene preserved."""
+    led = Ledger(tmp_path)
+    scene, lk = _seed_scene(
+        tmp_path,
+        led,
+        failed_gate="最终门",
+        findings=[
+            {"target": "report.md", "observation": "missing branch1 report.md", "severity": "hard"}
+        ],
+        with_real_ara=False,  # empty scene/ai/ara → load_ara_bundle()=={}
+    )
+    with led.acquire():
+        res = revive_all(workspace=tmp_path, ledger=led, seams=_seams(rigor_scores=_good_rigor))
+    assert res[0].status == "failed"
+    assert res[0].failed_gate == "结构门"
+    assert scene.exists()  # 现场保留,未晋升
+    assert not (tmp_path / "person_vault").exists() or not any(
+        (tmp_path / "person_vault").iterdir()
+    )
+
+
 def test_revive_watchdog_aborts_hung_scene(tmp_path):
     import time
 
