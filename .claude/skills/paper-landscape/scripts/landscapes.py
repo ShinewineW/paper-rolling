@@ -53,6 +53,24 @@ def _read_frontmatter(paper_md: Path) -> dict:
     return yaml.safe_load(parts[1]) or {}
 
 
+_ARXIV_YYMM = re.compile(r"(\d{2})(\d{2})\.")
+
+
+def _summary_year(fm: dict) -> int:
+    """Best-effort publication year. Prefer the frontmatter `year`; else derive it from
+    the arXiv key's YYMM prefix ('2606.12987' -> 2026); else 0. A null `year` is common
+    for paper-list (force_include) papers — the candidate carries only arxiv_id + title —
+    so the aggregator must not crash on it (it sorts/displays by year only)."""
+    y = fm.get("year")
+    if y is not None:
+        try:
+            return int(y)
+        except (TypeError, ValueError):
+            pass
+    m = _ARXIV_YYMM.match(str(fm.get("key") or ""))
+    return 2000 + int(m.group(1)) if m else 0
+
+
 def load_paper_summary(workspace: Path, entry_name: str) -> PaperSummary:
     """Load one ai_package entry (e.g. '2026-06-05_p0') into a PaperSummary."""
     paper_md = Path(workspace) / "ai_package" / entry_name / "ara" / "PAPER.md"
@@ -60,7 +78,7 @@ def load_paper_summary(workspace: Path, entry_name: str) -> PaperSummary:
     return PaperSummary(
         key=str(fm["key"]),
         title=str(fm["title"]),
-        year=int(fm["year"]),
+        year=_summary_year(fm),
         headline_metric=str(fm["headline_metric"]),
         headline_value=float(fm["headline_value"]),
         params_million=float(fm["params_million"]),
@@ -76,10 +94,11 @@ def _has_headline_frontmatter(paper_md: Path) -> bool:
     A branch2 PAPER.md without headline metrics (no leaderboard number to
     aggregate) is skipped from the cross-paper table rather than crashing the
     read-side aggregator (the entry still lives in the vault; it just has no
-    metric row in the landscape).
+    metric row in the landscape). Requires the keys to be present AND non-None —
+    a null headline_value/params_million would otherwise crash `float(None)`.
     """
     fm = _read_frontmatter(paper_md)
-    return all(k in fm for k in _HEADLINE_KEYS)
+    return all(fm.get(k) is not None for k in _HEADLINE_KEYS)
 
 
 def _collect(workspace: Path) -> list[PaperSummary]:

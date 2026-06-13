@@ -39,6 +39,56 @@ def test_load_paper_summary(tmp_path: Path):
     )
 
 
+def _write_paper_raw(workspace: Path, entry: str, body: str) -> None:
+    ara = workspace / "ai_package" / entry / "ara"
+    ara.mkdir(parents=True, exist_ok=True)
+    (ara / "PAPER.md").write_text(body, encoding="utf-8")
+
+
+def test_load_paper_summary_derives_year_from_arxiv_key_when_null(tmp_path: Path):
+    # Paper-list (force_include) papers carry no year → frontmatter year: null. The
+    # aggregator must NOT crash; it derives the year from the arXiv key's YYMM prefix.
+    _write_paper_raw(
+        tmp_path,
+        "2026-06-13_p_2606.12987",
+        "---\nkey: '2606.12987'\ntitle: T\nyear: null\n"
+        "headline_metric: mAP\nheadline_value: 1.0\nparams_million: 2.0\n---\n",
+    )
+    s = load_paper_summary(tmp_path, "2026-06-13_p_2606.12987")
+    assert s.year == 2026  # 2606.* -> 2026, no crash
+
+
+def test_generate_landscapes_tolerates_null_year(tmp_path: Path):
+    # End-to-end: a corpus whose papers all have year: null must still produce a
+    # landscape (regression for the 2026-06-14 int(None) crash in the WAM test run).
+    _write_paper_raw(
+        tmp_path,
+        "2026-06-13_a_2606.12987",
+        "---\nkey: '2606.12987'\ntitle: A\nyear: null\n"
+        "headline_metric: L2\nheadline_value: 0.5\nparams_million: 3.0\n---\n",
+    )
+    _write_paper_raw(
+        tmp_path,
+        "2026-06-13_b_2604.04198",
+        "---\nkey: '2604.04198'\ntitle: B\nyear: null\n"
+        "headline_metric: L2\nheadline_value: 0.6\nparams_million: 4.0\n---\n",
+    )
+    res = generate_landscapes(tmp_path, topic="t", generated_on="2026-06-14")
+    assert res.paper_count == 2 and res.report_path.exists()
+
+
+def test_has_headline_skips_paper_with_null_metric(tmp_path: Path):
+    # A null headline_value must SKIP the paper (no float(None) crash), not abort the tick.
+    _write_paper_raw(
+        tmp_path,
+        "2026-06-13_x_2606.00001",
+        "---\nkey: '2606.00001'\ntitle: X\nyear: 2026\n"
+        "headline_metric: mAP\nheadline_value: null\nparams_million: 1.0\n---\n",
+    )
+    res = generate_landscapes(tmp_path, topic="t", generated_on="2026-06-14")
+    assert res.paper_count == 0  # skipped, did not crash
+
+
 def test_generate_landscapes_writes_index_and_report(tmp_path: Path):
     _write_paper(
         tmp_path, "p0", title="MethodA", year=2023, metric="mAP", value=48.0, params_m=200.0
