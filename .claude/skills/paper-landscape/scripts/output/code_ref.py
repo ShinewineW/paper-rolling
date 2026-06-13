@@ -12,7 +12,9 @@ a temp location, resolve the pinned commit SHA, and locate each innovation to a
 
 We then write a self-contained pointer (`branch2/src/code_ref.md`) and DELETE the
 clone. The pointer is THREE-STATE and never conflates "not found" with "closed":
-  * found                     — repo + pinned SHA + innovation→file:line, + source;
+  * found                     — repo + pinned SHA + innovation→file:line, + source.
+                                file:line is SOURCE-only (no README/doc/config cites);
+                                innovations that don't resolve are OMITTED, not faked;
   * searched, not found       — every tier ran, nothing verified (NOT closed-source);
   * author-declared closed    — only when the paper explicitly says code won't ship.
 A DECLARED repo that is unreachable (clone failed) is recorded with provenance +
@@ -27,6 +29,42 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from scripts.output.repo_resolve import RepoCandidate
+
+# A "code location" must point at SOURCE, not prose/config. Restricting _locate to
+# these suffixes kills the README.md:N / docs/*.rst / *.yaml false "locations" that
+# made the innovation→file:line map untrustworthy (e.g. the bogus 'README.md:28').
+# Acceptance is unaffected: a README-only match still verifies via _repo_mentions.
+_CODE_EXT = frozenset(
+    {
+        ".py",
+        ".pyx",
+        ".ipynb",
+        ".cpp",
+        ".cc",
+        ".cxx",
+        ".c",
+        ".h",
+        ".hpp",
+        ".cuh",
+        ".cu",
+        ".java",
+        ".js",
+        ".jsx",
+        ".ts",
+        ".tsx",
+        ".go",
+        ".rs",
+        ".scala",
+        ".lua",
+        ".m",
+        ".mm",
+        ".swift",
+        ".kt",
+        ".sh",
+        ".rb",
+        ".jl",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -50,6 +88,10 @@ def _locate(repo_dir: Path, needle: str) -> str | None:
         if ".git" in path.parts:
             continue
         if not path.is_file() or path.stat().st_size > 2_000_000:
+            continue
+        # A code location must be SOURCE, not a README/doc/config match (honesty:
+        # don't report 'README.md:28' as where an innovation lives).
+        if path.suffix.lower() not in _CODE_EXT:
             continue
         try:
             for lineno, line in enumerate(
@@ -147,14 +189,26 @@ def _render_found(
         f"- **Source**: {cand.source} ({verified})",
         "- **Reproduce**: re-clone at the pinned commit; this workspace keeps no runnable copy.",  # noqa: E501
         "",
-        "## Innovation → code location",
-        "",
-        "| Innovation | Location (`file:line`) |",
-        "|---|---|",
     ]
-    for innov, loc in located:
-        lines.append(f"| {innov.name} | {loc if loc else '_not found_'} |")
-    lines.append("")
+    # Honesty: only render innovations that mechanically RESOLVED to a source location.
+    # A table full of '_not found_' rows (or fabricated doc-file cites) is worse than
+    # silence — omit the map entirely and say so, keeping the verified repo + SHA.
+    resolved = [(innov, loc) for innov, loc in located if loc]
+    if resolved:
+        lines += [
+            "## Innovation → code location",
+            "",
+            "| Innovation | Location (`file:line`) |",
+            "|---|---|",
+        ]
+        lines += [f"| {innov.name} | {loc} |" for innov, loc in resolved]
+        lines.append("")
+    else:
+        lines += [
+            "- **Innovation → code location**: not mechanically resolved at this commit "
+            "(symbols not located in source); see the repo at the pinned SHA.",
+            "",
+        ]
     return "\n".join(lines)
 
 

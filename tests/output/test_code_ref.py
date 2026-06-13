@@ -174,3 +174,44 @@ def test_no_candidates_author_declared_closed(tmp_path):
         declared_closed=True,
     )
     assert "Author-declared closed-source" in out.read_text(encoding="utf-8")
+
+
+def test_locate_reports_source_file_not_doc_match(tmp_path, monkeypatch):
+    # The grep symbol appears in BOTH README.md (sorts first) and model.py. The
+    # location must point at the SOURCE file, not the README (honesty: a code
+    # location is code, not prose). Without the _CODE_EXT filter, README.md:1 wins.
+    _fake_git(
+        monkeypatch,
+        {_SEARCH: {"README.md": "see MySymbol in the docs\n", "model.py": "class MySymbol:\n"}},
+    )
+    out = tmp_path / "code_ref.md"
+    build_code_ref(
+        candidates=[RepoCandidate(_SEARCH, "paper-text", "search")],
+        innovations=[Innovation(name="My innovation", grep="MySymbol")],
+        out_path=out,
+        clone_root=tmp_path / "repos",
+        idbase="2411.15139",
+    )
+    body = out.read_text(encoding="utf-8")
+    assert "model.py:1" in body
+    assert "README.md:" not in body  # the doc match is never reported as a code location
+
+
+def test_unresolved_innovations_omit_not_found_rows(tmp_path, monkeypatch):
+    # An accepted (official) repo where NO innovation symbol resolves to source must
+    # NOT render a table of '_not found_' rows — it omits the map and says so honestly,
+    # keeping the verified repo + SHA.
+    _fake_git(monkeypatch, {_OFFICIAL: {"README.md": "a project\n"}})
+    out = tmp_path / "code_ref.md"
+    build_code_ref(
+        candidates=[RepoCandidate(_OFFICIAL, "pwc-official", "official")],
+        innovations=[Innovation(name="Unfindable", grep="NoSuchSymbol")],
+        out_path=out,
+        clone_root=tmp_path / "repos",
+        idbase="2401.1",
+    )
+    body = out.read_text(encoding="utf-8")
+    assert _OFFICIAL in body and "abc1234def5678" in body  # repo + SHA kept
+    assert "_not found_" not in body
+    assert "## Innovation → code location" not in body
+    assert "not mechanically resolved" in body

@@ -40,8 +40,13 @@ _RETIRED_MISLABEL = "closed-source paper"
 _CLOSED_OK = re.compile(r"author-declared closed-source|not a closed-source")
 
 # A recognized three-state (or unreachable) pointer carries one of these markers.
+# The found state is identified by EITHER marker: "**Pinned commit**" is always present
+# (repo + SHA), while "## Innovation → code location" is now OMITTED when no innovation
+# resolves to source (honesty: no fabricated/_not found_ table). Accept both so a found
+# pointer is recognized whether or not the innovation map is present.
 _VALID_MARKERS = (
-    "## Innovation → code location",  # found
+    "**Pinned commit**",  # found — repo + SHA (innovation map may be omitted)
+    "## Innovation → code location",  # found — innovation map present
     "No public repository found",  # searched, not found
     "Author-declared closed-source",  # author-declared closed
     "unavailable — clone failed",  # declared repo unreachable
