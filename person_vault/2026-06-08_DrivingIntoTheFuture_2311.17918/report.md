@@ -129,7 +129,7 @@ flowchart TD
 
 ### 统一条件接口(Unified Condition Interface)
 **结论：将图像、布局、文本、动作等异构控制信号映射至同一特征空间并沿 Token 维度拼接，实现“即插即用”的跨模态条件注入。**
-接口将初始上下文帧 $\mathbf{i}$、参考视角图像 $\mathbf{l}$、3D 检测框/HD 地图/BEV 分割等布局信息 $\mathbf{e}$、CLIP 文本嵌入以及自车动作 $\mathbf{a}$ 统一编码为 $d$ 维特征，第 $t$ 帧的统一条件表示为 $\mathbf{c}_t = [\mathbf{i}_0,\mathbf{l}_0,\mathbf{e}_0,\mathbf{a}_t]\in\mathbb{R}^{(n+k+m+2)\times d}$，直接作为去噪 UNet 的跨注意力输入。
+接口将初始上下文帧与参考视角图像 $\mathbf{i}$、3D 检测框/HD 地图/BEV 分割等布局信息 $\mathbf{l}$、CLIP 文本嵌入 $\mathbf{e}$ 以及自车动作 $\mathbf{a}$ 统一编码为 $d$ 维特征，第 $t$ 帧的统一条件表示为 $\mathbf{c}_t = [\mathbf{i}_0,\mathbf{l}_0,\mathbf{e}_0,\mathbf{a}_t]\in\mathbb{R}^{(n+k+m+2)\times d}$，直接作为去噪 UNet 的跨注意力输入。
 **直觉与作用：** 传统扩散模型往往为不同条件设计独立的注入通道（如 AdaGN、Cross-Attention 分支），导致架构臃肿且难以扩展。该接口将所有条件“扁平化”为 Token 序列，模型只需通过标准的注意力机制读取，极大简化了条件融合逻辑，并支持灵活的条件组合。
 **工程比喻：** 如同 USB-C 接口，无论插入的是显示器、硬盘还是充电器（不同模态条件），底层都走同一套协议（$d$ 维特征拼接），主机无需为每种外设单独开槽。
 <details><summary><strong>边界与局限</strong></summary>动作被简化为二维位置增量，未显式编码姿态与加速度，需依赖下游规划器（如 VAD）提供完整轨迹候选；布局条件将 3D 信息投影至 2D 透视图，存在深度信息损失；不同模态间的表达能力受限于各自编码器的质量。</details>
