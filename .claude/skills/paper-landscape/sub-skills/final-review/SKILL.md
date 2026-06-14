@@ -24,10 +24,21 @@ LS-1 不变量)。
    re-ingest)、不重分析。跨机 / 纯 checkout 上先确认 corpus 完整(`scripts.status` /
    `scripts.preflight`),不全就先 re-ingest 再跑 FAIL 收尾。
 
+1.5 解析每篇 4 个路径(主会话注入给 agent 的变量)。**corpus 目录键 ≠ vault 键**,别用 idbase 直拼:
+   - **vault key** = `{intake_date}_{Name}_{idbase}`(`output.naming.vault_key`)→ 取自
+     `scripts.status.collect()` 每行的 `key` 字段。由它拼:`report_md = person_vault/{key}/report.md`、
+     `report_html = person_vault/{key}/report.html`、`ara_dir = ai_package/{key}/ara`。
+   - **md_path**(源 MD,只读基准)在 corpus 下,目录键是另一种 `{idbase}_{Slug}`(无日期前缀、非 vault key)
+     → 用 glob `corpus/{idbase}_*/{idbase}_*.md` 定位。
+   - 裸 `corpus/{idbase}/{idbase}.md`、`person_vault/{idbase}/…` 这类按 idbase 直拼的路径 **不存在** —— 不要硬拼。
+     发 agent 前先校验 4 个路径都 `exists()`(prompt 里也兜一句「路径与盘上不符则先 ls/glob 定位」)。
+
 2. 跑 Workflow(pipeline over 批次,每篇一个 agent):
-   - 每个 `agent(...)` 用下面的 prompt + schema;**pin model=opus + 足够 effort**;
+   - 每个 `agent(...)` 用下面的 prompt + schema;model 继承主会话(主会话须为 Opus + 高 effort);
      不同篇只碰各自文件 → 并行安全(无需 worktree)。
-   - prompt 的 `{today}` 由主会话注入当天日期;若用 Workflow 脚本,经 `args` 传入(脚本不可用 Date.now)。
+   - prompt 的 `{today}` 由主会话注入当天日期(脚本不可用 Date.now)。**批次数据(每篇 4 路径 + idbase)
+     直接内联进 Workflow 脚本 body**,不要走 `args` —— `args` 可能不以数组到达,`pipeline(args,…)` 会
+     抛 `expects an array`(2026-06-14 实测)。`{today}` 这类标量内联即可。
    - agent 自己改 + 自跑机械回归 + 写 final_review.json(CLEAN/REVISED)或返回 FAILED。
    - 主会话只收每篇的结构化 JSON,**不载入论文全文**。
 
