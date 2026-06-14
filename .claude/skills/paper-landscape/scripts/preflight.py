@@ -16,6 +16,13 @@ Three layers (cheap → expensive):
                             the ~75s model-load cost is paid only on first use /
                             version change; cache hits are instant.
 
+Plus one ADVISORY (non-blocking) check:
+  * check_runtime()       — which AI drives the engine (the engine never runs
+                            autonomously). On a non-Claude-Code runtime the
+                            terminal-review gate (ADR-0013) has no autonomous
+                            reviewer, so it WARNs (does not fail) — the operator
+                            decides whether to route a reviewer onto their provider.
+
 The TOP-LEVEL imports stay stdlib-only so layer 1 reports even when the runtime
 deps (requests/pyyaml) or the LLM stack are themselves missing; layers 2/3
 lazy-import the heavier modules inside their functions.
@@ -42,12 +49,17 @@ _SMOKE_GOLDEN = _ASSET_DIR / "smoke_golden.json"
 
 @dataclass(frozen=True)
 class Check:
-    """One prerequisite's status + the command to fix it if missing."""
+    """One prerequisite's status + the command to fix it if missing.
+
+    `warn=True` is an advisory: it renders as [WARN] and carries `fix` as a note,
+    but keeps `ok=True` so it never lowers the exit code — for situations the
+    operator must DECIDE on, not a hard prerequisite they must fix."""
 
     name: str
     ok: bool
     detail: str
     fix: str
+    warn: bool = False
 
 
 def _has_module(mod: str) -> bool:
@@ -91,6 +103,36 @@ def check_environment() -> list[Check]:
     )
 
     return checks
+
+
+def check_runtime() -> list[Check]:
+    """Which AI runtime drives the engine — an ADVISORY check, never blocking.
+
+    The engine NEVER runs autonomously: it is always driven by an AI, and the
+    terminal-review gate (ADR-0013) has no engine-side reviewer. On a non-Claude-Code
+    runtime (e.g. a pure-API driver) terminal review therefore has no autonomous
+    reviewer — report it (WARN) so the operator can route a reviewer onto their own
+    provider or skip terminal review deliberately, rather than have it silently absent.
+    """
+    if os.environ.get("CLAUDECODE", "").strip():
+        return [
+            Check(
+                "final-review:runtime",
+                True,
+                "Claude Code runtime — terminal review runs via the main-session agent",
+                "",
+            )
+        ]
+    return [
+        Check(
+            "final-review:runtime",
+            True,
+            "non-Claude-Code runtime (e.g. pure API): terminal-review gate has no "
+            "autonomous reviewer — the engine never runs alone",
+            "route terminal review onto your own API provider, or skip it deliberately",
+            warn=True,
+        )
+    ]
 
 
 # --------------------------------------------------------------------------- #
@@ -369,17 +411,18 @@ def all_ok(checks: list[Check]) -> bool:
 
 def format_report(checks: list[Check]) -> str:
     """Human-readable PASS/FAIL report; names the fix for each failing item."""
-    lines = ["paper-landscape preflight (all checks are REQUIRED):"]
+    lines = ["paper-landscape preflight (REQUIRED unless marked WARN):"]
     for c in checks:
-        mark = "OK  " if c.ok else "FAIL"
+        mark = "WARN" if c.warn else ("OK  " if c.ok else "FAIL")
         lines.append(f"  [{mark}] {c.name}: {c.detail}")
-        if not c.ok and c.fix:
-            lines.append(f"         fix: {c.fix}")
-    lines.append(
-        "ALL HEALTHY — safe to proceed."
-        if all_ok(checks)
-        else "PROBLEMS ABOVE — fix them, then re-run. DO NOT proceed."
-    )
+        if c.fix and (c.warn or not c.ok):
+            lines.append(f"         {'note' if c.warn else 'fix'}: {c.fix}")
+    if not all_ok(checks):
+        lines.append("PROBLEMS ABOVE — fix them, then re-run. DO NOT proceed.")
+    elif any(c.warn for c in checks):
+        lines.append("ALL HEALTHY (advisories above) — safe to proceed; decide on the WARNs.")
+    else:
+        lines.append("ALL HEALTHY — safe to proceed.")
     return "\n".join(lines)
 
 
@@ -391,7 +434,7 @@ def _main(argv: list[str] | None = None) -> int:
     deep = "--no-deep" not in argv
     force = "--force-smoke" in argv
 
-    checks = check_environment() + check_llm(probe=probe)
+    checks = check_environment() + check_runtime() + check_llm(probe=probe)
     if deep:
         checks += deep_smoke(force=force)
     print(format_report(checks))

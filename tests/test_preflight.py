@@ -58,6 +58,37 @@ def test_report_all_present_banner(monkeypatch):
 def test_check_is_a_frozen_dataclass():
     c = Check(name="x", ok=True, detail="d", fix="f")
     assert (c.name, c.ok, c.detail, c.fix) == ("x", True, "d", "f")
+    assert c.warn is False  # advisory flag defaults off
+
+
+# --- runtime advisory: terminal-review reviewer availability ----------------
+
+
+def test_runtime_claude_code_passes(monkeypatch):
+    monkeypatch.setenv("CLAUDECODE", "1")
+    checks = preflight.check_runtime()
+    assert len(checks) == 1
+    c = checks[0]
+    assert c.name == "final-review:runtime"
+    assert c.ok and not c.warn and "Claude Code runtime" in c.detail
+
+
+def test_runtime_non_claude_code_warns_but_does_not_block(monkeypatch):
+    monkeypatch.delenv("CLAUDECODE", raising=False)
+    checks = preflight.check_runtime()
+    c = checks[0]
+    assert c.warn and c.ok  # advisory: surfaced, but exit code stays clean
+    assert all_ok(checks)  # a WARN must not fail preflight
+    assert "non-Claude-Code" in c.detail and c.fix
+
+
+def test_report_renders_warn_with_note_and_healthy_banner(monkeypatch):
+    monkeypatch.delenv("CLAUDECODE", raising=False)
+    report = format_report(preflight.check_runtime())
+    assert "[WARN] final-review:runtime" in report
+    assert "note:" in report
+    assert "ALL HEALTHY" in report and "advisories above" in report
+    assert "DO NOT proceed" not in report
 
 
 # --- Layer 3: golden compare (pure) ----------------------------------------

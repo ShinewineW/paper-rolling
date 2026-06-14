@@ -381,7 +381,7 @@ engine + `config/`. Git **ignores inputs** (regenerable): original `*.pdf`, Mine
   `_not found_` rows / non-source locations). Confirm with
   `… -m scripts.status --card` (read-only) and `… -m scripts.output.check_ara_bundle`
   (regression gate → `32 bundle(s), 0 violation(s)`).
-- **Test suite: green** — `uv run pytest` → **630 passed**.
+- **Test suite: green** — `uv run pytest` → **633 passed**.
 - **Lint: clean** — `uv run ruff check .claude/skills/paper-landscape/scripts/ tests/`
   → "All checks passed!". NB: the gate is engine+tests-scoped, NOT repo-wide
   `ruff check .` (docs/handoff/ is gitignored session scratch, outside the gate — see

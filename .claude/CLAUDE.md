@@ -47,7 +47,10 @@ CLIs are **not** on that path — invoke them with the prefix:
 `PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.<module>`
 (e.g. `scripts.preflight`, `scripts.run_campaign`, `scripts.invalidate`,
 `scripts.output.anchor_lint`, `scripts.bibliography`). Run `scripts.preflight`
-first — it gates on `pandoc` + `mineru` being installed.
+first — it gates on `pandoc` + `mineru` being installed. It also emits one
+**advisory** `final-review:runtime` line: on a non-Claude-Code (e.g. pure-API)
+runtime it WARNs (never fails) that the terminal-review gate has no autonomous
+reviewer — route one onto your own provider or skip terminal review deliberately.
 
 **State / progress / compliance: read it via `scripts.status`, never infer it from
 directory existence.** `PYTHONPATH=.claude/skills/paper-landscape uv run python -m
