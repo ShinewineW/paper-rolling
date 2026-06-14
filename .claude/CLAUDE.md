@@ -37,10 +37,9 @@ uv run ruff check .claude/skills/paper-landscape/scripts/   # lint the ENGINE so
 
 "Green pytest + clean ruff on the engine source" is the only validation gate —
 there is no separate `validate` target. `pyproject.toml` excludes the dual-chain
-products (`ai_package/`, `person_vault/`) from ruff, but `docs/handoff/` driver
-scripts are intentionally NOT excluded and still carry lint noise — so scope the
-gate to the engine source (and `tests/` if checking tests), not `ruff check .`
-repo-wide.
+products (`ai_package/`, `person_vault/`) from ruff; scope the gate to the engine
+source (and `tests/` if checking tests), not `ruff check .` repo-wide. (`docs/handoff/`
+is gitignored session-handoff scratch — not products, outside the gate.)
 
 **PYTHONPATH gotcha:** `uv run pytest` works without setup (`pyproject.toml` sets
 `pythonpath = [".claude/skills/paper-landscape"]`). But the standalone module
