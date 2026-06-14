@@ -375,13 +375,13 @@ engine + `config/`. Git **ignores inputs** (regenerable): original `*.pdf`, Mine
 > Validated **2026-06-14** (commit moves as fixes land — re-run the commands below to
 > re-verify; read live per-paper state from `scripts.status`, the authority).
 
-- **Corpus: 27/27 papers compliant** — every paper has a sealed ARA (G3 level-2
+- **Corpus: 32/32 papers compliant** — every paper has a sealed ARA (G3 level-2
   `passes_seal2`) AND a new-form human report (opens with `## 评价`, no retired
   anchors, no ARA-not-loaded body), and every code_ref is honest (no fabricated
   `_not found_` rows / non-source locations). Confirm with
   `… -m scripts.status --card` (read-only) and `… -m scripts.output.check_ara_bundle`
-  (regression gate → `27 bundle(s), 0 violation(s)`).
-- **Test suite: green** — `uv run pytest` → **606 passed**.
+  (regression gate → `32 bundle(s), 0 violation(s)`).
+- **Test suite: green** — `uv run pytest` → **630 passed**.
 - **Lint: clean** — `uv run ruff check .claude/skills/paper-landscape/scripts/ tests/`
   → "All checks passed!". NB: the gate is engine+tests-scoped, NOT repo-wide
   `ruff check .` (docs/handoff/ driver scripts intentionally carry lint noise — see
