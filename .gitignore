@@ -68,3 +68,7 @@ _ledger/.lock
 # 失败现场=本地诊断 scratch，不是产物（ADR-0007）。保留 .gitkeep 占位。
 /_failed/*
 !/_failed/.gitkeep
+
+# docs/handoff/ = 临时 session 交接 scratch（handoff 文档不入库）。
+# 既有已跟踪的 debug-drivers/ 不受影响（gitignore 不反跟踪已跟踪文件）。
+/docs/handoff/
