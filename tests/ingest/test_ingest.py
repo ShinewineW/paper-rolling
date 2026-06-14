@@ -175,6 +175,38 @@ def test_ingest_demotes_to_tier2_when_html_missing(tmp_path, fake_http, fake_cli
     assert contract["image_count"] == 1
 
 
+def test_ingest_tier2_copies_content_list_to_canonical_tracked_path(
+    tmp_path, fake_http, fake_cli, candidate
+):
+    """Tier-2 (MinerU) emits content_list.json inside its own gitignored output
+    subtree; ingest must copy it to the canonical corpus/{ID}/content_list.json so
+    the G3 equation gate survives commit / fresh checkout (基调-D2). Without the copy,
+    a locally-ingested Tier-2 paper's content_list is lost on commit."""
+    aid, ver = candidate["arxiv_id"], candidate["arxiv_version"]
+    fake_http.add(f"https://arxiv.org/html/{aid}{ver}", 404, b"")
+    fake_http.add(candidate["oa_pdf_url"], 200, b"%PDF body")
+
+    def mineru(argv, cwd):
+        from pathlib import Path
+
+        out = argv[argv.index("-o") + 1]
+        write_mineru_output(
+            Path(cwd, out),
+            md="# T\n$$a$$\n",
+            images=[],
+            content_list='[{"type": "equation"}, {"type": "text"}]',
+        )
+
+    fake_cli.program(returncode=0, side_effect=mineru)
+    res = ingest(candidate, tmp_path, http=fake_http, run_cli=fake_cli, now=_now)
+
+    canonical = res.md_path.parent / "content_list.json"
+    assert res.tier == 2
+    assert res.content_list_path == canonical  # the tracked location, not the mineru/ subtree
+    assert canonical.is_file()
+    assert json.loads(canonical.read_text()) == [{"type": "equation"}, {"type": "text"}]
+
+
 def _eq_gate_runner(calls, pandoc_md):
     """A run_cli that emits `pandoc_md` for pandoc and a MinerU fallback."""
     from pathlib import Path

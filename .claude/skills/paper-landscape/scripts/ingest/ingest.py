@@ -116,6 +116,16 @@ def _finalize(
     md_path.write_text(md_text, encoding="utf-8")
     images_dir = paper_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
+    # Tier-2 (MinerU) emits content_list.json inside its own (gitignored) output
+    # subtree; copy it to the canonical, TRACKED corpus/{ID}/content_list.json so the
+    # G3 equation gate survives commit / fresh checkout (基调-D2). This is the same
+    # path Tier-1's synthetic list lands at and where _reuse_ready_corpus looks for
+    # it — without this, a locally-ingested Tier-2 paper's content_list is lost.
+    if content_list_path is not None:
+        canonical_content_list = paper_dir / "content_list.json"
+        if Path(content_list_path).resolve() != canonical_content_list.resolve():
+            shutil.copy2(content_list_path, canonical_content_list)
+        content_list_path = canonical_content_list
     tier = 1 if converter == "pandoc" else 2
     contract = MdContract(
         source_pdf_sha256=source_pdf_sha256,
