@@ -179,6 +179,10 @@ def collect(workspace: Path) -> list[dict]:
                     "detail": "person_vault/ai_package not paired",
                 }
             )
+    # 终审态(ADR-0013):合规产物是否已带 final_review.json。函数级 import 提到循环外,
+    # 既避开 status↔final_review 的模块级耦合,又不在 for 体内逐条 import。
+    from scripts.output.final_review import is_reviewed
+
     for r in recs:  # enrich with the engine's own recorded status (latest ledger row)
         led_row = led.get(r["idbase"]) or {}
         led_status = led_row.get("status")
@@ -192,6 +196,8 @@ def collect(workspace: Path) -> list[dict]:
         # the engine is about to redo. (Rescinded-done was the 2026-06-11 blind spot.)
         synced = led_status == "done" and not led_row.get("rescinded_at")
         r["ledger_diverged"] = r["state"] == "compliant" and not synced
+        ai_dir = ai.get(r["idbase"])  # 仅成对产物有 ai 目录;失败/孤儿/待入库为 None
+        r["final_reviewed"] = bool(ai_dir and is_reviewed(ai_dir / "ara"))
     return recs
 
 

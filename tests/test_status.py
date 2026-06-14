@@ -185,3 +185,17 @@ def test_render_card_surfaces_corrupt_and_funnel() -> None:
     assert "内容损坏" in card  # the corrupt bucket is surfaced
     assert "进度" in card and "ARA密封 2" in card  # funnel reflects pipeline depth
     assert "全部合规" not in card  # a corrupt report must NOT read as all-clear
+
+
+def test_collect_marks_final_reviewed(tmp_path: Path) -> None:
+    # 合规产物带 final_review.json → final_reviewed True;不带 → False。
+    from scripts.output.final_review import write_marker
+
+    ws = tmp_path
+    _compliant_pair(ws, "2026-01-01_A_1111.11111")  # 复用本文件已有的 helper
+    _compliant_pair(ws, "2026-01-01_B_2222.22222")
+    write_marker(ws / "ai_package" / "2026-01-01_A_1111.11111" / "ara",
+                 verdict="clean", edits=[], date="2026-06-14")
+    recs = {r["idbase"]: r for r in collect(ws)}
+    assert recs["1111.11111"]["final_reviewed"] is True
+    assert recs["2222.22222"]["final_reviewed"] is False

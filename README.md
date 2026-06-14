@@ -276,6 +276,19 @@ ruff" is the validation gate.
     PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.output.check_ara_bundle
     ```
 
+11. **终审修订 (`final-review` sub-skill) — the OPTIONAL post-run revision layer**
+    (ADR-0013; `sub-skills/final-review/SKILL.md` + engine `output/final_review.py` /
+    `demote.py` / `revival.revive_all(only_keys=…)`). After a `/loop` run, the main
+    session fans out one Opus sub-agent per published product to "revise or send back to
+    the foundry" against the source MD: small flaws are surgically fixed in place
+    (REVISE → a `final_review.json` marker), and products with no trustworthy base
+    (read-wrong-paper / wholesale-fabrication / rewrite-grade) are demoted to a
+    branch2-root failure scene and re-analyzed via the revival path (FAIL). **Default
+    OFF, operator-triggered, NOT wired into `/loop`** — the engine side is pure
+    deterministic functions, the revision judgment lives in the sub-agents, and the
+    ledger / scenes / revival are written only by the main session (single-writer LS-1).
+    Terminal-review state surfaces in `scripts.status` (`final_reviewed`).
+
 ## The injected seams
 
 The composition is CODE; the runtime injects the seams. Three infrastructure
@@ -362,13 +375,13 @@ engine + `config/`. Git **ignores inputs** (regenerable): original `*.pdf`, Mine
 > Validated **2026-06-14** (commit moves as fixes land — re-run the commands below to
 > re-verify; read live per-paper state from `scripts.status`, the authority).
 
-- **Corpus: 27/27 papers compliant** — every paper has a sealed ARA (G3 level-2
+- **Corpus: 32/32 papers compliant** — every paper has a sealed ARA (G3 level-2
   `passes_seal2`) AND a new-form human report (opens with `## 评价`, no retired
   anchors, no ARA-not-loaded body), and every code_ref is honest (no fabricated
   `_not found_` rows / non-source locations). Confirm with
   `… -m scripts.status --card` (read-only) and `… -m scripts.output.check_ara_bundle`
-  (regression gate → `27 bundle(s), 0 violation(s)`).
-- **Test suite: green** — `uv run pytest` → **606 passed**.
+  (regression gate → `32 bundle(s), 0 violation(s)`).
+- **Test suite: green** — `uv run pytest` → **630 passed**.
 - **Lint: clean** — `uv run ruff check .claude/skills/paper-landscape/scripts/ tests/`
   → "All checks passed!". NB: the gate is engine+tests-scoped, NOT repo-wide
   `ruff check .` (docs/handoff/ driver scripts intentionally carry lint noise — see

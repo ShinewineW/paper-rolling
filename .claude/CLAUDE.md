@@ -181,6 +181,18 @@ tier=strong → Sonnet 4.6) to `claude-code`; all keys from `.env`.
   `content_list.json` by construction.
 - **No mid-pipeline questions** during a `/loop` tick — all HITL happens once at
   the campaign Hard Gate (`config/campaign.yaml`).
+- **终审修订 (final-review, ADR-0013) is an OPTIONAL acceptance LAYER, not a gate, and is
+  NOT wired into `/loop`** (default off, operator-triggered;
+  `sub-skills/final-review/SKILL.md`). The engine side is pure deterministic functions
+  (`output/final_review.py` marker, `demote.py` published→branch2-root demotion,
+  `revival.revive_all(only_keys=…)` scoped revival); the non-deterministic revise/FAIL
+  judgment lives in main-session Opus sub-agents (each edits only its own paper). The
+  cost/account guard is INTACT — no engine LLM seam is added (the REVISE agents are the
+  main session's Agent tool, not `claude -p`). The ledger / `_failed/` scenes / revival
+  are written ONLY by the main session, serially, under ONE LS-1 lock — the sub-agents
+  never touch them. A REVISE that edits sealed ARA content is trusted (NOT re-run through
+  G3): `final_review.json` (verdict=revised) is the provenance and `passes_seal2` is left
+  unchanged.
 
 ## docs/ governance (enforced by docs/INDEX.md)
 

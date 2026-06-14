@@ -320,3 +320,18 @@ def test_load_scenes_recovers_crash_between_renames(tmp_path):
     (oldd / "scene.json").write_text('{"ledger_key":"9.9","attempts":[{}]}', encoding="utf-8")
     _load_scenes(tmp_path)
     assert (base / "k2" / "scene.json").exists()
+
+
+def test_revive_all_only_keys_scopes_to_subset(tmp_path, monkeypatch):
+    # only_keys 限定后,_load_scenes 里不在集合内的现场被跳过(本批 FAIL 不碰无关积压)。
+    import scripts.revival as rv
+
+    seen: list[str] = []
+    monkeypatch.setattr(rv, "_load_scenes", lambda ws: [
+        (tmp_path / "_failed" / "A", {"ledger_key": "A", "failed_gate": "结构门"}),
+        (tmp_path / "_failed" / "B", {"ledger_key": "B", "failed_gate": "结构门"}),
+    ])
+    monkeypatch.setattr(rv, "_run_revive_guarded", lambda ws, sd, mf, *a, **k: (
+        seen.append(sd.name) or rv.RevivalResult(sd.name, mf["ledger_key"], "done", "结构门")))
+    res = rv.revive_all(workspace=tmp_path, ledger=object(), seams={}, only_keys={"B"})
+    assert seen == ["B"] and [r.key for r in res] == ["B"]
