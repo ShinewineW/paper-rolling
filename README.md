@@ -276,6 +276,19 @@ ruff" is the validation gate.
     PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.output.check_ara_bundle
     ```
 
+11. **终审修订 (`final-review` sub-skill) — the OPTIONAL post-run revision layer**
+    (ADR-0013; `sub-skills/final-review/SKILL.md` + engine `output/final_review.py` /
+    `demote.py` / `revival.revive_all(only_keys=…)`). After a `/loop` run, the main
+    session fans out one Opus sub-agent per published product to "revise or send back to
+    the foundry" against the source MD: small flaws are surgically fixed in place
+    (REVISE → a `final_review.json` marker), and products with no trustworthy base
+    (read-wrong-paper / wholesale-fabrication / rewrite-grade) are demoted to a
+    branch2-root failure scene and re-analyzed via the revival path (FAIL). **Default
+    OFF, operator-triggered, NOT wired into `/loop`** — the engine side is pure
+    deterministic functions, the revision judgment lives in the sub-agents, and the
+    ledger / scenes / revival are written only by the main session (single-writer LS-1).
+    Terminal-review state surfaces in `scripts.status` (`final_reviewed`).
+
 ## The injected seams
 
 The composition is CODE; the runtime injects the seams. Three infrastructure
