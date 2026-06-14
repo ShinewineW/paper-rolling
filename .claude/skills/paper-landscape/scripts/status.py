@@ -279,7 +279,11 @@ def render_card(recs: list[dict], *, width: int = 60) -> str:
     # Pipeline funnel — finer than the binary bar: how far the corpus got down the
     # stages (ARA sealed → report compliant), so progress is visible mid-run.
     sealed_n = sum(1 for r in recs if r.get("sealed"))
-    funnel = f"  进度     入库 {len(recs)} · ARA密封 {sealed_n} · 报告合规 {counts['compliant']}"
+    reviewed_n = sum(1 for r in recs if r.get("final_reviewed"))
+    funnel = (
+        f"  进度     入库 {len(recs)} · ARA密封 {sealed_n} · "
+        f"报告合规 {counts['compliant']} · 终审 {reviewed_n}"
+    )
 
     lines = [
         "╭" + "─" * width + "╮",

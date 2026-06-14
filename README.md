@@ -372,16 +372,20 @@ engine + `config/`. Git **ignores inputs** (regenerable): original `*.pdf`, Mine
 
 ## Current status + validation
 
-> Validated **2026-06-14** (commit moves as fixes land — re-run the commands below to
+> Validated **2026-06-15** (commit moves as fixes land — re-run the commands below to
 > re-verify; read live per-paper state from `scripts.status`, the authority).
 
-- **Corpus: 32/32 papers compliant** — every paper has a sealed ARA (G3 level-2
-  `passes_seal2`) AND a new-form human report (opens with `## 评价`, no retired
-  anchors, no ARA-not-loaded body), and every code_ref is honest (no fabricated
-  `_not found_` rows / non-source locations). Confirm with
-  `… -m scripts.status --card` (read-only) and `… -m scripts.output.check_ara_bundle`
-  (regression gate → `32 bundle(s), 0 violation(s)`).
-- **Test suite: green** — `uv run pytest` → **633 passed**.
+- **Corpus: 33/33 papers compliant AND terminally reviewed** — every paper has a
+  sealed ARA (G3 level-2 `passes_seal2`) AND a new-form human report (opens with
+  `## 评价`, no retired anchors, no ARA-not-loaded body), and every code_ref is honest
+  (no fabricated `_not found_` rows / non-source locations). The optional ADR-0013
+  terminal-review layer is also **complete for all 33** (`final_reviewed` true; markers
+  in `ai_package/*/ara/final_review.json`). Confirm with `… -m scripts.status --card`
+  (read-only; its funnel shows `终审 33`) and `… -m scripts.output.check_ara_bundle`
+  (regression gate → `33 bundle(s), 0 violation(s)`). The newest paper, DriveWAM
+  (`2605.28544`), was added via a full normal-trigger pipeline run (ingest → ARA → G2 →
+  report → G3 → publish → terminal review).
+- **Test suite: green** — `uv run pytest` → **638 passed**.
 - **Lint: clean** — `uv run ruff check .claude/skills/paper-landscape/scripts/ tests/`
   → "All checks passed!". NB: the gate is engine+tests-scoped, NOT repo-wide
   `ruff check .` (docs/handoff/ is gitignored session scratch, outside the gate — see
