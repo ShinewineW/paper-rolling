@@ -125,14 +125,19 @@ def revive_all(
     repo_resolver: Any = None,  # 审计 R10:必须随 stage_branch2 透传
     stall_seconds: float | None = None,  # 审计 R13:per-scene wall-clock 看门狗
     human_directive: str | None = None,
+    only_keys: set[str] | None = None,  # 限定只重放这些现场名;None = 全量(既有行为)
 ) -> list[RevivalResult]:
     """branch 级重放每个现场。per-scene 隔离 + wall-clock 看门狗,可稳定长程自动化运行。
 
     `repo_resolver`:复用引擎 `make_repo_resolver()`。凡走 `stage_branch2` 的分支都必须
     把它传下去,否则 branch2 重生丢 T2b/T4 码链解析(R10)。
+    `only_keys`:仅重放现场名在此集合内的篇(终审 FAIL 只复活本批降级的产物,不碰
+    `_failed/` 既有无关积压);None = 全量(既有行为)。
     """
     results: list[RevivalResult] = []
     for scene_dir, manifest in _load_scenes(workspace):
+        if only_keys is not None and scene_dir.name not in only_keys:
+            continue  # 不在本批范围,跳过(默认 None = 全量,既有调用方行为不变)
         try:
             results.append(
                 _run_revive_guarded(
