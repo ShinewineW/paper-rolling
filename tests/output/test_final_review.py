@@ -52,6 +52,7 @@ def test_is_reviewed_false_for_empty_or_invalid_marker(tmp_path: Path) -> None:
         '{"verdict": "bogus"}',
         '{"verdict": "clean"}',  # 缺 date/by/edits → 半写
         '{"verdict": "clean", "date": "2026-06-14", "by": "x"}',  # 仍缺 edits
+        '{"verdict": "clean", "date": "2026-06-14", "by": 123, "edits": []}',  # by 非 str
         "[]",
         "[1, 2]",
     ):

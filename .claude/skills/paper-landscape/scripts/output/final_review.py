@@ -64,7 +64,8 @@ def is_reviewed(ara_dir: Path) -> bool:
         and m.get("verdict") in _VALID_VERDICTS
         and isinstance(m.get("date"), str)
         and m["date"]
-        and m.get("by")
+        and isinstance(m.get("by"), str)
+        and m["by"]
         and isinstance(m.get("edits"), list)
     )
 
