@@ -142,3 +142,35 @@ seam's prompt so the LLM self-corrects. Branch-level, not section-level (ADR-000
 修订): the WHOLE failed branch regenerates with an overall feedback block. Used for
 content gates (最终门 anchor → branch1; rigor/entailment → branch2 analyzer),
 never for 数字门. See ADR-0006/0009.
+
+## Post-publish review
+
+**终审修订 (final-review revision)**:
+The OPTIONAL, owner-triggered, post-publish quality pass over a BATCH of already-published
+products, run by the main session via a Workflow — one fresh Opus sub-agent per paper, each in
+its own context, so the main session stays uncontaminated. Its purpose is to **REVISE, not merely
+judge**: each sub-agent compares one 理解阅读 + AI知识库 against its source MD (the 基底 / ground
+truth) and either fixes localized flaws IN PLACE (全文件可改) or, when the product has no sound base
+to patch, demotes it to a 失败现场 for a branch2 复活赛 (re-analysis). Trusted, not re-judged — only
+a mechanical regression check guards a botched edit. Sits ABOVE the gates: it is NOT a gate
+(non-deterministic, session-level, owner-invoked) and is NOT wired into the `/loop` tick (preserves
+headless automation + the cost guard). Optional — skip it if the operator lacks a strong closing model.
+_Avoid_: 验收 (it revises in place, not just accept/reject); confusing it with 评价 — 评价 is branch1's
+in-pipeline, fail-soft opening note by a cheap seam, whereas 终审修订 is the post-publish,
+strongest-model revise-or-fail layer over the whole batch.
+
+**基底 / 瓦砾 (sound base / rubble)**:
+The judgement 终审修订 uses for REVISE vs FAIL. A product with a correct paper-identity and a sound
+overall narrative is a 基底 to PATCH (→ REVISE, even across several surgical edits). A product that is
+wrong-paper, wholesale-fabricated, or would need rewriting is 瓦砾 with no base → FAIL (→ 复活赛
+re-analysis). FAIL is closed to exactly three categories — 读错论文 / 整体胡说 / 重写级. "When in
+doubt, REVISE."
+_Avoid_: treating edit-count as the threshold (the test is base-vs-rubble, not how many edits).
+
+**终审标记 (final-review marker)**:
+The `ai_package/<key>/ara/final_review.json` sidecar a 终审修订 pass writes per product
+(`{date, verdict: clean|revised, by, edits}`). Doubles as (1) the provenance stamp on a REVISED
+product — records "G3-sealed → then 终审-revised", so `passes_seal2` is not a silent stale claim after
+an edit to sealed ARA content — and (2) the idempotency key: the next 终审修订 batch skips products
+that already carry it. A FAILED product writes no marker (it is demoted + re-analyzed → a fresh product).
+_Avoid_: putting the marker inside PAPER.md (a sidecar keeps it separable + auto-cleared on reprocess).

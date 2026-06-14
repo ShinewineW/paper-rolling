@@ -48,6 +48,7 @@
 - [`guides/codemaps/output-branches.md`](guides/codemaps/output-branches.md) — 双链原子产出、LLM 人链、图形策展。
 
 ### spec/ — 设计文档(活跃)
+- [`spec/2026-06-14-final-review-revision-layer-impl.md`](spec/2026-06-14-final-review-revision-layer-impl.md) — 终审修订层:可选、操作者触发、主会话 workflow 逐篇 Opus agent 对已发布产物「修订或回炉」(全文件可改、信任+provenance、基底-vs-瓦砾度、FAIL 三类走复活赛 branch2 根、REVISE 后机械回归、final_review.json 标记)(依据 ADR-0013;草稿)。
 - [`spec/2026-06-13-human-chain-assessment-no-gate-impl.md`](spec/2026-06-13-human-chain-assessment-no-gate-impl.md) — 人链报告改「评价」、不设硬门:唯一真值参照=已验证 ARA、退役整套 MD 锚点机制、branch1 永不失败、开篇自带忠实性「评价」(依据 ADR-0012 rev;已落地)。
 
 ### spec/archive/ — 设计文档(归档)
