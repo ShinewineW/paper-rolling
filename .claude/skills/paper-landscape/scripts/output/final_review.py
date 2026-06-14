@@ -56,9 +56,17 @@ def read_marker(ara_dir: Path) -> dict | None:
 
 
 def is_reviewed(ara_dir: Path) -> bool:
-    """是否已被有效终审(marker 存在且 verdict 合法);{}/损坏 marker 视作未终审。"""
+    """是否已被有效终审(marker 存在且 schema 完整)。{}/损坏/半写(缺 date/by/edits)的 marker
+    一律视作未终审 —— 否则一次坏写入会借幂等永久跳过该篇。"""
     m = read_marker(ara_dir)
-    return bool(m and m.get("verdict") in _VALID_VERDICTS)
+    return bool(
+        m
+        and m.get("verdict") in _VALID_VERDICTS
+        and isinstance(m.get("date"), str)
+        and m["date"]
+        and m.get("by")
+        and isinstance(m.get("edits"), list)
+    )
 
 
 def _compliant_idbases(workspace: Path) -> set[str]:

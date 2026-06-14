@@ -45,9 +45,16 @@ def test_is_reviewed_false_when_absent(tmp_path: Path) -> None:
 
 
 def test_is_reviewed_false_for_empty_or_invalid_marker(tmp_path: Path) -> None:
-    # 非阻断:{}/verdict 非法/非 dict 的 marker 不得算"已终审"(坏写入不能永久跳过该篇)。
+    # {}/verdict 非法/半写(缺字段)/非 dict 的 marker 都不得算"已终审"(坏写入不能永久跳过该篇)。
     ara = _ara(tmp_path, "2026-06-14_V_7777.77777")
-    for bad in ("{}", '{"verdict": "bogus"}', "[]", "[1, 2]"):
+    for bad in (
+        "{}",
+        '{"verdict": "bogus"}',
+        '{"verdict": "clean"}',  # 缺 date/by/edits → 半写
+        '{"verdict": "clean", "date": "2026-06-14", "by": "x"}',  # 仍缺 edits
+        "[]",
+        "[1, 2]",
+    ):
         (ara / "final_review.json").write_text(bad, encoding="utf-8")
         assert is_reviewed(ara) is False
     # 最后一次写入的 [1, 2] 是非 dict → read_marker 归一为 None(is_reviewed 不会对 list 调 .get)

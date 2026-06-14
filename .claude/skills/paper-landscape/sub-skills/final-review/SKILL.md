@@ -50,12 +50,10 @@ LS-1 不变量)。
        # failed = [(idbase, fail_category, fail_reason), ...] —— 取自各篇 verdict=="failed"
        with led.acquire():                      # LS-1:整段一把锁
            # 持锁后重核(MED-2):failed 源自锁外无锁快照(status.collect),窗口内 /loop /
-           # revival 可能改了状态;剔除已不合规/已发散的,别 demote 刚被 invalidate 的产物。
-           live = {
-               r["idbase"]
-               for r in collect(ws)
-               if r["state"] == "compliant" and not r.get("ledger_diverged")
-           }
+           # revival 可能改了状态;剔除已不再合规/已不存在的篇。注意**不**按 ledger_diverged
+           # 过滤(DOI-only 会被误判 diverged → 漏掉,与 _compliant_idbases 一致;且 rescinded-
+           # compliant 篇的 FAIL→revive 本就让账本收敛,demote 它无害)。
+           live = {r["idbase"] for r in collect(ws) if r["state"] == "compliant"}
            failed = [(ib, c, w) for ib, c, w in failed if ib in live]
            scenes = [
                demote_to_scene(ws, idbase, ledger=led, category=cat, reason=why)
@@ -136,15 +134,16 @@ LS-1 不变量)。
    (改了封印内容不重跑 G3,靠 final_review.json 盖来源章——决策 #2)。
    - 两道都过 → 写终审标记(date 用注入的 {today};edits 列你改了哪些文件/要点;**单行 `-c`**):
        PYTHONPATH=.claude/skills/paper-landscape uv run python -c "from pathlib import Path; from scripts.output.final_review import write_marker; write_marker(Path('{ara_dir}'), verdict='revised', edits=['report.md: …'], date='{today}')"
-     返回 {verdict:"revised", edits:[...]}。
-   - 任一道挂了 → 改崩了(结构破损,非内容)→ 重试修一次;再挂 → 返回 {verdict:"failed",
-     fail_category:"重写级", fail_reason:"机械回归无法通过"}(不写 marker)。
+     返回 {idbase:"{idbase}", verdict:"revised", edits:[...]}。
+   - 任一道挂了 → 改崩了(结构破损,非内容)→ 重试修一次;再挂 → 返回 {idbase:"{idbase}",
+     verdict:"failed", fail_category:"重写级", fail_reason:"机械回归无法通过"}(不写 marker)。
 4. 若 CLEAN(无需改): 同款**单行** incantation 写标记,但 verdict='clean'、edits=[]:
        PYTHONPATH=.claude/skills/paper-landscape uv run python -c "from pathlib import Path; from scripts.output.final_review import write_marker; write_marker(Path('{ara_dir}'), verdict='clean', edits=[], date='{today}')"
-   返回 {verdict:"clean"}。
-5. 若 FAIL: 不改任何文件、不写 marker,返回 {verdict:"failed", fail_category, fail_reason}。
+   返回 {idbase:"{idbase}", verdict:"clean"}。
+5. 若 FAIL: 不改任何文件、不写 marker,返回 {idbase:"{idbase}", verdict:"failed", fail_category, fail_reason}。
 
-只返回上面 schema 的 JSON。你的编辑发生在你自己的上下文里;主会话只收这个 JSON。
+每个返回 JSON 都必须带 `idbase:"{idbase}"`(即上面注入的论文 id)+ 对应 verdict 的字段,
+与 schema 一致。只返回该 JSON。你的编辑发生在你自己的上下文里;主会话只收这个 JSON。
 ```
 
 > provenance(ADR-0013 #2):改了封印内容**不重跑 G3**;`final_review.json`(verdict=revised)即来源章,
