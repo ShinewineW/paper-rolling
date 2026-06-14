@@ -47,7 +47,7 @@ def _find_corpus_md(ws: Path, idbase: str) -> Path | None:
 def _candidate_from_paper(ara: Path) -> dict:
     """从 ara/PAPER.md frontmatter 还原 revival 需要的 candidate 字段。
 
-    write_branch2._paper_md 以**下标**取 candidate["title"] 与 candidate["year"](必填),
+    复活赛 write_branch2(经 stage_branch2)以**下标**取 candidate["title"]/["year"](必填),
     其余 .get(authors/venue/doi/arxiv_id)。故 year 必须始终在字典里(缺则 None,渲染为 null,
     不 KeyError)。arxiv_id 只接受真 arXiv id(YYMM.NNNNN)或 None —— 绝不把裸 DOI 放进
     arxiv_id,否则 identity_base/vault_key 会把它当身份基,DOI-only 论文复活会改键。
@@ -96,6 +96,7 @@ def demote_to_scene(
 
     Raises:
         FileNotFoundError: 找不到该 idbase 的已发布产物 / 源 MD。
+        FileExistsError: 该 vault key 已有 `_failed/` 现场(demote 是建、不是 append)。
     """
     ws = Path(workspace)
     ai = _find_one(str(ws / "ai_package" / f"*_{idbase}"))
@@ -108,6 +109,12 @@ def demote_to_scene(
     ara = ai / "ara"
     candidate = _candidate_from_paper(ara)
     scene_key = ai.name  # 现场名 = vault key(同 _g3_to_scene;ledger_key 仍 idbase)
+    if (ws / FAILED_REL / scene_key).exists():
+        # demote 是「建」不是「append」:write_scene 撞名会把产物并进既有现场(那是复活再失败
+        # 的语义),故撞名直接 fail-loud,先让操作者解决既有现场。
+        raise FileExistsError(
+            f"demote: a _failed scene already exists for {scene_key}; resolve/revive it first"
+        )
     content_list = _ensure_content_list(md)  # 复活赛 G3 需现场恒有 content_list.json
     ledger_key = _candidate_key(candidate)  # 与 hub 同口径还原账本键(DOI-only 也对)
     observation = f"终审修订 FAIL({category}):{reason} —— 无可信基底,回炉重分析"

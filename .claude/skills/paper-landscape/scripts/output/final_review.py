@@ -75,7 +75,12 @@ def _compliant_idbases(workspace: Path) -> set[str]:
 
 
 def unreviewed_compliant_keys(workspace: Path) -> list[str]:
-    """终审批次:合规且未带 final_review.json 的已发布产物 idbase(排序、确定)。"""
+    """终审批次:合规且未带 final_review.json 的已发布产物 idbase(排序、确定)。
+
+    ⚠️ 这是一个**无锁快照**(status.collect 不持 LS-1)。调用方在拿它去 demote/revive 前,
+    必须在持 LS-1 锁后**重新核对**每篇仍合规/未发散(窗口内 /loop 或 revival 可能改了状态),
+    否则可能 demote 一篇刚被 invalidate 的产物。见 sub-skills/final-review/SKILL.md 步骤 3。
+    """
     from scripts.status import _idbase  # 函数级 import:回避 status→final_review 反向引用
 
     compliant = _compliant_idbases(workspace)

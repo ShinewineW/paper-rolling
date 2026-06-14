@@ -50,7 +50,7 @@ def test_is_reviewed_false_for_empty_or_invalid_marker(tmp_path: Path) -> None:
     for bad in ("{}", '{"verdict": "bogus"}', "[]", "[1, 2]"):
         (ara / "final_review.json").write_text(bad, encoding="utf-8")
         assert is_reviewed(ara) is False
-    # 非 dict JSON 经 read_marker 归一为 None(is_reviewed 不会对 list 调 .get → 不崩)
+    # 最后一次写入的 [1, 2] 是非 dict → read_marker 归一为 None(is_reviewed 不会对 list 调 .get)
     assert read_marker(ara) is None
 
 

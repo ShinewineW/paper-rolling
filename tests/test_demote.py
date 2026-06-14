@@ -148,3 +148,14 @@ def test_demote_preserves_products_under_failed_if_write_scene_raises(
     survivors = list((tmp_path / "_failed").rglob("PAPER.md"))
     assert survivors, "products must survive under _failed/ when write_scene fails"
     assert led.recorded == []
+
+
+def test_demote_refuses_when_scene_already_exists(tmp_path: Path) -> None:
+    # MED-1(sharp-edges):demote 是建、不是 append —— vault key 已有 _failed/ 现场时 fail-loud。
+    import pytest
+
+    _publish(tmp_path, "1111.11111", "Foo")
+    (tmp_path / "_failed" / "2026-06-14_Foo_1111.11111").mkdir(parents=True)
+    led = _FakeLedger()
+    with pytest.raises(FileExistsError):
+        demote_to_scene(tmp_path, "1111.11111", ledger=led, category="读错论文", reason="x")

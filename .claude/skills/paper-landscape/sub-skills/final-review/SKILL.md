@@ -39,6 +39,7 @@ LS-1 不变量)。
        from scripts.ledger.store import Ledger
        from scripts.llm.seams import build_seams
        from scripts.output.repo_resolve import make_repo_resolver   # R10:复活也要码链解析
+       from scripts.status import collect
        from scripts.demote import demote_to_scene
        from scripts.revival import revive_all
 
@@ -48,6 +49,14 @@ LS-1 不变量)。
        resolver = make_repo_resolver(web_search=seams.get("web_search"))
        # failed = [(idbase, fail_category, fail_reason), ...] —— 取自各篇 verdict=="failed"
        with led.acquire():                      # LS-1:整段一把锁
+           # 持锁后重核(MED-2):failed 源自锁外无锁快照(status.collect),窗口内 /loop /
+           # revival 可能改了状态;剔除已不合规/已发散的,别 demote 刚被 invalidate 的产物。
+           live = {
+               r["idbase"]
+               for r in collect(ws)
+               if r["state"] == "compliant" and not r.get("ledger_diverged")
+           }
+           failed = [(ib, c, w) for ib, c, w in failed if ib in live]
            scenes = [
                demote_to_scene(ws, idbase, ledger=led, category=cat, reason=why)
                for idbase, cat, why in failed
