@@ -60,16 +60,29 @@ def build_http(*, timeout: float = 120.0) -> Callable[[str], tuple[int, bytes]]:
     return http
 
 
-def build_run_cli() -> Callable[[list[str], str], subprocess.CompletedProcess]:
+def build_run_cli(
+    *, timeout: float = 1800.0
+) -> Callable[[list[str], str], subprocess.CompletedProcess]:
     """Return a ``run_cli(argv, cwd) -> CompletedProcess`` seam (subprocess.run).
 
     Captures stdout/stderr as text and never raises on a non-zero exit (callers
     check ``result.returncode``), so a failed MinerU / pandoc run is a recoverable
-    Tier failure rather than a crash.
+    Tier failure rather than a crash. A per-call ``timeout`` (default 30 min) bounds
+    the ONE genuinely-unbounded non-LLM operation — MinerU on a pathological PDF can
+    hang — so each uncertain op is guarded at its OWN layer (vs. a spoke-wide
+    wall-clock watchdog that also penalised legitimate provider-queue waits). On expiry
+    it returns returncode 124 (a recoverable Tier failure), never hangs the tick.
     """
 
     def run_cli(argv: list[str], cwd: str) -> subprocess.CompletedProcess:
-        return subprocess.run(argv, cwd=cwd, capture_output=True, text=True, check=False)  # noqa: S603
+        try:
+            return subprocess.run(  # noqa: S603
+                argv, cwd=cwd, capture_output=True, text=True, check=False, timeout=timeout
+            )
+        except subprocess.TimeoutExpired:
+            return subprocess.CompletedProcess(
+                argv, returncode=124, stdout="", stderr=f"run_cli timeout after {timeout}s"
+            )
 
     return run_cli
 

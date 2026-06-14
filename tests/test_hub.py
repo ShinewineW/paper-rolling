@@ -569,6 +569,23 @@ def test_guarded_spoke_is_signalled_to_cancel_on_stall(tmp_path: Path):
     assert saw["set_after_timeout"] is True  # ...and the guard set it on timeout
 
 
+def test_guarded_spoke_with_no_wall_clock_is_not_killed(tmp_path: Path):
+    # The production default (run_campaign_tick: Watchdog(stall_seconds=None)) means NO
+    # per-spoke wall-clock cap — a spoke that is slow because it is QUEUING for a provider
+    # slot must run to completion, not be spuriously killed as "stalled" (the 2026-06-14
+    # 5-paper regression). stall_seconds=None => join(timeout=None) => the real result.
+    import time as _time
+
+    from scripts.hub import _run_spoke_guarded
+
+    def slow_spoke(cand: dict, *, cancel=None) -> SpokeResult:
+        _time.sleep(0.4)  # "slow" (e.g. waiting on a busy semaphore) — must NOT be killed
+        return _ok(cand)
+
+    res = _run_spoke_guarded(slow_spoke, _candidate("p0"), stall_seconds=None)
+    assert res.status == "done"  # completed, not abandoned as a stall
+
+
 def test_watchdog_recover_isolates_a_crashing_refire(tmp_path: Path):
     # Codex Round-15: the watchdog RE-FIRE path must use the same per-paper
     # isolation as the main dispatch — a crashing re-fire spoke must NOT abort
@@ -903,8 +920,13 @@ def test_run_tick_engine_abort_in_later_paper_does_not_hang(tmp_path: Path):
     def _run() -> None:
         try:
             run_tick(
-                workspace=tmp_path, topic="t", n_target=2, ledger=led,
-                discover=lambda topic, n: pool, spoke=spoke, max_concurrent=2,
+                workspace=tmp_path,
+                topic="t",
+                n_target=2,
+                ledger=led,
+                discover=lambda topic, n: pool,
+                spoke=spoke,
+                max_concurrent=2,
             )
         except EngineAbort:
             outcome["aborted"] = True

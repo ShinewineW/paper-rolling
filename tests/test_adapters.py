@@ -56,6 +56,15 @@ def test_build_run_cli_nonzero_does_not_raise():
     assert result.returncode == 3
 
 
+def test_build_run_cli_timeout_is_recoverable_not_a_crash():
+    # The one unbounded non-LLM op (MinerU/pandoc) is bounded at its OWN layer: a CLI
+    # that overruns the timeout returns returncode 124 (recoverable Tier failure), never
+    # raises / hangs — so the tick no longer needs a spoke-wide wall-clock watchdog.
+    result = build_run_cli(timeout=0.3)([sys.executable, "-c", "import time; time.sleep(5)"], ".")
+    assert result.returncode == 124
+    assert "timeout" in result.stderr.lower()
+
+
 def test_build_discover_wires_five_sources_and_config(monkeypatch):
     seen = {}
 

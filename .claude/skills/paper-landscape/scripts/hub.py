@@ -151,11 +151,14 @@ class Watchdog:
 
     NOT a daemon: it re-fires at most ``max_refires`` times total and only while
     the tick is still short of N. False-done records (claimed done, missing vault
-    paths) are re-fired in place; ``stall_seconds`` is the wall-clock stall
-    threshold used by the real harness (0 in tests → re-fire immediately).
+    paths) are re-fired in place; ``stall_seconds`` is the per-spoke wall-clock stall
+    threshold (0 in tests → re-fire immediately; **None → NO wall-clock cap**, the
+    production default — see run_campaign_tick: each unbounded op is guarded at its own
+    layer, so the spoke needs no chain-wide timer). false-done re-fire is driven by
+    ``max_refires``, NOT by ``stall_seconds``, so it still works with stall_seconds=None.
     """
 
-    def __init__(self, *, stall_seconds: int = 1200, max_refires: int = 5) -> None:
+    def __init__(self, *, stall_seconds: int | None = 1200, max_refires: int = 5) -> None:
         self.stall_seconds = stall_seconds
         self.max_refires = max_refires
 
@@ -500,7 +503,15 @@ def run_campaign_tick(
     # AFTER the gate passes and BEFORE the batch dispatch.
     ledger.consistency_check()
     if watchdog is None:
-        watchdog = Watchdog()
+        # NO per-spoke wall-clock cap by default. The old 1200s budget timed the WHOLE
+        # spoke — including time a paper spent merely QUEUING for a provider slot behind
+        # the per-provider semaphore — so a paper waiting its turn under concurrency was
+        # spuriously killed as "stalled" (the 2026-06-14 5-paper run). Each genuinely
+        # unbounded op is guarded at ITS OWN layer instead: every LLM call has a config
+        # timeout that starts AFTER acquiring its slot (queue-wait excluded), and run_cli
+        # (MinerU/pandoc) has its own timeout — so the spoke always terminates without a
+        # chain-wide timer. The Watchdog is still created for its OTHER job: false-done re-fire.
+        watchdog = Watchdog(stall_seconds=None)
     hub = run_tick(
         workspace=workspace,
         topic=cfg.topic,
