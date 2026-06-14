@@ -24,14 +24,14 @@ LS-1 不变量)。
    re-ingest)、不重分析。跨机 / 纯 checkout 上先确认 corpus 完整(`scripts.status` /
    `scripts.preflight`),不全就先 re-ingest 再跑 FAIL 收尾。
 
-1.5 解析每篇 4 个路径(主会话注入给 agent 的变量)。**corpus 目录键 ≠ vault 键**,别用 idbase 直拼:
-   - **vault key** = `{intake_date}_{Name}_{idbase}`(`output.naming.vault_key`)→ 取自
-     `scripts.status.collect()` 每行的 `key` 字段。由它拼:`report_md = person_vault/{key}/report.md`、
-     `report_html = person_vault/{key}/report.html`、`ara_dir = ai_package/{key}/ara`。
-   - **md_path**(源 MD,只读基准)在 corpus 下,目录键是另一种 `{idbase}_{Slug}`(无日期前缀、非 vault key)
-     → 用 glob `corpus/{idbase}_*/{idbase}_*.md` 定位。
-   - 裸 `corpus/{idbase}/{idbase}.md`、`person_vault/{idbase}/…` 这类按 idbase 直拼的路径 **不存在** —— 不要硬拼。
-     发 agent 前先校验 4 个路径都 `exists()`(prompt 里也兜一句「路径与盘上不符则先 ls/glob 定位」)。
+1.5 解析每篇 4 个路径(主会话注入给 agent 的变量):用唯一权威
+   `output.naming.resolve_paper_paths(workspace, idbase)` —— **不要手工 glob/拼**。它按盘扫描返回
+   `corpus_md / report_md / report_html / ara_dir`(产物缺则为 None;report_html 即使文件未生成也给出目标路径)。
+   单行 `-c` 取一篇:
+   `PYTHONPATH=.claude/skills/paper-landscape uv run python -c "from pathlib import Path; from scripts.output.naming import resolve_paper_paths; print(resolve_paper_paths(Path('.'), '2503.14492'))"`
+   发 agent 前确认 `corpus_md/report_md/ara_dir` 非 None。背景(为何不能按 idbase 直拼):一篇论文的产物散在
+   corpus(键 `{idbase}_{Slug}`)与 person_vault/ai_package(键 `{date}_{Name}_{idbase}`)两套方案下,corpus Slug
+   ≠ vault Name、都不按裸 idbase —— 故必须扫盘解析,`resolve_paper_paths` 是唯一入口。
 
 2. 跑 Workflow(pipeline over 批次,每篇一个 agent):
    - 每个 `agent(...)` 用下面的 prompt + schema;model 继承主会话(主会话须为 Opus + 高 effort);

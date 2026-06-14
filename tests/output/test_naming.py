@@ -9,8 +9,69 @@ from scripts.output.naming import (
     derive_name,
     find_existing_entries,
     identity_base,
+    resolve_paper_paths,
     vault_key,
 )
+
+
+def _scaffold(ws, idbase, *, corpus_slug, vault_key_name, html=False):
+    """Build the on-disk product layout for one paper (two divergent key schemes)."""
+    cdir = ws / "corpus" / f"{idbase}_{corpus_slug}"
+    cdir.mkdir(parents=True)
+    (cdir / f"{idbase}_{corpus_slug}.md").write_text("md", encoding="utf-8")
+    pv = ws / "person_vault" / vault_key_name
+    pv.mkdir(parents=True)
+    (pv / "report.md").write_text("r", encoding="utf-8")
+    if html:
+        (pv / "report.html").write_text("<html>", encoding="utf-8")
+    (ws / "ai_package" / vault_key_name / "ara").mkdir(parents=True)
+
+
+def test_resolve_paper_paths_spans_two_key_schemes(tmp_path):
+    # the whole point: corpus Slug ('...ForPhy') != vault Name ('...PhysicalAI'),
+    # neither is bare idbase — resolution must still find both from one idbase.
+    idb = "2501.03575"
+    _scaffold(
+        tmp_path,
+        idb,
+        corpus_slug="CosmosWorldFoundationModelPlatformForPhy",
+        vault_key_name=f"2026-06-08_CosmosWorldFoundationModelPlatformForPhysicalAI_{idb}",
+    )
+    pp = resolve_paper_paths(tmp_path, idb)
+    assert pp.corpus_md is not None and pp.corpus_md.name.endswith(".md")
+    assert pp.corpus_md.read_text() == "md"
+    assert pp.report_md is not None and pp.report_md.exists()
+    assert pp.ara_dir is not None and pp.ara_dir.is_dir()
+    # report_html path is BUILT even though the file is absent (writer/REVISE target)
+    assert pp.report_html is not None and pp.report_html.name == "report.html"
+    assert not pp.report_html.exists()
+
+
+def test_resolve_paper_paths_missing_paper_all_none(tmp_path):
+    (tmp_path / "corpus").mkdir()
+    pp = resolve_paper_paths(tmp_path, "9999.99999")
+    assert pp.corpus_dir is None and pp.corpus_md is None
+    assert pp.person_vault_dir is None and pp.report_md is None and pp.report_html is None
+    assert pp.ai_package_dir is None and pp.ara_dir is None
+
+
+def test_resolve_paper_paths_doi_identity(tmp_path):
+    idb = "doi-abcd1234"  # DOI-only papers key the same way (_{idbase} / {idbase}_)
+    _scaffold(
+        tmp_path, idb, corpus_slug="SomeVenuePaper", vault_key_name=f"2026-06-08_SomeVenue_{idb}"
+    )
+    pp = resolve_paper_paths(tmp_path, idb)
+    assert pp.corpus_md is not None and pp.ara_dir is not None and pp.report_md is not None
+
+
+def test_resolve_paper_paths_does_not_match_idbase_substring(tmp_path):
+    # '_{idbase}' suffix / '{idbase}_' prefix must not match a longer idbase that merely
+    # contains the query (e.g. querying 2501.0357 must not return 2501.03575's dirs).
+    _scaffold(
+        tmp_path, "2501.03575", corpus_slug="Real", vault_key_name="2026-06-08_Real_2501.03575"
+    )
+    pp = resolve_paper_paths(tmp_path, "2501.0357")
+    assert pp.corpus_dir is None and pp.person_vault_dir is None and pp.ai_package_dir is None
 
 
 @pytest.mark.parametrize(

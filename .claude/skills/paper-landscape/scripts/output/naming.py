@@ -12,6 +12,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 _KEEP = re.compile(r"[A-Za-z0-9]+")
@@ -83,3 +84,80 @@ def find_existing_entries(
         return []
     idbase = identity_base(arxiv_id, doi)
     return sorted(p for p in vault_dir.iterdir() if p.is_dir() and p.name.endswith(f"_{idbase}"))
+
+
+# --------------------------------------------------------------------------- #
+# idbase -> on-disk product paths (the SINGLE external resolver)               #
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class PaperPaths:
+    """Every on-disk product path for one paper, resolved from its idbase.
+
+    A paper's products span THREE dirs under TWO key schemes — `corpus/{idbase}_{Slug}`
+    (the ingest `corpus_id`, full-title slug ≤40) and `person_vault|ai_package/
+    {date}_{Name}_{idbase}` (the `vault_key`, before-colon name ≤60). NONE is keyed by
+    bare idbase, and the corpus Slug differs from the vault Name — so the date prefix and
+    both slugs are NOT recoverable from an idbase alone. Resolution is therefore by disk
+    SCAN, not name recomputation. Each field is the resolved Path, or None if that product
+    is absent (report_md/report_html/ara_dir are built from the found dir even if the file
+    itself is not yet written, so a writer/REVISE caller gets the target path).
+    """
+
+    idbase: str
+    corpus_dir: Path | None
+    corpus_md: Path | None
+    person_vault_dir: Path | None
+    report_md: Path | None
+    report_html: Path | None
+    ai_package_dir: Path | None
+    ara_dir: Path | None
+
+
+def _one_dir(parent: Path, *, prefix: str = "", suffix: str = "") -> Path | None:
+    """The single sub-dir of `parent` matching `prefix`/`suffix`, else None.
+
+    None if `parent` is absent or nothing matches; the first (sorted) on the rare
+    same-idbase collision the vault keying is designed to avoid.
+    """
+    if not parent.is_dir():
+        return None
+    hits = sorted(
+        p
+        for p in parent.iterdir()
+        if p.is_dir() and p.name.startswith(prefix) and p.name.endswith(suffix)
+    )
+    return hits[0] if hits else None
+
+
+def resolve_paper_paths(workspace: Path, idbase: str) -> PaperPaths:
+    """Resolve every on-disk product path for `idbase` — the SINGLE authority for
+    "idbase -> product paths". External callers (status, final-review orchestration,
+    tooling) MUST use this instead of hand-globbing corpus/vault dirs, since the two
+    key schemes (corpus_id vs vault_key) make ad-hoc reconstruction error-prone.
+
+    `idbase` is the identity key (arXiv base id sans version, or `doi-<hash>`) — i.e.
+    `identity_base(...)`, the same key vault dirs end with and corpus dirs start with.
+    """
+    ws = Path(workspace)
+    corpus_dir = _one_dir(ws / "corpus", prefix=f"{idbase}_")
+    corpus_md: Path | None = None
+    if corpus_dir is not None:
+        cand = corpus_dir / f"{corpus_dir.name}.md"
+        if not cand.is_file():
+            mds = sorted(corpus_dir.glob("*.md"))
+            cand = mds[0] if mds else None
+        corpus_md = cand
+    pv = _one_dir(ws / "person_vault", suffix=f"_{idbase}")
+    ai = _one_dir(ws / "ai_package", suffix=f"_{idbase}")
+    return PaperPaths(
+        idbase=idbase,
+        corpus_dir=corpus_dir,
+        corpus_md=corpus_md,
+        person_vault_dir=pv,
+        report_md=(pv / "report.md") if pv else None,
+        report_html=(pv / "report.html") if pv else None,
+        ai_package_dir=ai,
+        ara_dir=(ai / "ara") if ai else None,
+    )
