@@ -172,8 +172,8 @@ offline `arxiv_id → official repo` lookup (T2a), read with stdlib gzip at runt
 uv sync --group dev      # set up the venv
 uv run pytest            # run the test suite (the executable spec)
 uv run ruff check .claude/skills/paper-landscape/scripts/   # lint the ENGINE source
-# NB: scope ruff to the engine source (and tests/), NOT `ruff check .` — docs/handoff/
-# driver scripts are intentionally not excluded and carry lint noise (see .claude/CLAUDE.md).
+# NB: scope ruff to the engine source (and tests/), NOT `ruff check .` repo-wide
+# (docs/handoff/ is gitignored session scratch, outside the gate; see .claude/CLAUDE.md).
 # Environment preflight — verify pandoc + mineru + runtime deps before a campaign
 # (exit 1 + install hints if any is missing; the skill runs this FIRST as a gate):
 PYTHONPATH=.claude/skills/paper-landscape uv run python -m scripts.preflight
@@ -384,7 +384,7 @@ engine + `config/`. Git **ignores inputs** (regenerable): original `*.pdf`, Mine
 - **Test suite: green** — `uv run pytest` → **630 passed**.
 - **Lint: clean** — `uv run ruff check .claude/skills/paper-landscape/scripts/ tests/`
   → "All checks passed!". NB: the gate is engine+tests-scoped, NOT repo-wide
-  `ruff check .` (docs/handoff/ driver scripts intentionally carry lint noise — see
+  `ruff check .` (docs/handoff/ is gitignored session scratch, outside the gate — see
   `.claude/CLAUDE.md`).
 - **Known non-defects** (normal, not gaps): some papers have **no public code repo**
   (e.g. OmniDreams' only release is FlashDreams, a serving stack, not the model) —

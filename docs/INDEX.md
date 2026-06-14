@@ -28,7 +28,7 @@
 | `reports/` | 报告 | 时间点产物:对本代码仓库的观测、审计、排查结论(正文中文) | H1 + `日期 / 作者 / 基准版本 / 影响范围` |
 | `reference/` | 参考来源 | 所有参考的 GitHub 仓库 / 博客等克隆体(本地、不入库);仅 `INDEX.md` 清单入库 | H1 + `范围` |
 | `adr/` | 架构决策记录 | 不可变架构决策(编号 `NNNN-<slug>.md`)——**由 `mp-grill-me` 自管理,豁免** | H1 + `Status: <状态> — <日期>` |
-| `handoff/` | 上下文接手 | 临时切换上下文时的接手 / 进度交接文档(工作态草稿区,随任务来去) | 自由(工作态,不强制规范) |
+| `handoff/` | 上下文接手 | 临时切换上下文时的接手 / 进度交接文档(**gitignored 工作态 scratch,不入库、用完即清**) | 自由(工作态,不强制规范) |
 
 ---
 
@@ -76,4 +76,4 @@
 - [`adr/0005-public-cc-by-nc-keep-original-figures.md`](adr/0005-public-cc-by-nc-keep-original-figures.md) — 保持公开 + CC-BY-NC;原图原样嵌入(不改 Apache、不只重绘);版权立场与权衡。
 
 ### handoff/ — 上下文接手(工作态)
-- [`handoff/debug-drivers/`](handoff/debug-drivers/) — 批量跑根因诊断期间的接手文档 + 复现驱动脚本(`loop_progress.md` 进度交接 + `run24.py` 等驱动,被 `reports/2026-06-09-…` 引用为复现配套)。
+- `handoff/` 现为 **gitignored 临时 session 交接 scratch**(不入库、用完即清),无 tracked 内容,故不逐一登记。(历史的 `debug-drivers/` 复现驱动已移除;时间点报告 `reports/2026-06-09-…` 仍按原文引用它,不回改。)
