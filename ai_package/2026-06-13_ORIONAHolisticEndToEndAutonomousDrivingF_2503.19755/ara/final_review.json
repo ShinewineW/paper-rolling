@@ -1,0 +1,9 @@
+{
+  "date": "2026-06-15",
+  "verdict": "revised",
+  "by": "main-session-opus",
+  "edits": [
+    "report.md: 修正“相关性≠因果性风险”条目——ORION 推理主干实为 Vicuna v1.5(7B,LoRA),原文误称约 72000.0M(72B);澄清 Qwen2VL-72B 仅用于离线 Chat-B2D VQA 标注,非 ORION 算力/参数",
+    "PAPER.md: params_million 72000.0 -> 7000.0(ORION 推理主干 Vicuna v1.5 7B,非 VQA 标注用的 Qwen2VL-72B)"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "date": "2026-06-15",
+  "verdict": "revised",
+  "by": "main-session-opus",
+  "edits": [
+    "report.md: 重写 评价>忠实性评价 段，纠正其对参数量的错误指控（4M=Atari 扩散模型本体、13M=DIAMOND 整体系统、381M/51M=CS:GO 模型，均与源论文 Sec 6 / Table 4 / Table 8 逐字一致，原 评价 误把 Table 8 的 184M cross-attention 变体当作上限、把不同口径的 4M/13M 当作矛盾）；report.html: 用引擎 _html 重生"
+  ]
+}

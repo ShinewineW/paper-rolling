@@ -1,0 +1,9 @@
+{
+  "date": "2026-06-15",
+  "verdict": "revised",
+  "by": "main-session-opus",
+  "edits": [
+    "ara/src/code_ref.md: 修正倒置错误——原文断言论文为闭源(author-declared closed-source)，实则论文摘要与引言明确声明在 OpenMDW-1.1 许可证下开源代码/权重/数据集/基准于 github.com/nvidia/cosmos；改为 found 状态(repo + 无 paper-pinned SHA 的诚实说明)",
+    "report.md(开源代码与复现入口节): 删除源文中不存在的捏造 commit SHA(1fe7e3be…)及对仓库内部公开程度的臆断，改为论文实际声明的开源事实(OpenMDW-1.1 + 仓库/HF 集合 URL + 论文未给 SHA/行号映射)"
+  ]
+}

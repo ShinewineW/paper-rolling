@@ -1,0 +1,8 @@
+{
+  "date": "2026-06-15",
+  "verdict": "revised",
+  "by": "main-session-opus",
+  "edits": [
+    "report.md L226: 修正跨视角注意力视角数误植——OmniDreams-MV 联合生成的是 4 视角(front-wide/cross-left/cross-right/front-tele)而非 7,7 仅为架构最高环视上限"
+  ]
+}

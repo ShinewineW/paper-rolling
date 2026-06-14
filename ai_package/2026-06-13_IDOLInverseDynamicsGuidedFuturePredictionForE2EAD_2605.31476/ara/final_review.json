@@ -1,0 +1,8 @@
+{
+  "date": "2026-06-15",
+  "verdict": "revised",
+  "by": "main-session-opus",
+  "edits": [
+    "report.md (推理期公式映射, IDM转移解码步骤): 修正 IDM 释义错误——“智能驾驶模型”改为“逆动力学模型”(inverse dynamics model)，并将 $g_k$ 的“增益参数”改为“全局动态特征”、$S_k$ 的“空间转移矩阵”改为“空间动态图”，与全文及 ARA 术语一致；report.html 已用引擎 _html 重生"
+  ]
+}

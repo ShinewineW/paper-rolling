@@ -1,0 +1,8 @@
+{
+  "date": "2026-06-15",
+  "verdict": "revised",
+  "by": "main-session-opus",
+  "edits": [
+    "report.md: 在导读/趋势/局限/评价四处将钻石成功率 0.7 补全单位为 0.7%，消除被误读为 70% 的歧义（值与 Table 7 及 ARA headline_value=0.7 一致）"
+  ]
+}

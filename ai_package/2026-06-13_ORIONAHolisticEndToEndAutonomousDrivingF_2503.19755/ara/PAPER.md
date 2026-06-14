@@ -24,7 +24,7 @@ claims_summary:
 - 在ORION框架中，VAE式生成规划器相对Diffusion式生成规划器在闭环、开环和能力均值指标上整体更优。
 headline_metric: Driving Score (DS)
 headline_value: 77.74
-params_million: 72000.0
+params_million: 7000.0
 ---
 
 # ORIONAHolisticEndToEndAutonomousDrivingF

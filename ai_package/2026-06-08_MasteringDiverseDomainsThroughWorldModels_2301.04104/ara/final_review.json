@@ -1,0 +1,8 @@
+{
+  "date": "2026-06-15",
+  "verdict": "revised",
+  "by": "main-session-opus",
+  "edits": [
+    "src/code_ref.md: 删除错误的「Linked artifacts (Hugging Face)」段——两条 arc-agi-3-grid-jepa 模型链接属跨论文污染,与 DreamerV3 无关;仓库+SHA(danijar/dreamerv3)正确保留"
+  ]
+}

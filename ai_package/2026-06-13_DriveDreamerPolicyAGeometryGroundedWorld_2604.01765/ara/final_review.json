@@ -1,0 +1,8 @@
+{
+  "date": "2026-06-15",
+  "verdict": "revised",
+  "by": "main-session-opus",
+  "edits": [
+    "report.md: 修正代码开源状态——原文称无公开仓库，与已核验 ARA code_ref(github.com/youngzhou1999/DriveDreamer-Policy, pinned commit)矛盾，改为已公开+pinned commit(工程与复现结论段 + 运行环境与代码现状段共2处)"
+  ]
+}

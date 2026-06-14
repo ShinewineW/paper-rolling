@@ -223,7 +223,7 @@ flowchart TB
 
 轨迹、文本提示、首帧 RGB 与世界场景地图被送入有状态的 OmniDreams 服务端。场景渲染器依据相机内外参，将 HD map、动态 actor cuboid 与 ego trajectory 投影为对齐的视频条件。随后，轻量级 control branch（小型 MLP）将这些结构化状态编码为 control tokens，与噪声 latent tokens、首帧 latent 及文本交叉注意力条件拼接，送入因果 Transformer 主干。
 
-主干网络的核心是**因果掩码与流式 KV Cache**。每个 latent token 在独立噪声时间步下学习基于历史帧的速度预测，配合推理期限定的局部时间窗口注意力（OmniDreams-SV 为 6 个 latent frames，OmniDreams-MV 为 8 个），在显存占用、延迟与长程上下文之间取得精确折中。为适配多视角，OmniDreams-MV 在每个时间步注入 view embedding 并启用 Cross-View Attention，使 7 个相机视角共享几何与运动一致性。经过少步去噪后，LightTAE 将 latent 解码为 RGB/JPEG 帧。服务端同步更新 KV cache、渲染器状态与 CUDA Graph state，并将帧返回 AlpaSim，驱动策略进入下一轮闭环。
+主干网络的核心是**因果掩码与流式 KV Cache**。每个 latent token 在独立噪声时间步下学习基于历史帧的速度预测，配合推理期限定的局部时间窗口注意力（OmniDreams-SV 为 6 个 latent frames，OmniDreams-MV 为 8 个），在显存占用、延迟与长程上下文之间取得精确折中。为适配多视角，OmniDreams-MV 在每个时间步注入 view embedding 并启用 Cross-View Attention，使联合生成的 4 个相机视角（front-wide、cross-left、cross-right、front-tele）共享几何与运动一致性（架构最高可支持 7 视角环视）。经过少步去噪后，LightTAE 将 latent 解码为 RGB/JPEG 帧。服务端同步更新 KV cache、渲染器状态与 CUDA Graph state，并将帧返回 AlpaSim，驱动策略进入下一轮闭环。
 
 训练目标显式包含 Diffusion Forcing 与 Self Forcing DMD。Diffusion Forcing 用因果掩码让模型在独立噪声时间下学习基于过去帧的 velocity prediction，其损失为：
 $$

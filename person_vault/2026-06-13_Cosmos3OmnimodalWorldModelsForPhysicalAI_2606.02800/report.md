@@ -847,7 +847,7 @@ flowchart TD
 环境依赖方面，论文未公开 Python 版本与统一随机种子。数据加载器采用基于迭代索引的全局种子选择器（globally seeded selector keyed on iteration index）以保证流选择可复现，checkpoint 恢复时采用 rank-aware RNG state。合成数据集中的部分 simulation run 由 seed 控制随机变量。复现时若需严格对齐，需自行固定数据流切分逻辑，并注意不同模态的 token 限制（如单样本 2048 image tokens 与 8192 video tokens）对显存占用的直接影响。
 
 ### 开源代码与复现入口
-官方代码仓库位于 `https://github.com/nvidia/cosmos`，锁定 commit `1fe7e3be1687d797392b0e82ff6fe6296638b49f`。需明确区分论文“声称”与仓库“实际提供”的内容：当前开源版本主要提供模型架构说明、推理示例与部分数据处理工具，README 中提及的“统一多模态建模”与“MoT 双塔架构”有对应入口，但核心训练循环（如 dual-stream joint attention 实现、clean-prefix/noisy-target 统一编排、domain-aware action projection 等）在仓库中尚未完全公开。
+论文明确声明开源：代码、模型权重、合成数据集与评测基准在 Linux Foundation 的 OpenMDW-1.1 许可证下发布于 `https://github.com/nvidia/cosmos` 与 `huggingface.co/collections/nvidia/cosmos3`（已发布 `Cosmos3-Nano` 与 `Cosmos3-Super`，`Cosmos3-Edge` 留待后续版本）。论文正文未给出具体的代码文件/行号映射或锁定 commit，因此复现时需以官方仓库的实际目录结构为准核对各核心模块（如 dual-stream joint attention、clean-prefix/noisy-target 统一编排、domain-aware action projection）的对应入口。
 
 对于希望从零复现的工程师，建议路径为：以开源权重与推理代码为基线，优先对齐 token arrangement 与 temporal gap 15000 的序列构造逻辑；利用 `vLLM-Omni` 或 `TensorRT-LLM` 验证生成延迟；若需重训，需自行实现基于 `FusedAdamW` 与 `Hybrid Sharded Data Parallelism` 的分布式训练管线，并严格遵循上述分阶段学习率与 loss scale 策略。论文未提供完整的端到端训练脚本，复现成本主要集中在分布式通信优化与多模态数据流的确定性打包上。
 

@@ -553,7 +553,7 @@ flowchart TD
 
 ## 工程与复现要点
 
-**结论：** 复现该系统的核心在于“单阶段联合训练+固定Query瓶颈”的架构约束，以及严格对齐的几何/视频/动作多任务损失配比；硬件门槛明确（8×H20），但当前无官方开源入口，需自行搭建依赖链并严格遵循论文给出的归一化与权重设置。
+**结论：** 复现该系统的核心在于“单阶段联合训练+固定Query瓶颈”的架构约束，以及严格对齐的几何/视频/动作多任务损失配比；硬件门槛明确（8×H20）。官方代码仓库已公开（`github.com/youngzhou1999/DriveDreamer-Policy`，已核验并锁定 commit），复现时建议以该 pinned commit 为准并严格遵循论文给出的归一化与权重设置。
 
 ### 架构规模与信息路由
 系统采用“大语言模型理解+固定容量Query瓶颈+模态专家生成”的三段式设计，通过显式的信息路由避免多模态特征在隐空间中的相互干扰。主干理解模块使用 `Qwen3-VL-2B`，负责融合语言指令、同步多视角RGB观测与当前动作上下文。融合后的表征被压缩至固定大小的Query槽位中，并按 `depth queries → video queries → action queries` 的严格顺序传递，形成“几何先于外观，外观再引导动作”的单向依赖链。生成端包含三个独立扩散头：像素空间深度生成器（基于 `PPD` 初始化）、潜在空间视频生成器（基于 `Wan-2.1-T2V-1.3B` 改造）与轻量动作生成器。所有生成任务均在 `144 × 256` 分辨率下微调，视频预测时间跨度固定为 9 帧。
@@ -608,7 +608,7 @@ flowchart TB
 ### 运行环境与代码现状
 系统依赖明确的硬件与软件栈：推理与训练需在 `8 NVIDIA H20 GPUs` 上完成。关键依赖链包括 `Navsim` 基准、`Qwen3-VL-2B`、`PPD`、`Wan-2.1-T2V-1.3B`、`Depth Anything 3 (DA3)`、`VAE`、`CLIP` 与 `AdamW`。评估严格遵循 `navtrain` 训练、`navtest` 测试的划分，指标对应 `Navsim v1` 的 PDMS 与 `v2` 的 EPDMS。
 
-**代码开源状态：** 经检索论文正文与 Papers-with-Code 官方索引，**当前无公开代码仓库**。复现需完全依赖论文描述自行搭建。建议优先对齐 Query 数量配置（默认 64 depth + 64 video + 8 action tokens），论文消融表明缩减至 32+32+4 会显著削弱规划与世界生成性能。由于缺乏官方实现，复现者需特别注意跨模态交叉注意力的掩码实现与扩散头初始化权重的加载逻辑。
+**代码开源状态：** 论文正文仅给出项目主页（drivedreamer-policy.github.io），但已核验存在公开代码仓库 `github.com/youngzhou1999/DriveDreamer-Policy`（来源 hf-live，已锁定 pinned commit）。复现建议以该 pinned commit 为准；本工作区不保留可运行副本，需重新 clone。建议优先对齐 Query 数量配置（默认 64 depth + 64 video + 8 action tokens），论文消融表明缩减至 32+32+4 会显著削弱规划与世界生成性能；并特别注意跨模态交叉注意力的掩码实现与扩散头初始化权重的加载逻辑。
 
 <details><summary><strong>深度推导与边界 Caveat</strong></summary>
 - **联合损失公式**：$\mathcal{L} = \lambda_d \mathcal{L}_d + \lambda_v \mathcal{L}_v + \lambda_a \mathcal{L}_a$，其中 $\lambda_d = 0.1$，其余默认 1.0。该配比是经验设定，论文未提供权重敏感性扫描。

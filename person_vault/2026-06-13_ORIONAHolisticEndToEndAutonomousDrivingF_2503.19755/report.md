@@ -782,7 +782,7 @@ flowchart TD
 
 <details><summary><strong>深度展开：隐空间对齐的代价与未解问题</strong></summary>
 <ul>
-<li><strong>相关性≠因果性风险：</strong> Bench2Drive 分数提升被归因于 reasoning-action 对齐，但大模型（如 Qwen2VL-72B 级别，参数量约 72000.0M）本身携带的海量驾驶先验知识可能贡献了部分性能。论文尚未完全剥离“模型规模红利”与“架构设计红利”。</li>
+<li><strong>相关性≠因果性风险：</strong> Bench2Drive 分数提升被归因于 reasoning-action 对齐，但 ORION 所用 LLM（Vicuna v1.5，经 LoRA 微调）本身携带的世界知识与驾驶先验也可能贡献了部分性能；论文尚未完全剥离“预训练大模型先验红利”与“架构设计红利”。需澄清：Qwen2VL-72B 仅用于离线自动生成 Chat-B2D 的 VQA 标注，并非 ORION 推理主干，故其 72B 规模不构成 ORION 自身的算力或参数量。</li>
 <li><strong>历史上下文压缩假设：</strong> QT-Former 依赖 Memory Bank 承载长期视觉上下文，其有效性建立在“压缩后的 token 足以保留关键交互线索”的假设上。在极端长尾或遮挡场景中，信息瓶颈可能导致规划退化。</li>
 <li><strong>数值推理短板未根除：</strong> 尽管 VAE 隐空间缓解了纯文本输出的数值缺陷，但 LLM 本身的 autoregressive 机制仍倾向于输出单一模式。若需覆盖多模态不确定性（如多车道汇入的概率分布），生成式规划器仍需更强的分布建模能力。</li>
 </ul>

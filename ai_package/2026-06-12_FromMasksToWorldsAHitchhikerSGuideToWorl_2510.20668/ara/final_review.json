@@ -1,0 +1,9 @@
+{
+  "date": "2026-06-15",
+  "verdict": "revised",
+  "by": "main-session-opus",
+  "edits": [
+    "report.md: 修正 ## 评价 机器核对行——原行将数学下标 -1(来自 h_{t-1}/a_{t-1}/h_{-1} 等公式)误标为未对应的正文数字,改为正确的全部可对应表述",
+    "report.html: 用引擎 _html 重生"
+  ]
+}
