@@ -699,3 +699,11 @@ processed:
   person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-13_DriveVAVideoActionModelsAreZeroShotDrivers_2604.04198
   ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-13_DriveVAVideoActionModelsAreZeroShotDrivers_2604.04198
   processed_at: '2026-06-13T21:43:02Z'
+- key: '2605.28544'
+  md_sha256: null
+  status: done
+  failure_class: null
+  retry_after: null
+  person_vault_path: /Users/shinewine/Coding/paper-rolling/person_vault/2026-06-14_DriveWAM_2605.28544
+  ai_package_path: /Users/shinewine/Coding/paper-rolling/ai_package/2026-06-14_DriveWAM_2605.28544
+  processed_at: '2026-06-14T17:04:49Z'

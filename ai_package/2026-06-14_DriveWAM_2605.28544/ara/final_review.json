@@ -1,0 +1,8 @@
+{
+  "date": "2026-06-15",
+  "verdict": "revised",
+  "by": "main-session-opus",
+  "edits": [
+    "report.md: 重写 评价 段——原文断言 Table 3 数据与 C3 声称相悖(误把表格符号字面读法当定论),改为如实指出源论文 Table 3 符号标注与正文叙述方向相反这一内部不一致,并说明按正文 C3 成立"
+  ]
+}

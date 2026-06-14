@@ -1,0 +1,123 @@
+{
+  "artifact": "2026-06-14_DriveWAM_2605.28544",
+  "review_version": "3.0.0",
+  "prerequisite": "Level 1 passed",
+  "overall": {
+    "grade": "Accept",
+    "mean_score": 3.83,
+    "passes_seal2": true
+  },
+  "dimensions": {
+    "D1_evidence_relevance": {
+      "score": 2,
+      "strengths": [
+        "Most claims (C1, C2, C5, C6, C7) are supported by directly relevant tables and metrics.",
+        "Evidence types generally match claim types (e.g., ablations for causal claims, baseline comparisons for improvement claims)."
+      ],
+      "weaknesses": [
+        "C3's evidence (Table 3) actively contradicts the claim. The table shows the baseline (fixed prompt, marked with ×) outperforming the proposed method (SE guidance, blank) at 4k and 100k scales.",
+        "Table 4 uses ambiguous symbols (blanks, 一, x<>) making it hard to verify the exact ablation configurations without external context."
+      ],
+      "suggestions": [
+        "Correct Table 3 to accurately reflect the claimed improvements, or revise C3 to reflect the actual mixed/negative results shown in the data.",
+        "Ensure all table symbols are explicitly defined in the table footer or caption for every table."
+      ]
+    },
+    "D2_falsifiability": {
+      "score": 5,
+      "strengths": [
+        "Every claim has a specific, actionable falsification criterion.",
+        "Criteria are scope-matched and independently testable (e.g., specifying the exact dataset, protocol, and metric thresholds).",
+        "Criteria avoid triviality by defining exact conditions under which the claim would fail."
+      ],
+      "weaknesses": [
+        "None significant; the criteria are well-formulated and rigorous."
+      ],
+      "suggestions": [
+        "For C4 (data scaling), specify the minimum acceptable improvement margin to avoid claiming success on statistically insignificant drops in error."
+      ]
+    },
+    "D3_scope_calibration": {
+      "score": 3,
+      "strengths": [
+        "Assumptions are explicitly listed in the problem specification.",
+        "Generalization boundaries are somewhat constrained to the specific benchmarks (NAVSIM v1, PhysicalAI curated subset)."
+      ],
+      "weaknesses": [
+        "C1 overclaims 'overall outperforms' when DriveVLA-W0t (90.2) slightly beats DriveWAM (90.1) in the same single-view (SV) setting.",
+        "C3 claims improvement across data scales, which is factually incorrect based on the provided evidence, representing a severe scope miscalibration."
+      ],
+      "suggestions": [
+        "Temper C1 to state 'achieves highly competitive performance, outperforming most comparable methods' rather than 'overall outperforms'.",
+        "Align C3's scope strictly with the empirical findings, acknowledging where the proposed method underperforms the baseline."
+      ]
+    },
+    "D4_argument_coherence": {
+      "score": 4,
+      "strengths": [
+        "Clear and logical arc from observations (VLM lacks dynamics, video gen has dynamics) to gaps, insights, and solution.",
+        "The exploration tree and problem specification perfectly align with the proposed architecture.",
+        "Every identified gap is addressed by a specific component in the solution."
+      ],
+      "weaknesses": [
+        "The internal contradiction in C3 breaks the final link of the argument arc for the semantic guidance component.",
+        "The transition from G2 (lack of high-level semantics) to the solution (VLM guidance) is logically sound, but the evidence fails to close the loop."
+      ],
+      "suggestions": [
+        "Re-evaluate the narrative around scene-evolving guidance to ensure the argument arc is fully supported by the empirical results."
+      ]
+    },
+    "D5_exploration_integrity": {
+      "score": 5,
+      "strengths": [
+        "Rich exploration tree with genuine dead-ends (e.g., FIFO cache, random sampling) and clear pivots.",
+        "Decision rationales are well-documented and trace back to specific research questions.",
+        "Negative results (e.g., action-only adaptation destroying video priors) are honestly reported and integrated into the narrative."
+      ],
+      "weaknesses": [
+        "None; the exploration graph is highly faithful and detailed."
+      ],
+      "suggestions": [
+        "Consider adding a dead-end or pivot regarding the mixed results of SE guidance at different data scales to reflect the actual experimental outcomes."
+      ]
+    },
+    "D6_methodological_rigor": {
+      "score": 4,
+      "strengths": [
+        "Comprehensive baselines in NAVSIM, covering classical, VLA, and WA methods.",
+        "Thorough ablation coverage for all major components (guidance, KV memory, video init, inference cost).",
+        "Clear metric-claim alignment (PDMS for planning, ADE/FDE for trajectory)."
+      ],
+      "weaknesses": [
+        "Lack of statistical reporting (error bars, variance across seeds) in all tables.",
+        "Ambiguous formatting in Tables 3 and 4 reduces clarity and reproducibility."
+      ],
+      "suggestions": [
+        "Include standard deviations or confidence intervals for all main results and ablations.",
+        "Standardize table formatting and ensure all symbols are clearly defined in the caption or a dedicated legend."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "D1_evidence_relevance",
+      "severity": "critical",
+      "observation": "C3's evidence (Table 3) directly contradicts the claim. The table shows the baseline (fixed global prompt, marked with ×) outperforming the proposed SE guidance (blank) at 4k and 100k data scales, refuting the claim that SE guidance improves performance across scales."
+    },
+    {
+      "dimension": "D3_scope_calibration",
+      "severity": "major",
+      "observation": "C1 overclaims 'overall outperforms' comparable methods, but Table 1 shows DriveVLA-W0t (90.2) slightly outperforms DriveWAM (90.1) in the same single-view (SV) setting."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "minor",
+      "observation": "Tables lack statistical reporting such as error bars, confidence intervals, or variance across multiple random seeds, relying solely on point estimates."
+    },
+    {
+      "dimension": "D6_methodological_rigor",
+      "severity": "suggestion",
+      "observation": "Evidence tables (e.g., Table 3, Table 4) use ambiguous symbols (blanks, ×, 一, x<>) without clear legend mapping in the table itself, hindering reproducibility and clarity."
+    }
+  ]
+}

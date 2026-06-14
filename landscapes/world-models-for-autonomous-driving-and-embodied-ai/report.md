@@ -1,6 +1,6 @@
 # world models for autonomous driving and embodied AI — 全景对比报告
 
-> 共 32 篇论文 | 生成日期 2026-06-14
+> 共 33 篇论文 | 生成日期 2026-06-15
 
 ## 一、统一指标对比表
 
@@ -12,6 +12,7 @@
 | DiffusionTransformerWorldActionModelForAVScenePrediction | 2026 | KID | 0.078 | 5.4 | 0.0144 |
 | DriveDreamerPolicyAGeometryGroundedWorld | 2026 | EPDMS | 88.7 | 2000.0 | 0.0444 |
 | DriveVAVideoActionModelsAreZeroShotDrivers | 2026 | PDMS | 90.9 | 5000.0 | 0.0182 |
+| DriveWAM: Video Generative Priors Enable Scalable World-Action Modeling for Autonomous Driving | 2026 | PDMS | 90.1 | 13000.0 | 0.0069 |
 | Enhancing Policy Learning with World-Action Model | 2026 | average_success_rate_PPO | 92.8 | 0.0 | 0.0 |
 | Fast-WAM: Do World Action Models Need Test-time Future Imagination? | 2026 | success_rate | 91.8 | 6000.0 | 0.0153 |
 | IDOLInverseDynamicsGuidedFuturePredictionForE2EAD | 2026 | EPDMS | 38.0 | 69.36 | 0.5479 |
@@ -22,7 +23,7 @@
 | Cosmos-Reason1: From Physical Common Sense to Embodied Reasoning | 2025 | 物理AI综合平均准确率（Avg.）——物理常识与具身推理联合基准，Cosmos-Reason1-7B 经 Physical AI RL 后训练 | 65.7 | 7000.0 | 0.0094 |
 | Cosmos-Transfer1: Conditional World Generation with Adaptive Multimodal Control | 2025 | Quality Score | 8.54 | 7000.0 | 0.0012 |
 | FromMasksToWorldsAHitchhikerSGuideToWorl | 2025 | fps | 24.0 | 0.0 | 0.0 |
-| ORIONAHolisticEndToEndAutonomousDrivingF | 2025 | Driving Score (DS) | 77.74 | 72000.0 | 0.0011 |
+| ORIONAHolisticEndToEndAutonomousDrivingF | 2025 | Driving Score (DS) | 77.74 | 7000.0 | 0.0111 |
 | TrainingAgentsInsideOfScalableWorldModel | 2025 | Success rates for Diamond | 0.7 | 2000.0 | 0.0003 |
 | World4DriveEndToEndAutonomousDrivingViaI | 2025 | L2 (m)↓ Avg. | 0.5 | 0.0 | 0.0 |
 | WorldSimulationWithVideoFoundationModels | 2025 | PAI-Bench-Predict-Image2World Overall Score | 0.81 | 2000.0 | 0.0004 |
@@ -45,4 +46,4 @@
 
 ## 三、趋势（trend，按年份）
 
-2018（906.0）→ 2026（89.4），avg_score (CarRacing-v0) 变化 -816.6。
+2018（906.0）→ 2026（90.1），avg_score (CarRacing-v0) 变化 -815.9。

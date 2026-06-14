@@ -1,0 +1,258 @@
+# Exploration Tree
+tree:
+- id: Q1
+  type: question
+  title: 能否把pretrained video diffusion transformer直接改造成驾驶policy core
+  support_level: explicit
+  source_refs:
+  - Abstract
+  - Sec 1
+  - Sec 3
+  description: 论文的中心问题是利用video generative priors补足VLM-centric policy缺少的dense temporal
+    dynamics，并将视频生成骨干改造成end-to-end autonomous driving policy。
+  children:
+  - id: D1
+    type: decision
+    title: 采用world-action而非VLM-centric policy core
+    support_level: explicit
+    source_refs:
+    - Sec 1
+    - Sec 2.1
+    - Sec 2.2
+    choice: 选择pretrained video generative model作为policy core，并把VLM作为语义guide。
+    alternatives: VLM-centric policy、把future video generation作为辅助branch、separate planner、discrete
+      video tokenizer或customized generation architecture。
+    children:
+    - id: Q2
+      type: question
+      title: 如何在同一骨干里联合建模未来世界与ego action
+      support_level: explicit
+      source_refs:
+      - Sec 3.1
+      description: 把驾驶clip分成连续chunks，在decision step k预测next video-action chunk，并使用历史H_k、ego
+        state e_k和guidance g_k作为条件。
+      children:
+      - id: D2
+        type: decision
+        title: 统一video-action temporal token sequence
+        support_level: explicit
+        source_refs:
+        - Sec 3.1 Tokenization
+        choice: 用pretrained VAE编码video chunk，用MLP action encoder编码ego-action chunk，并按时间顺序组织为统一token序列。
+        alternatives: 分离视频和动作模型、只预测动作、使用离散video tokenizer。
+      - id: D3
+        type: decision
+        title: 采用inverse-dynamics action generation
+        support_level: explicit
+        source_refs:
+        - Sec 3.1 World-action flow
+        choice: 先生成future video latent，再让action branch在future world latent和当前上下文条件下预测action
+          velocity。
+        alternatives: 独立trajectory head、只从当前观察直接回归动作。
+      - id: E1
+        type: experiment
+        title: 验证pretrained initialization和joint video supervision
+        support_level: explicit
+        source_refs:
+        - Table 4
+        - Sec 4.4 Video Foundation Model Adaptation
+        result: 完整配置最好；从头训练或去掉video supervision都会导致轨迹误差变差。
+        also_depends_on:
+        - D2
+        - D3
+- id: Q3
+  type: question
+  title: video foundation model缺少高层驾驶语义时如何补足
+  support_level: explicit
+  source_refs:
+  - Sec 3.2
+  description: 论文指出video foundation model有dense dynamic priors，但缺少semantic planning
+    ability，而驾驶决策还依赖route intent、traffic participants和decision-level semantics。
+  children:
+  - id: D4
+    type: decision
+    title: 引入scene-evolving driving guidance
+    support_level: explicit
+    source_refs:
+    - Sec 3.2 Causal guidance generation
+    - Appendix B
+    choice: 使用frozen Qwen3-VL-8B在每个decision step基于latest observation、recent ego trajectory和route
+      command生成g_k。
+    alternatives: 使用单一clip-level text condition或simple navigation commands。
+  - id: D5
+    type: decision
+    title: 使用temporally localized guidance injection
+    support_level: explicit
+    source_refs:
+    - Sec 3.2 Temporally localized guidance injection
+    choice: 通过block-diagonal text mask让目标chunk只关注对应guidance tokens。
+    alternatives: 让所有future chunks共享或交叉访问不同chunk的guidance。
+  - id: E2
+    type: experiment
+    title: 消融scene-evolving guidance
+    support_level: explicit
+    source_refs:
+    - Table 3
+    - Sec 4.4 Scene-evolving Driving Guidance
+    result: scene-evolving guidance在不同数据规模下都带来更好的轨迹预测趋势，且收益没有随训练数据增加而消失。
+    also_depends_on:
+    - D4
+    - D5
+  - id: P1
+    type: pivot
+    title: 从global prompt转向chunk-specific guidance
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    - Sec 4.4 Scene-evolving Driving Guidance
+    from: 固定global prompt作为text conditioning。
+    to: 每个chunk生成fresh guidance并进行temporally localized注入。
+    trigger: 固定语义条件不能随scene context和route intent演化，并可能不足以表达当前horizon的驾驶意图。
+- id: Q4
+  type: question
+  title: 长horizon autoregressive rollout如何控制KV cache成本
+  support_level: explicit
+  source_refs:
+  - Sec 3.3
+  description: full-window cache随rollout length线性增长，sliding-window或FIFO可能丢弃旧但关键的历史证据。
+  children:
+  - id: D6
+    type: decision
+    title: 采用modality-aware selective KV memory
+    support_level: explicit
+    source_refs:
+    - Sec 3.3 Modality-aware memory pools
+    - Sec 3.3 Relevance-redundancy retention
+    choice: 维护video和action两个bounded memory pools，并按relevance-redundancy score淘汰低分token。
+    alternatives: Full KV caching、FIFO sliding-window、single global cache。
+  - id: E3
+    type: experiment
+    title: 比较Full、FIFO和Selective KV memory
+    support_level: explicit
+    source_refs:
+    - Table 5
+    - Sec 4.4 Selective KV Memory
+    result: Selective在固定缓存预算下明显优于FIFO，并大幅接近Full的轨迹表现，同时降低长horizon开销。
+    also_depends_on:
+    - D6
+  - id: X1
+    type: dead_end
+    title: 单纯FIFO缓存不适合驾驶长时历史
+    support_level: explicit
+    source_refs:
+    - Sec 3.3
+    - Table 5
+    hypothesis: 只保留最近tokens即可近似完整历史。
+    failure_mode: age-based eviction可能移除旧但仍decision-relevant的车辆运动趋势或被遮挡行人线索，并保留新的冗余静态背景。
+    lesson: 长horizon驾驶缓存需要同时考虑当前relevance和历史redundancy，而不是只看时间新旧。
+- id: Q5
+  type: question
+  title: world-action modeling是否随训练数据规模持续改善
+  support_level: explicit
+  source_refs:
+  - Sec 4.4 Data Scaling
+  - Table 3
+  - Figure 5
+  description: 论文在PhysicalAI-Autonomous-Vehicles上固定训练流程，比较4k、20k、100k clips的数据规模。
+  children:
+  - id: E4
+    type: experiment
+    title: 数据规模扩展实验
+    support_level: explicit
+    source_refs:
+    - Table 3
+    - Figure 5
+    - Sec 4.4 Data Scaling
+    result: 随着训练clips增加，ADE@4s和FDE@4s总体改善，说明当前规模下尚未饱和。
+  - id: P2
+    type: pivot
+    title: 从组件有效性转向scalable foundation验证
+    support_level: explicit
+    source_refs:
+    - Sec 4.4 Data Scaling
+    - Sec 5
+    from: 只验证单个模块带来的局部收益。
+    to: 验证semantically guided world-action modeling作为可扩展policy foundation。
+    trigger: 数据规模从4k到100k时仍保持改进趋势。
+- id: Q6
+  type: question
+  title: 构建非平凡PhysicalAI子集是否影响评测代表性
+  support_level: explicit
+  source_refs:
+  - Sec 4.1 Datasets
+  - Appendix A
+  description: 论文使用VLM标注clip并过滤simple scenes，构造100k training subset和curated 1,000-clip
+    test subset。
+  children:
+  - id: D7
+    type: decision
+    title: 用Qwen3-VL-8B进行scene tagging和interest score筛选
+    support_level: explicit
+    source_refs:
+    - Appendix A
+    choice: 为每个clip采样front-view frames，按scene attributes、vulnerable road-user events、vehicle
+      interaction events、intersection and long-tail events生成tags并打分。
+    alternatives: 直接随机抽样全部训练和测试clips。
+  - id: X2
+    type: dead_end
+    title: 只用简单随机样本会稀释long-tail场景
+    support_level: explicit
+    source_refs:
+    - Appendix A
+    hypothesis: 随机抽样足以覆盖训练和评测所需场景。
+    failure_mode: ordinary driving scenarios可能主导分布，使rare-event和interaction-rich cases覆盖不足。
+    lesson: 论文选择保留高interest clips并混入普通样本，以同时覆盖long-tail和ordinary driving controls。
+- id: Q7
+  type: question
+  title: 推理成本是否可与VLA baseline接近
+  support_level: explicit
+  source_refs:
+  - Appendix C
+  description: 论文把per-chunk inference分为VLM guidance、video generation和action denoising三阶段，并在single
+    NVIDIA H20 GPU上比较。
+  children:
+  - id: E5
+    type: experiment
+    title: 降低action denoising steps的效率实验
+    support_level: explicit
+    source_refs:
+    - Appendix C
+    - Table 6
+    result: 减少action denoising steps显著降低动作阶段耗时，轨迹指标变化很小，并使per-chunk总成本接近Alpamayo-1.5。
+  - id: D8
+    type: decision
+    title: 每个chunk只查询一次VLM guidance
+    support_level: explicit
+    source_refs:
+    - Sec 3.2
+    - Appendix C
+    choice: 在chunk边界查询frozen Qwen3-VL-8B，并在所有denoising steps中复用guidance。
+    alternatives: 每帧或每个denoising step重复查询VLM。
+- id: Q8
+  type: question
+  title: 论文中的主要工程假设是什么
+  support_level: inferred
+  description: 分析推断,论文未显式声明：工程路径依赖一个足够强的pretrained video backbone、可离线缓存的VLM guidance、以及可接受的多GPU训练成本。
+  children:
+  - id: E6
+    type: experiment
+    title: 跨benchmark主结果验证
+    support_level: explicit
+    source_refs:
+    - Table 1
+    - Table 2
+    - Sec 4.3
+    result: DriveWAM在NAVSIM和PhysicalAI-Autonomous-Vehicles上均表现强，支持video-action policy设计的有效性。
+  - id: X3
+    type: dead_end
+    title: 只依赖动作监督会破坏video prior保留
+    support_level: explicit
+    source_refs:
+    - Table 4
+    - Sec 4.4 Video Foundation Model Adaptation
+    hypothesis: pretrained backbone只需动作适配，不需要继续video supervision。
+    failure_mode: 去掉video supervision后表现变差，论文解释为action-only adaptation无法保留WA policy
+      learning所需的generative video priors。
+    lesson: 在把video foundation model转成policy时，联合video-action flow-matching比单纯动作适配更关键。
+    also_depends_on:
+    - E1

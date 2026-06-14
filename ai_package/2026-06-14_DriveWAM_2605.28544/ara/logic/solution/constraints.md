@@ -1,0 +1,7 @@
+- 论文依赖 pretrained video foundation model；其能力来自视频生成先验，若预训练先验与 driving domain 不匹配，action generation 可能受限。
+- Video foundation model 本身缺少 semantic planning ability，因此需要 frozen VLM guidance；该 guidance 的质量受最新观测、recent ego trajectory、route command 与 prompt 影响。
+- 推理期先生成 future video latent 再生成 action，action 分支依赖 generated latent，存在 train-test mismatch，论文用 noisy-history augmentation 缓解但未给出更细公式。
+- Selective KV memory 是 inference-time、training-free 近似 full-history attention；它通过 cache selection 降低长时 rollout 成本，但仍可能驱逐后续才变得关键的历史证据。
+- Scene-evolving guidance 必须只使用 causally available context；若实现中误用 target chunk observation 或 later guidance，会破坏 causal consistency。
+- PhysicalAI-Autonomous-Vehicles 子集经过 VLM tagging 与 rule-based interest score 过滤，评估分布受 curated subset 构造影响。
+- 论文主要报告 NAVSIM 与 PhysicalAI-Autonomous-Vehicles 上的结果，没有证明该方案在所有 sensor layouts、route annotation regimes 或闭环真实部署中同样成立。
