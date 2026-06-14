@@ -207,7 +207,8 @@ ruff" is the validation gate.
    what the `/loop` tick actually drives. It composes
    `Ledger → make_spoke(seams) → (LS-1 lock) run_campaign_tick`. It is a function, not
    a CLI: the runtime agent must supply `discover`, `http`, `run_cli`, and the **five
-   analysis/audit model seams** (incl. the branch1 「评价」 `faithfulness_judge` note-writer, ADR-0012 rev).
+   analysis/audit model seams** (the Agent-isolated subset of the seven LLM seams —
+   incl. the branch1 「评价」 `faithfulness_judge` note-writer, ADR-0012 rev).
    See `SKILL.md` → "Wiring the model seams" for the exact contract.
    Invoking the module directly prints a usage message and exits (it is intentionally
    not a silent no-op):
