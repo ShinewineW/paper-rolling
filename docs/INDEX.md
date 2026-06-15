@@ -22,6 +22,7 @@
 |------|------|--------|-----------|
 | `guides/` | 操作指南 | 常青 how-to / 工作流 / 路线图——"怎么做、往哪走" | H1 + `创建日期 / 更新日期 / 适用环境` |
 | `guides/codemaps/` | 代码地图(代码感知) | 本仓库架构概览:绑定代码模块的常青地图(子系统拓扑、数据流、关键决策),供快速建立代码感知 | H1 + `范围`(子索引见 `guides/codemaps/INDEX.md`) |
+| `guides/release-notes/` | 发布说明 | 版本发布记录(`v<x.y.z>.md`):每个版本含什么、关键新增/变更、质量验证、使用方式、已知限制与延后项 | H1 + `版本 / 日期 / 状态 / 基准版本 / 范围` |
 | `spec/` | 设计文档 | 带生命周期的设计方案与实施计划(design + impl,`YYYY-MM-DD-<topic>.md`) | H1 + `日期 / 状态 / 作者 / 基准版本 / 目的` |
 | `spec/archive/` | 设计文档(归档) | 已过时或已落地的设计——从 `spec/` 移入,文件名不变 | 同上(状态改为"已归档") |
 | `spec/manual/` | 用户原始设想 | 操作者手写的项目总设想 / 原始需求脑暴(非规范设计文档,常青保留) | 自由(用户原文,豁免四分类与文件头) |
@@ -46,6 +47,9 @@
 - [`guides/codemaps/audit-gates.md`](guides/codemaps/audit-gates.md) — G2 数据保真 + G3 6 维严谨性密封。
 - [`guides/codemaps/discovery-sources.md`](guides/codemaps/discovery-sources.md) — 多源排序 (ADR-0001)、LLM 查询扩展。
 - [`guides/codemaps/output-branches.md`](guides/codemaps/output-branches.md) — 双链原子产出、LLM 人链、图形策展。
+
+### guides/release-notes/ — 发布说明
+- [`guides/release-notes/v1.0.0.md`](guides/release-notes/v1.0.0.md) — v1.0.0 首个稳定版:33 篇语料全合规 + 终审、引擎架构、本版关键新增(ADR-0013 终审层完成 / resolve_paper_paths / Tier-2 content_list 修复 / preflight 自检通告 / 终审 Stop hook / DriveWAM 全流水线验证)、质量与跨模型验收、使用方式、已知限制与延后项。
 
 ### spec/ — 设计文档(活跃)
 - [`spec/2026-06-14-final-review-revision-layer-impl.md`](spec/2026-06-14-final-review-revision-layer-impl.md) — 终审修订层:可选、操作者触发、主会话 workflow 逐篇 Opus agent 对已发布产物「修订或回炉」(全文件可改、信任+provenance、基底-vs-瓦砾度、FAIL 三类走复活赛 branch2 根、REVISE 后机械回归、final_review.json 标记)(依据 ADR-0013;草稿)。
